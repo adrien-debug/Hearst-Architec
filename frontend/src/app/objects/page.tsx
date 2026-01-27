@@ -1020,16 +1020,30 @@ export default function ObjectsPage() {
                   {/* 3D Preview */}
                   <div className="md:col-span-2">
                     <h3 className="font-semibold text-slate-900 border-b pb-2 mb-4">3D Preview</h3>
-                    <Object3DPreview
-                      dimensions={
-                        (selectedObject as InfraObject & { combinedDimensions?: { width: number; height: number; depth: number } }).combinedDimensions 
-                        || selectedObject.dimensions 
-                        || { width: 1000, height: 1000, depth: 1000 }
-                      }
-                      color={selectedObject.color || '#8AFD81'}
-                      name={selectedObject.name}
-                      autoRotate={true}
-                    />
+                    {(() => {
+                      const isModule = selectedObject.type === 'module';
+                      const moduleData = selectedObject as InfraObject & { 
+                        combinedDimensions?: { width: number; height: number; depth: number };
+                        baseObject?: { name: string; subtype?: string };
+                        attachments?: Array<{ name: string; mountPoint: string; dimensions?: { width: number; height: number; depth: number } }>;
+                      };
+                      
+                      return (
+                        <Object3DPreview
+                          dimensions={
+                            moduleData.combinedDimensions 
+                            || selectedObject.dimensions 
+                            || { width: 1000, height: 1000, depth: 1000 }
+                          }
+                          color={selectedObject.color || '#8AFD81'}
+                          name={selectedObject.name}
+                          autoRotate={true}
+                          isModule={isModule}
+                          baseObjectDimensions={isModule ? { width: 12196, height: 2896, depth: 2438 } : undefined}
+                          attachments={isModule ? moduleData.attachments : undefined}
+                        />
+                      );
+                    })()}
                   </div>
                 </div>
               )}
