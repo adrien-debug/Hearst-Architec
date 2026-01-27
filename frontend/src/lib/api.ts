@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3006';
+// Use empty string to leverage Next.js rewrites proxy (avoids CORS issues)
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface ApiResponse<T> {
   success: boolean;
