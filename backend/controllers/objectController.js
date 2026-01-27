@@ -641,73 +641,101 @@ exports.createFromTemplate = async (req, res) => {
 };
 
 /**
+ * Helper: Find object in mockObjects OR in templates
+ */
+function findObjectOrTemplate(objectId) {
+  // First, look in existing objects
+  for (const category of Object.keys(mockObjects)) {
+    const found = mockObjects[category].find(o => o.id === objectId);
+    if (found) {
+      return { object: found, category, isTemplate: false };
+    }
+  }
+  
+  // Then, look in templates (OBJECT_SUBTYPES)
+  for (const [category, subtypes] of Object.entries(OBJECT_SUBTYPES)) {
+    if (subtypes[objectId]) {
+      const template = subtypes[objectId];
+      return {
+        object: {
+          id: objectId,
+          name: template.description || objectId,
+          type: category.slice(0, -1), // containers -> container
+          subtype: objectId,
+          ...template
+        },
+        category,
+        isTemplate: true
+      };
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Create assembled module (container + cooling, etc.)
  * POST /api/objects/assemble
+ * Supports both existing objects AND templates directly
  */
 exports.assembleModule = async (req, res) => {
   try {
-    const { name, baseObjectId, attachments } = req.body;
+    const { name, baseObjectId, baseTemplateId, attachments, attachmentTemplates } = req.body;
 
-    if (!name || !baseObjectId) {
+    if (!name || (!baseObjectId && !baseTemplateId)) {
       return res.status(400).json({ 
-        error: 'Name and baseObjectId are required'
+        error: 'Name and baseObjectId (or baseTemplateId) are required'
       });
     }
 
-    // Find base object
-    let baseObject = null;
-    let baseCategory = null;
-    for (const category of Object.keys(mockObjects)) {
-      const found = mockObjects[category].find(o => o.id === baseObjectId);
-      if (found) {
-        baseObject = found;
-        baseCategory = category;
-        break;
-      }
+    // Find base object (from objects or templates)
+    const baseId = baseObjectId || baseTemplateId;
+    const baseResult = findObjectOrTemplate(baseId);
+    
+    if (!baseResult) {
+      return res.status(404).json({ error: `Base object/template '${baseId}' not found` });
     }
+    
+    const baseObject = baseResult.object;
 
-    if (!baseObject) {
-      return res.status(404).json({ error: 'Base object not found' });
-    }
-
-    // Validate attachments
+    // Resolve attachments (from objects or templates)
     const resolvedAttachments = [];
-    if (attachments && Array.isArray(attachments)) {
-      for (const att of attachments) {
-        let attObject = null;
-        for (const category of Object.keys(mockObjects)) {
-          const found = mockObjects[category].find(o => o.id === att.objectId);
-          if (found) {
-            attObject = found;
-            break;
-          }
-        }
-        if (attObject) {
-          resolvedAttachments.push({
-            objectId: att.objectId,
-            name: attObject.name,
-            mountPoint: att.mountPoint || 'top',
-            offset: att.offset || { x: 0, y: 0, z: 0 }
-          });
-        }
+    const allAttachments = [
+      ...(attachments || []),
+      ...(attachmentTemplates || []).map(t => ({ objectId: t.templateId || t.objectId, mountPoint: t.mountPoint }))
+    ];
+    
+    for (const att of allAttachments) {
+      const attResult = findObjectOrTemplate(att.objectId);
+      if (attResult) {
+        resolvedAttachments.push({
+          objectId: att.objectId,
+          name: attResult.object.name || attResult.object.description,
+          type: attResult.object.type,
+          mountPoint: att.mountPoint || 'side',
+          offset: att.offset || { x: baseObject.dimensions.width + 500, y: 0, z: 0 },
+          dimensions: attResult.object.dimensions,
+          isTemplate: attResult.isTemplate
+        });
       }
     }
 
-    // Calculate combined dimensions
+    // Calculate combined dimensions (side by side for EC2-DT)
+    let totalWidth = baseObject.dimensions.width;
     let totalHeight = baseObject.dimensions.height;
-    let totalPowerKW = baseObject.powerCapacityMW ? baseObject.powerCapacityMW * 1000 : 0;
+    let totalDepth = baseObject.dimensions.depth;
+    let totalPowerKW = baseObject.powerCapacityMW ? baseObject.powerCapacityMW * 1000 : (baseObject.maxPowerKW || 0);
     
     for (const att of resolvedAttachments) {
-      for (const category of Object.keys(mockObjects)) {
-        const attObj = mockObjects[category].find(o => o.id === att.objectId);
-        if (attObj) {
-          if (att.mountPoint === 'top') {
-            totalHeight += attObj.dimensions.height;
-          }
-          if (attObj.powerKW) {
-            totalPowerKW += attObj.powerKW;
-          }
-        }
+      if (att.mountPoint === 'top') {
+        totalHeight += att.dimensions.height;
+      } else if (att.mountPoint === 'side' || att.mountPoint === 'side-right') {
+        totalWidth += att.dimensions.width + 500; // 500mm gap
+      }
+      // Add cooling power consumption
+      const attResult = findObjectOrTemplate(att.objectId);
+      if (attResult && attResult.object.powerKW) {
+        totalPowerKW += attResult.object.powerKW;
       }
     }
 
@@ -717,18 +745,22 @@ exports.assembleModule = async (req, res) => {
       type: 'module',
       baseObject: {
         id: baseObject.id,
-        name: baseObject.name,
+        name: baseObject.name || baseObject.description,
         type: baseObject.type,
-        subtype: baseObject.subtype
+        subtype: baseObject.subtype || baseObject.id
       },
       attachments: resolvedAttachments,
       combinedDimensions: {
-        width: baseObject.dimensions.width,
+        width: totalWidth,
         height: totalHeight,
-        depth: baseObject.dimensions.depth
+        depth: totalDepth
       },
       totalPowerKW,
       machineSlots: baseObject.machineSlots || 0,
+      coolingCapacityKW: resolvedAttachments.reduce((sum, att) => {
+        const attResult = findObjectOrTemplate(att.objectId);
+        return sum + (attResult?.object?.heatDissipationKW || 0);
+      }, 0),
       color: '#10b981',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -736,7 +768,12 @@ exports.assembleModule = async (req, res) => {
 
     mockObjects.modules.push(assembledModule);
 
-    logger.info('Module assembled', { moduleId: assembledModule.id, baseObjectId, attachments: resolvedAttachments.length });
+    logger.info('Module assembled', { 
+      moduleId: assembledModule.id, 
+      baseId, 
+      attachments: resolvedAttachments.length,
+      fromTemplates: baseResult.isTemplate
+    });
 
     res.status(201).json({
       success: true,

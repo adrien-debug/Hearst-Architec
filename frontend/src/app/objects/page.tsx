@@ -116,6 +116,12 @@ export default function ObjectsPage() {
   const [assemblyName, setAssemblyName] = useState('');
   const [selectedBaseObject, setSelectedBaseObject] = useState<InfraObject | null>(null);
   const [selectedAttachments, setSelectedAttachments] = useState<Array<{ objectId: string; mountPoint: string }>>([]);
+  
+  // Template-based assembly
+  const [containerTemplates, setContainerTemplates] = useState<ObjectSubtype[]>([]);
+  const [coolingTemplates, setCoolingTemplates] = useState<ObjectSubtype[]>([]);
+  const [selectedContainerTemplate, setSelectedContainerTemplate] = useState<ObjectSubtype | null>(null);
+  const [selectedCoolingTemplate, setSelectedCoolingTemplate] = useState<ObjectSubtype | null>(null);
 
   // Convert all objects to 3D format for editor
   const convertTo3DObjects = useCallback(() => {
@@ -200,6 +206,14 @@ export default function ObjectsPage() {
     loadSubtypes(selectedCategory);
   }, [selectedCategory, loadSubtypes]);
 
+  // Load templates for assembly panel
+  useEffect(() => {
+    if (showAssembly) {
+      objectsApi.getSubtypes('containers').then(setContainerTemplates).catch(console.error);
+      objectsApi.getSubtypes('cooling').then(setCoolingTemplates).catch(console.error);
+    }
+  }, [showAssembly]);
+
   const handleSelectObject = (obj: InfraObject) => {
     setSelectedObject(obj);
     setEditingObject(null);
@@ -236,20 +250,31 @@ export default function ObjectsPage() {
   };
 
   const handleAssemble = async () => {
-    if (!assemblyName.trim() || !selectedBaseObject) return;
+    // Support both object-based and template-based assembly
+    const baseId = selectedBaseObject?.id || selectedContainerTemplate?.id;
+    if (!assemblyName.trim() || !baseId) return;
 
     setSaving(true);
     try {
+      // Build attachments from objects OR templates
+      const attachments = selectedBaseObject 
+        ? selectedAttachments 
+        : selectedCoolingTemplate 
+          ? [{ objectId: selectedCoolingTemplate.id, mountPoint: 'side' }]
+          : [];
+
       await objectsApi.assemble({
         name: assemblyName,
-        baseObjectId: selectedBaseObject.id,
-        attachments: selectedAttachments,
+        baseObjectId: baseId,
+        attachments,
       });
       await loadObjects();
       setShowAssembly(false);
       setAssemblyName('');
       setSelectedBaseObject(null);
       setSelectedAttachments([]);
+      setSelectedContainerTemplate(null);
+      setSelectedCoolingTemplate(null);
     } catch (error) {
       console.error('Failed to assemble module:', error);
     } finally {
@@ -563,96 +588,194 @@ export default function ObjectsPage() {
               </CardHeader>
               <CardContent className="p-6">
                 <div className="grid md:grid-cols-2 gap-6">
-                  {/* Base Container Selection */}
+                  {/* Base Container Selection - Templates OR Objects */}
                   <div>
                     <h4 className="font-semibold mb-3 flex items-center gap-2">
                       <Package className="w-4 h-4" />
-                      1. Select Base Container
+                      1. Select Container
                     </h4>
-                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                      {containerObjects.length === 0 ? (
-                        <p className="text-sm text-slate-400">Create containers first</p>
-                      ) : (
-                        containerObjects.map((obj) => (
-                          <button
-                            key={obj.id}
-                            onClick={() => setSelectedBaseObject(obj)}
-                            className={`w-full p-3 rounded-lg border text-left transition-all ${
-                              selectedBaseObject?.id === obj.id
-                                ? 'border-hearst-green bg-hearst-green/10'
-                                : 'border-slate-200 hover:border-hearst-green/50'
-                            }`}
-                          >
-                            <div className="font-medium text-sm">{obj.name}</div>
-                            <div className="text-xs text-slate-500">
-                              {(obj as InfraObject & { machineSlots?: number }).machineSlots} slots • 
-                              {(obj as InfraObject & { powerCapacityMW?: number }).powerCapacityMW} MW
-                            </div>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Cooling Attachment Selection */}
-                  <div>
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <Wind className="w-4 h-4" />
-                      2. Attach Cooling (Top Mount)
-                    </h4>
-                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                      {coolingObjects.length === 0 ? (
-                        <p className="text-sm text-slate-400">Create cooling units first</p>
-                      ) : (
-                        coolingObjects.map((obj) => {
-                          const isSelected = selectedAttachments.some(a => a.objectId === obj.id);
-                          return (
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                      {/* Show templates first */}
+                      {containerTemplates.length > 0 && (
+                        <>
+                          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Templates</p>
+                          {containerTemplates.map((template) => (
                             <button
-                              key={obj.id}
+                              key={template.id}
                               onClick={() => {
-                                if (isSelected) {
-                                  setSelectedAttachments(selectedAttachments.filter(a => a.objectId !== obj.id));
-                                } else {
-                                  setSelectedAttachments([...selectedAttachments, { objectId: obj.id, mountPoint: 'top' }]);
-                                }
+                                setSelectedContainerTemplate(template);
+                                setSelectedBaseObject(null);
                               }}
                               className={`w-full p-3 rounded-lg border text-left transition-all ${
-                                isSelected
+                                selectedContainerTemplate?.id === template.id
                                   ? 'border-hearst-green bg-hearst-green/10'
                                   : 'border-slate-200 hover:border-hearst-green/50'
                               }`}
                             >
                               <div className="flex items-center gap-2">
-                                {isSelected && <CheckCircle className="w-4 h-4 text-hearst-green" />}
+                                {selectedContainerTemplate?.id === template.id && (
+                                  <CheckCircle className="w-4 h-4 text-hearst-green" />
+                                )}
                                 <div>
-                                  <div className="font-medium text-sm">{obj.name}</div>
+                                  <div className="font-medium text-sm">{template.id}</div>
                                   <div className="text-xs text-slate-500">
-                                    {(obj as InfraObject & { capacityTons?: number }).capacityTons} tons • 
-                                    {(obj as InfraObject & { powerKW?: number }).powerKW} kW
+                                    {(template as ObjectSubtype & { machineSlots?: number }).machineSlots} slots • 
+                                    {(template as ObjectSubtype & { powerCapacityMW?: number }).powerCapacityMW} MW
                                   </div>
                                 </div>
                               </div>
                             </button>
-                          );
-                        })
+                          ))}
+                        </>
+                      )}
+                      {/* Show existing objects if any */}
+                      {containerObjects.length > 0 && (
+                        <>
+                          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mt-4">Created Objects</p>
+                          {containerObjects.map((obj) => (
+                            <button
+                              key={obj.id}
+                              onClick={() => {
+                                setSelectedBaseObject(obj);
+                                setSelectedContainerTemplate(null);
+                              }}
+                              className={`w-full p-3 rounded-lg border text-left transition-all ${
+                                selectedBaseObject?.id === obj.id
+                                  ? 'border-hearst-green bg-hearst-green/10'
+                                  : 'border-slate-200 hover:border-hearst-green/50'
+                              }`}
+                            >
+                              <div className="font-medium text-sm">{obj.name}</div>
+                              <div className="text-xs text-slate-500">
+                                {(obj as InfraObject & { machineSlots?: number }).machineSlots} slots • 
+                                {(obj as InfraObject & { powerCapacityMW?: number }).powerCapacityMW} MW
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Cooling Selection - Templates OR Objects */}
+                  <div>
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <Wind className="w-4 h-4" />
+                      2. Select Cooling (Side Mount)
+                    </h4>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                      {/* Show templates first */}
+                      {coolingTemplates.length > 0 && (
+                        <>
+                          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Templates</p>
+                          {coolingTemplates.map((template) => (
+                            <button
+                              key={template.id}
+                              onClick={() => {
+                                setSelectedCoolingTemplate(
+                                  selectedCoolingTemplate?.id === template.id ? null : template
+                                );
+                              }}
+                              className={`w-full p-3 rounded-lg border text-left transition-all ${
+                                selectedCoolingTemplate?.id === template.id
+                                  ? 'border-hearst-green bg-hearst-green/10'
+                                  : 'border-slate-200 hover:border-hearst-green/50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {selectedCoolingTemplate?.id === template.id && (
+                                  <CheckCircle className="w-4 h-4 text-hearst-green" />
+                                )}
+                                <div>
+                                  <div className="font-medium text-sm">{template.id}</div>
+                                  <div className="text-xs text-slate-500">
+                                    {(template as ObjectSubtype & { heatDissipationKW?: number }).heatDissipationKW || 
+                                     (template as ObjectSubtype & { capacityTons?: number }).capacityTons} 
+                                    {(template as ObjectSubtype & { heatDissipationKW?: number }).heatDissipationKW ? ' kW' : ' tons'} • 
+                                    {(template as ObjectSubtype & { powerKW?: number }).powerKW} kW
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {/* Show existing objects if any */}
+                      {coolingObjects.length > 0 && (
+                        <>
+                          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mt-4">Created Objects</p>
+                          {coolingObjects.map((obj) => {
+                            const isSelected = selectedAttachments.some(a => a.objectId === obj.id);
+                            return (
+                              <button
+                                key={obj.id}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedAttachments(selectedAttachments.filter(a => a.objectId !== obj.id));
+                                  } else {
+                                    setSelectedAttachments([...selectedAttachments, { objectId: obj.id, mountPoint: 'side' }]);
+                                  }
+                                  setSelectedCoolingTemplate(null);
+                                }}
+                                className={`w-full p-3 rounded-lg border text-left transition-all ${
+                                  isSelected
+                                    ? 'border-hearst-green bg-hearst-green/10'
+                                    : 'border-slate-200 hover:border-hearst-green/50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {isSelected && <CheckCircle className="w-4 h-4 text-hearst-green" />}
+                                  <div>
+                                    <div className="font-medium text-sm">{obj.name}</div>
+                                    <div className="text-xs text-slate-500">
+                                      {(obj as InfraObject & { capacityTons?: number }).capacityTons} tons • 
+                                      {(obj as InfraObject & { powerKW?: number }).powerKW} kW
+                                    </div>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {selectedBaseObject && (
-                  <div className="flex gap-4 items-end border-t pt-4 mt-4">
-                    <div className="flex-1">
-                      <Input
-                        label="Assembled Module Name"
-                        placeholder={`${selectedBaseObject.name} + Cooling`}
-                        value={assemblyName}
-                        onChange={(e) => setAssemblyName(e.target.value)}
-                      />
+                {/* Assembly Summary & Create Button */}
+                {(selectedBaseObject || selectedContainerTemplate) && (
+                  <div className="border-t pt-4 mt-4">
+                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                      <h5 className="font-semibold text-sm mb-2">Assembly Summary</h5>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-slate-500">Container:</span>
+                          <span className="ml-2 font-medium">
+                            {selectedContainerTemplate?.id || selectedBaseObject?.name}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Cooling:</span>
+                          <span className="ml-2 font-medium">
+                            {selectedCoolingTemplate?.id || 
+                             (selectedAttachments.length > 0 ? `${selectedAttachments.length} unit(s)` : 'None')}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <Button onClick={handleAssemble} disabled={saving || !assemblyName.trim()}>
-                      {saving ? 'Assembling...' : 'Create Assembled Module'}
-                    </Button>
+                    <div className="flex gap-4 items-end">
+                      <div className="flex-1">
+                        <Input
+                          label="Assembled Module Name"
+                          placeholder={`${selectedContainerTemplate?.id || selectedBaseObject?.name} + ${selectedCoolingTemplate?.id || 'Cooling'}`}
+                          value={assemblyName}
+                          onChange={(e) => setAssemblyName(e.target.value)}
+                        />
+                      </div>
+                      <Button onClick={handleAssemble} disabled={saving || !assemblyName.trim()}>
+                        {saving ? 'Assembling...' : 'Create Assembled Module'}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
