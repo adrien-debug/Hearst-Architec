@@ -939,38 +939,77 @@ export default function ObjectsPage() {
 
                   <div className="space-y-4">
                     <h3 className="font-semibold text-slate-900 border-b pb-2">Dimensions</h3>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div className="p-4 bg-slate-50 rounded-xl">
-                        <span className="text-xs text-slate-500">Width</span>
-                        <p className="text-xl font-bold text-slate-900">{selectedObject.dimensions?.width || 0}</p>
-                        <span className="text-xs text-slate-400">mm</span>
-                      </div>
-                      <div className="p-4 bg-slate-50 rounded-xl">
-                        <span className="text-xs text-slate-500">Height</span>
-                        <p className="text-xl font-bold text-slate-900">{selectedObject.dimensions?.height || 0}</p>
-                        <span className="text-xs text-slate-400">mm</span>
-                      </div>
-                      <div className="p-4 bg-slate-50 rounded-xl">
-                        <span className="text-xs text-slate-500">Depth</span>
-                        <p className="text-xl font-bold text-slate-900">{selectedObject.dimensions?.depth || 0}</p>
-                        <span className="text-xs text-slate-400">mm</span>
-                      </div>
-                    </div>
+                    {(() => {
+                      // Use combinedDimensions for modules, dimensions for other objects
+                      const dims = (selectedObject as InfraObject & { combinedDimensions?: { width: number; height: number; depth: number } }).combinedDimensions 
+                        || selectedObject.dimensions 
+                        || { width: 0, height: 0, depth: 0 };
+                      return (
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div className="p-4 bg-slate-50 rounded-xl">
+                            <span className="text-xs text-slate-500">Width</span>
+                            <p className="text-xl font-bold text-slate-900">{dims.width.toLocaleString()}</p>
+                            <span className="text-xs text-slate-400">mm</span>
+                          </div>
+                          <div className="p-4 bg-slate-50 rounded-xl">
+                            <span className="text-xs text-slate-500">Height</span>
+                            <p className="text-xl font-bold text-slate-900">{dims.height.toLocaleString()}</p>
+                            <span className="text-xs text-slate-400">mm</span>
+                          </div>
+                          <div className="p-4 bg-slate-50 rounded-xl">
+                            <span className="text-xs text-slate-500">Depth</span>
+                            <p className="text-xl font-bold text-slate-900">{dims.depth.toLocaleString()}</p>
+                            <span className="text-xs text-slate-400">mm</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Technical Specifications */}
                   <div className="md:col-span-2">
                     <h3 className="font-semibold text-slate-900 border-b pb-2 mb-4">Technical Specifications</h3>
+                    
+                    {/* Special display for modules - show base object info */}
+                    {selectedObject.type === 'module' && (selectedObject as InfraObject & { baseObject?: { name: string; subtype?: string } }).baseObject && (
+                      <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                        <span className="text-xs text-emerald-600 font-medium uppercase">Base Container</span>
+                        <p className="font-bold text-emerald-900">
+                          {(selectedObject as InfraObject & { baseObject?: { name: string; subtype?: string } }).baseObject?.name}
+                        </p>
+                        <p className="text-sm text-emerald-700">
+                          {(selectedObject as InfraObject & { baseObject?: { name: string; subtype?: string } }).baseObject?.subtype}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Attachments for modules */}
+                    {selectedObject.type === 'module' && (selectedObject as InfraObject & { attachments?: Array<{ name: string; mountPoint: string }> }).attachments && 
+                     (selectedObject as InfraObject & { attachments?: Array<{ name: string; mountPoint: string }> }).attachments!.length > 0 && (
+                      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                        <span className="text-xs text-blue-600 font-medium uppercase">Attachments</span>
+                        {(selectedObject as InfraObject & { attachments?: Array<{ name: string; mountPoint: string }> }).attachments?.map((att, idx) => (
+                          <div key={idx} className="mt-2">
+                            <p className="font-bold text-blue-900">{att.name}</p>
+                            <p className="text-sm text-blue-700">Mount: {att.mountPoint}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {Object.entries(selectedObject)
-                        .filter(([key]) => !['id', 'name', 'type', 'subtype', 'dimensions', 'color', 'createdAt', 'updatedAt', 'description', 'mountingPoints', 'compatibleCooling'].includes(key))
+                        .filter(([key]) => !['id', 'name', 'type', 'subtype', 'dimensions', 'combinedDimensions', 'color', 'createdAt', 'updatedAt', 'description', 'mountingPoints', 'compatibleCooling', 'baseObject', 'attachments'].includes(key))
+                        .filter(([, value]) => value !== null && value !== undefined)
                         .map(([key, value]) => (
                           <div key={key} className="p-3 bg-slate-50 rounded-lg">
                             <span className="text-xs text-slate-500 capitalize">
                               {key.replace(/([A-Z])/g, ' $1')}
                             </span>
                             <p className="font-bold text-slate-900">
-                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                              {typeof value === 'object' 
+                                ? (Array.isArray(value) ? value.join(', ') : JSON.stringify(value))
+                                : String(value)}
                             </p>
                           </div>
                         ))
@@ -982,7 +1021,11 @@ export default function ObjectsPage() {
                   <div className="md:col-span-2">
                     <h3 className="font-semibold text-slate-900 border-b pb-2 mb-4">3D Preview</h3>
                     <Object3DPreview
-                      dimensions={selectedObject.dimensions || { width: 1000, height: 1000, depth: 1000 }}
+                      dimensions={
+                        (selectedObject as InfraObject & { combinedDimensions?: { width: number; height: number; depth: number } }).combinedDimensions 
+                        || selectedObject.dimensions 
+                        || { width: 1000, height: 1000, depth: 1000 }
+                      }
                       color={selectedObject.color || '#8AFD81'}
                       name={selectedObject.name}
                       autoRotate={true}
