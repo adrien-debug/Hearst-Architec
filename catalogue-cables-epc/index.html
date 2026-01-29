@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catalogue EPC - Chemins de Câbles</title>
+  <style>
+    :root {
+      --primary: #1a365d;
+      --primary-light: #2c5282;
+      --secondary: #38a169;
+      --accent: #ed8936;
+      --bg: #f7fafc;
+      --card-bg: #ffffff;
+      --text: #2d3748;
+      --text-light: #718096;
+      --border: #e2e8f0;
+      --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+
+    .header h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+    .header p { opacity: 0.9; font-size: 1rem; }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+
+    /* Recherche et contrôles */
+    .controls {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .search-bar {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 200px;
+      padding: 0.75rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .view-btn {
+      padding: 0.75rem 1rem;
+      border: 2px solid var(--border);
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 1rem;
+    }
+
+    .view-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .view-btn:hover:not(.active) {
+      border-color: var(--primary);
+    }
+
+    /* Filtres */
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .filter-group h4 {
+      font-size: 0.85rem;
+      color: var(--text-light);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .filter-chip {
+      padding: 0.4rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--card-bg);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .filter-chip:hover {
+      border-color: var(--primary);
+    }
+
+    .filter-chip.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .filter-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background: var(--secondary);
+      color: white;
+    }
+
+    .btn-primary:hover { background: #2f855a; }
+
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover { background: #cbd5e0; }
+
+    .btn-accent {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-accent:hover { background: #dd6b20; }
+
+    .results-count {
+      font-size: 0.9rem;
+      color: var(--text-light);
+      margin-left: auto;
+    }
+
+    /* Vue Cartes */
+    .cards-view {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+
+    .card-header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 1rem 1.25rem;
+    }
+
+    .card-header h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .card-header .famille-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      padding: 0.2rem 0.6rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      margin-top: 0.5rem;
+    }
+
+    .card-body {
+      padding: 1.25rem;
+    }
+
+    .card-section {
+      margin-bottom: 1rem;
+    }
+
+    .card-section:last-child { margin-bottom: 0; }
+
+    .card-section h4 {
+      font-size: 0.75rem;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.4rem;
+    }
+
+    .card-section p {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .tag {
+      padding: 0.2rem 0.5rem;
+      background: var(--bg);
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: var(--text-light);
+    }
+
+    .tag.usage { background: #ebf8ff; color: #2b6cb0; }
+    .tag.materiau { background: #f0fff4; color: #276749; }
+    .tag.env { background: #faf5ff; color: #6b46c1; }
+
+    .nom-en {
+      font-style: italic;
+      color: var(--text-light);
+      font-size: 0.85rem;
+    }
+
+    .card-footer {
+      padding: 1rem 1.25rem;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+    }
+
+    .copy-btn {
+      width: 100%;
+      padding: 0.6rem;
+      background: var(--secondary);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .copy-btn:hover { background: #2f855a; }
+    .copy-btn.copied { background: var(--accent); }
+
+    /* Vue Tableau */
+    .table-view {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: var(--primary);
+      color: white;
+      text-align: left;
+      padding: 1rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tr:hover td {
+      background: var(--bg);
+    }
+
+    td.nom-cell {
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    td .small-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      margin-top: 0.25rem;
+    }
+
+    td .small-tag {
+      padding: 0.15rem 0.4rem;
+      background: var(--bg);
+      border-radius: 3px;
+      font-size: 0.7rem;
+    }
+
+    .table-copy-btn {
+      padding: 0.4rem 0.8rem;
+      background: var(--secondary);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .table-copy-btn:hover { background: #2f855a; }
+    .table-copy-btn.copied { background: var(--accent); }
+
+    /* Glossaire */
+    .glossaire {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .glossaire h2 {
+      color: var(--primary);
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .glossaire-table {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .glossaire table {
+      font-size: 0.85rem;
+    }
+
+    .glossaire th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--primary);
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* Hidden */
+    .hidden { display: none !important; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header h1 { font-size: 1.4rem; }
+      
+      .cards-view {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-group {
+        grid-column: span 1;
+      }
+
+      .search-bar {
+        flex-direction: column;
+      }
+
+      .view-toggle {
+        width: 100%;
+      }
+
+      .view-btn {
+        flex: 1;
+        text-align: center;
+      }
+
+      .results-count {
+        width: 100%;
+        margin-left: 0;
+        text-align: center;
+      }
+
+      .filter-actions {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    /* Print styles */
+    @media print {
+      .controls, .filter-actions, .copy-btn, .table-copy-btn {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>📋 Catalogue EPC - Chemins de Câbles</h1>
+    <p>Référentiel technique des passages et cheminements de câbles</p>
+  </header>
+
+  <div class="container">
+    <section class="controls">
+      <div class="search-bar">
+        <input type="text" class="search-input" id="searchInput" placeholder="Rechercher par nom, description, mots-clés...">
+        <div class="view-toggle">
+          <button class="view-btn active" data-view="cards">🃏 Cartes</button>
+          <button class="view-btn" data-view="table">📊 Tableau</button>
+        </div>
+      </div>
+
+      <div class="filters" id="filtersContainer"></div>
+
+      <div class="filter-actions">
+        <button class="btn btn-secondary" id="resetFilters">↻ Réinitialiser</button>
+        <button class="btn btn-primary" id="exportJson">📥 Export JSON</button>
+        <button class="btn btn-accent" id="exportCsv">📥 Export CSV</button>
+        <span class="results-count" id="resultsCount">0 résultats</span>
+      </div>
+    </section>
+
+    <main id="mainContent">
+      <div class="cards-view" id="cardsView"></div>
+      <div class="table-view hidden" id="tableView">
+        <div class="table-wrapper">
+          <table id="dataTable">
+            <thead>
+              <tr>
+                <th>Nom FR</th>
+                <th>Famille</th>
+                <th>Description</th>
+                <th>Usages</th>
+                <th>Nom EN</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <section class="glossaire">
+      <h2>
+        Glossaire EPC FR/EN
+        <button class="btn btn-accent" id="exportGlossaire">📥 Export CSV Glossaire</button>
+      </h2>
+      <div class="glossaire-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Terme FR</th>
+              <th>Terme EN</th>
+              <th>Famille</th>
+            </tr>
+          </thead>
+          <tbody id="glossaireBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast">Texte copié !</div>
+
+  <script>
+    // ============================================================
+    // DONNÉES DU CATALOGUE
+    // ============================================================
+    const data = [
+      // A) Termes génériques
+      {
+        id: "chemin-de-cables",
+        famille: "Générique",
+        nom_fr: "Chemin de câbles",
+        noms_alternatifs: ["CDC", "Cable tray"],
+        nom_en: "Cable tray",
+        description: "Terme générique désignant tout système de support permettant le cheminement horizontal ou vertical des câbles électriques et de données dans une installation.",
+        materiaux: ["Acier", "Inox", "Alu", "PVC-PE"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Data", "Puissance", "Contrôle-commande"],
+        notes_epc: ["Spécifier charge admissible", "Préciser finition (galva, peint, inox)", "Dimensionnement selon nombre de câbles"],
+        exemple_phrase_epc: "L'Entrepreneur shall fournir et installer les chemins de câbles conformément aux plans d'exécution approuvés. / The Contractor shall supply and install cable trays in accordance with approved shop drawings."
+      },
+      {
+        id: "cheminement-de-cables",
+        famille: "Générique",
+        nom_fr: "Cheminement de câbles",
+        noms_alternatifs: ["Parcours de câbles", "Circuit de câbles"],
+        nom_en: "Cable routing / Cable pathway",
+        description: "Ensemble du parcours emprunté par les câbles depuis leur origine jusqu'à leur destination, incluant tous les supports et traversées.",
+        materiaux: ["Mixte"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Data", "Puissance"],
+        notes_epc: ["Définir les points de départ et d'arrivée", "Identifier les traversées de locaux"],
+        exemple_phrase_epc: "Le cheminement de câbles shall être optimisé pour minimiser les longueurs et éviter les zones à risque. / Cable routing shall be optimized to minimize lengths and avoid hazardous areas."
+      },
+      {
+        id: "support-de-cables",
+        famille: "Générique",
+        nom_fr: "Support de câbles",
+        noms_alternatifs: ["Fixation de câbles", "Attache câbles"],
+        nom_en: "Cable support",
+        description: "Tout élément mécanique permettant de maintenir les câbles en position, incluant colliers, clips, attaches et structures porteuses.",
+        materiaux: ["Acier", "Inox", "Alu"],
+        environnements: ["Indoor", "Outdoor", "Corrosif"],
+        usages: ["BT", "MT", "Data", "Puissance", "Contrôle-commande"],
+        notes_epc: ["Compatibilité électrochimique avec les câbles", "Résistance à la corrosion si outdoor"],
+        exemple_phrase_epc: "Les supports de câbles shall être dimensionnés pour supporter 1.5 fois la charge nominale des câbles. / Cable supports shall be sized to withstand 1.5 times the nominal cable load."
+      },
+      {
+        id: "passage-de-cables",
+        famille: "Générique",
+        nom_fr: "Passage de câbles",
+        noms_alternatifs: ["Transit de câbles", "Couloir de câbles"],
+        nom_en: "Cable passage / Cable run",
+        description: "Zone ou espace dédié au transit des câbles à travers un bâtiment ou une structure, pouvant être horizontal ou vertical.",
+        materiaux: ["Mixte"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Data", "Puissance"],
+        notes_epc: ["Respecter les rayons de courbure", "Prévoir espaces de réserve 20-30%"],
+        exemple_phrase_epc: "Les passages de câbles shall prévoir une réserve de capacité de 30% minimum. / Cable passages shall provide a minimum 30% spare capacity."
+      },
+      {
+        id: "reseau-chemins-cables",
+        famille: "Générique",
+        nom_fr: "Réseau de chemins de câbles",
+        noms_alternatifs: ["Infrastructure de câblage", "Système de cheminement"],
+        nom_en: "Cable tray network / Cable ladder system",
+        description: "Ensemble interconnecté des chemins de câbles formant l'infrastructure complète de distribution électrique et data d'un site.",
+        materiaux: ["Acier", "Inox", "Alu"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Data", "Puissance", "Contrôle-commande"],
+        notes_epc: ["Cohérence des dimensions sur l'ensemble du réseau", "Plan de masse et numérotation"],
+        exemple_phrase_epc: "Le réseau de chemins de câbles shall être conçu comme un système unifié avec des dimensions standardisées. / The cable tray network shall be designed as a unified system with standardized dimensions."
+      },
+
+      // B) Aériens (métalliques)
+      {
+        id: "chemin-cables-metallique",
+        famille: "Aérien",
+        nom_fr: "Chemin de câbles métallique",
+        noms_alternatifs: ["CDC métal", "Tablette métallique"],
+        nom_en: "Metal cable tray",
+        description: "Chemin de câbles fabriqué en acier galvanisé, inox ou aluminium, offrant résistance mécanique et protection électromagnétique.",
+        materiaux: ["Acier", "Inox", "Alu"],
+        environnements: ["Indoor", "Outdoor", "Corrosif"],
+        usages: ["BT", "MT", "Puissance", "Contrôle-commande"],
+        notes_epc: ["Épaisseur minimum selon charge", "Traitement de surface adapté à l'environnement", "Mise à la terre continue"],
+        exemple_phrase_epc: "Les chemins de câbles métalliques shall être en acier galvanisé à chaud selon EN 10346 épaisseur min. 1.5mm. / Metal cable trays shall be hot-dip galvanized steel per EN 10346 min. thickness 1.5mm."
+      },
+      {
+        id: "chemin-cables-perfore",
+        famille: "Aérien",
+        nom_fr: "Chemin de câbles perforé",
+        noms_alternatifs: ["CDC perforé", "Tablette perforée"],
+        nom_en: "Perforated cable tray",
+        description: "Chemin de câbles à fond plein avec perforations régulières permettant la ventilation des câbles et la fixation par colliers.",
+        materiaux: ["Acier", "Inox", "Alu"],
+        environnements: ["Indoor"],
+        usages: ["BT", "Data", "Contrôle-commande"],
+        notes_epc: ["Taux de perforation à préciser", "Adapté aux câbles nécessitant ventilation"],
+        exemple_phrase_epc: "Les chemins de câbles perforés shall avoir un taux de perforation de 30% minimum pour assurer la ventilation. / Perforated cable trays shall have a minimum 30% perforation rate to ensure ventilation."
+      },
+      {
+        id: "chemin-cables-plein",
+        famille: "Aérien",
+        nom_fr: "Chemin de câbles plein",
+        noms_alternatifs: ["CDC fermé", "Tablette pleine", "Goulotte pleine"],
+        nom_en: "Solid bottom cable tray",
+        description: "Chemin de câbles à fond continu sans perforations, offrant une protection maximale contre les chutes d'objets et les projections.",
+        materiaux: ["Acier", "Inox", "Alu"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Puissance"],
+        notes_epc: ["Protection mécanique renforcée", "Attention à l'échauffement des câbles"],
+        exemple_phrase_epc: "Les chemins de câbles pleins shall être utilisés dans les zones exposées aux projections ou chutes d'objets. / Solid bottom cable trays shall be used in areas exposed to splashes or falling objects."
+      },
+      {
+        id: "chemin-cables-grillage",
+        famille: "Aérien",
+        nom_fr: "Chemin de câbles grillagé (panier)",
+        noms_alternatifs: ["CDC fil", "Panier à câbles", "CDC filaire", "Wire basket"],
+        nom_en: "Wire mesh cable tray / Cable basket",
+        description: "Structure en fil d'acier soudé formant un panier ouvert, léger et économique, idéal pour les câbles data et courants faibles.",
+        materiaux: ["Acier", "Inox"],
+        environnements: ["Indoor"],
+        usages: ["Data", "Contrôle-commande", "BT"],
+        notes_epc: ["Charge admissible réduite vs perforé", "Installation rapide", "Excellente ventilation"],
+        exemple_phrase_epc: "Les chemins de câbles grillagés shall être réservés aux câbles data et courants faibles avec charge max. 15 kg/m. / Wire mesh cable trays shall be reserved for data and low current cables with max. load 15 kg/m."
+      },
+      {
+        id: "chemin-cables-echelle",
+        famille: "Aérien",
+        nom_fr: "Chemin de câbles échelle",
+        noms_alternatifs: ["CDC à barreaux", "Échelle à câbles", "Ladder tray"],
+        nom_en: "Cable ladder / Ladder cable tray",
+        description: "Structure composée de deux longerons latéraux reliés par des barreaux transversaux, conçue pour les charges lourdes et grandes portées.",
+        materiaux: ["Acier", "Inox", "Alu"],
+        environnements: ["Indoor", "Outdoor", "Corrosif"],
+        usages: ["MT", "Puissance", "BT"],
+        notes_epc: ["Portée max. entre supports selon charge", "Barreaux espacés 300mm max.", "Idéal pour gros câbles"],
+        exemple_phrase_epc: "Les chemins de câbles échelle shall avoir des barreaux espacés de 300mm max. et supporter une charge de 100 kg/m min. / Cable ladders shall have rungs spaced max. 300mm apart and support min. 100 kg/m load."
+      },
+      {
+        id: "chemin-cables-suspendu",
+        famille: "Aérien",
+        nom_fr: "Chemin de câbles suspendu",
+        noms_alternatifs: ["CDC suspendu", "Chemin suspendu en plafond"],
+        nom_en: "Suspended cable tray",
+        description: "Chemin de câbles fixé en sous-face de dalle ou charpente par des tiges filetées ou câbles de suspension.",
+        materiaux: ["Acier", "Inox", "Alu"],
+        environnements: ["Indoor"],
+        usages: ["BT", "Data", "Puissance", "Contrôle-commande"],
+        notes_epc: ["Hauteur libre sous chemin", "Longueur max. des tiges", "Contreventement si nécessaire"],
+        exemple_phrase_epc: "Les chemins de câbles suspendus shall maintenir une hauteur libre de 2.5m minimum sous le chemin. / Suspended cable trays shall maintain a minimum 2.5m clear height below the tray."
+      },
+      {
+        id: "chemin-cables-autoportant",
+        famille: "Aérien",
+        nom_fr: "Chemin de câbles autoportant",
+        noms_alternatifs: ["CDC autoporteur", "Chemin grande portée"],
+        nom_en: "Self-supporting cable tray",
+        description: "Chemin de câbles renforcé conçu pour franchir de grandes portées sans support intermédiaire (jusqu'à 6-9m selon modèle).",
+        materiaux: ["Acier", "Alu"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["Puissance", "MT", "BT"],
+        notes_epc: ["Flèche max. admissible L/200", "Vérifier charge admissible vs portée"],
+        exemple_phrase_epc: "Les chemins de câbles autoportants shall permettre des portées de 6m min. avec flèche max. L/200 à pleine charge. / Self-supporting cable trays shall allow min. 6m spans with max. deflection L/200 at full load."
+      },
+      {
+        id: "console-chemin-cables",
+        famille: "Aérien",
+        nom_fr: "Console de chemin de câbles",
+        noms_alternatifs: ["Équerre de support", "Support mural CDC"],
+        nom_en: "Cable tray bracket / Wall bracket",
+        description: "Support mural en forme de L ou triangulaire permettant la fixation latérale des chemins de câbles sur les murs ou poteaux.",
+        materiaux: ["Acier", "Inox"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Data", "Puissance"],
+        notes_epc: ["Charge admissible par console", "Espacement max. des consoles", "Type de fixation murale"],
+        exemple_phrase_epc: "Les consoles shall être espacées de 1.5m max. et supporter 50% de charge en plus de la charge nominale. / Brackets shall be spaced max. 1.5m apart and support 50% more than nominal load."
+      },
+      {
+        id: "potence-chemin-cables",
+        famille: "Aérien",
+        nom_fr: "Potence de chemin de câbles",
+        noms_alternatifs: ["Bras de support", "Support déporté"],
+        nom_en: "Cable tray cantilever / Cantilever arm",
+        description: "Support en porte-à-faux permettant de supporter les chemins de câbles à distance des murs ou structures porteuses.",
+        materiaux: ["Acier", "Inox"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Puissance"],
+        notes_epc: ["Longueur de bras et charge admissible", "Fixation sur IPN ou mur béton"],
+        exemple_phrase_epc: "Les potences shall avoir une portée de 600mm min. et être fixées sur structure béton ou métallique. / Cantilevers shall have min. 600mm reach and be fixed to concrete or steel structure."
+      },
+      {
+        id: "portique-cables",
+        famille: "Aérien",
+        nom_fr: "Portique de câbles",
+        noms_alternatifs: ["Portique porte-câbles", "Structure de franchissement"],
+        nom_en: "Cable gantry / Cable bridge",
+        description: "Structure autoportante formant un cadre ou pont permettant le passage des chemins de câbles au-dessus des voies de circulation.",
+        materiaux: ["Acier", "Alu"],
+        environnements: ["Outdoor", "Indoor"],
+        usages: ["MT", "Puissance", "BT"],
+        notes_epc: ["Hauteur libre sous portique", "Portée et charge admissible", "Fondations"],
+        exemple_phrase_epc: "Les portiques shall assurer une hauteur libre de 5m au-dessus des voies de circulation engins. / Cable gantries shall provide 5m clear height above vehicle circulation routes."
+      },
+      {
+        id: "structure-metallique-porte-cables",
+        famille: "Aérien",
+        nom_fr: "Structure métallique porte-câbles",
+        noms_alternatifs: ["Rack à câbles", "Ossature de câblage"],
+        nom_en: "Cable support steelwork",
+        description: "Ensemble de charpente métallique dédié au support de multiples niveaux de chemins de câbles sur un site industriel.",
+        materiaux: ["Acier"],
+        environnements: ["Outdoor", "Indoor"],
+        usages: ["Puissance", "MT", "BT", "Data"],
+        notes_epc: ["Plans de structure IFC", "Charges par niveau", "Protection anticorrosion"],
+        exemple_phrase_epc: "La structure porte-câbles shall être dimensionnée pour 3 niveaux de chemins avec réserve 30%. / Cable support steelwork shall be sized for 3 tray levels with 30% spare capacity."
+      },
+
+      // C) Enterrés / au sol
+      {
+        id: "caniveau-technique",
+        famille: "Enterré",
+        nom_fr: "Caniveau technique",
+        noms_alternatifs: ["Caniveau de câbles", "Caniveau électrique", "Tranchée couverte"],
+        nom_en: "Cable trench / Cable duct",
+        description: "Ouvrage en béton enterré ou au sol recouvert de dalles amovibles permettant le passage et l'accessibilité des câbles.",
+        materiaux: ["Béton", "Acier"],
+        environnements: ["Outdoor", "Indoor", "Zone humide"],
+        usages: ["MT", "Puissance", "BT"],
+        notes_epc: ["Dimensions intérieures", "Classe de charge des dalles", "Drainage et étanchéité"],
+        exemple_phrase_epc: "Les caniveaux techniques shall avoir des dimensions min. 400x400mm et dalles classe C250. / Cable trenches shall have min. 400x400mm dimensions and C250 class covers."
+      },
+      {
+        id: "tranchee-technique",
+        famille: "Enterré",
+        nom_fr: "Tranchée technique",
+        noms_alternatifs: ["Tranchée câbles", "Tranchée enterrée"],
+        nom_en: "Cable trench / Underground trench",
+        description: "Excavation linéaire dans le sol destinée à recevoir des câbles posés sur lit de sable avec remblai et grillage avertisseur.",
+        materiaux: ["Béton", "PVC-PE"],
+        environnements: ["Outdoor", "Zone humide"],
+        usages: ["MT", "Puissance", "BT"],
+        notes_epc: ["Profondeur min. 80cm sous circulation", "Grillage avertisseur", "Lit de sable 10cm"],
+        exemple_phrase_epc: "Les tranchées shall avoir une profondeur de 80cm min. sous voirie avec grillage avertisseur rouge. / Trenches shall have min. 80cm depth under roads with red warning mesh."
+      },
+      {
+        id: "galerie-technique",
+        famille: "Enterré",
+        nom_fr: "Galerie technique",
+        noms_alternatifs: ["Tunnel technique", "Galerie câbles", "Galerie de service"],
+        nom_en: "Cable tunnel / Utility tunnel",
+        description: "Ouvrage souterrain visitable de grandes dimensions permettant le passage de multiples réseaux (électrique, data, fluides).",
+        materiaux: ["Béton"],
+        environnements: ["Indoor", "Zone humide"],
+        usages: ["MT", "Puissance", "BT", "Data"],
+        notes_epc: ["Hauteur libre min. 2m", "Ventilation", "Éclairage de sécurité", "Issues de secours"],
+        exemple_phrase_epc: "La galerie technique shall avoir une hauteur libre de 2.2m et des issues de secours tous les 100m. / The cable tunnel shall have 2.2m clear height and emergency exits every 100m."
+      },
+      {
+        id: "fourreau-cables",
+        famille: "Enterré",
+        nom_fr: "Fourreau de câbles",
+        noms_alternatifs: ["Gaine de passage", "Tube de protection"],
+        nom_en: "Cable conduit / Cable duct",
+        description: "Tube rigide ou semi-rigide enterré permettant le tirage et la protection des câbles contre les contraintes mécaniques du sol.",
+        materiaux: ["PVC-PE", "Acier"],
+        environnements: ["Outdoor", "Zone humide"],
+        usages: ["MT", "BT", "Data"],
+        notes_epc: ["Diamètre adapté au câble (1.5x)", "Aiguillage pour tirage", "Courbes à grand rayon"],
+        exemple_phrase_epc: "Les fourreaux shall avoir un diamètre min. 1.5x le diamètre du câble et être aiguillés. / Conduits shall have min. 1.5x cable diameter and be fitted with draw wire."
+      },
+      {
+        id: "gaine-enterree",
+        famille: "Enterré",
+        nom_fr: "Gaine enterrée",
+        noms_alternatifs: ["Conduit enterré", "Canalisation électrique enterrée"],
+        nom_en: "Buried conduit / Underground duct",
+        description: "Système de tubes enterrés formant un réseau pour la distribution des câbles sur un site, avec regards de tirage intermédiaires.",
+        materiaux: ["PVC-PE", "Béton"],
+        environnements: ["Outdoor", "Zone humide"],
+        usages: ["MT", "BT", "Data"],
+        notes_epc: ["Pente min. 1% vers regards", "Regards tous les 50m", "Chambres de tirage aux changements de direction"],
+        exemple_phrase_epc: "Les gaines enterrées shall avoir une pente de 1% min. vers les regards espacés de 50m max. / Buried conduits shall have min. 1% slope towards manholes spaced max. 50m apart."
+      },
+      {
+        id: "tpc",
+        famille: "Enterré",
+        nom_fr: "TPC (Tube de Protection des Câbles)",
+        noms_alternatifs: ["Tube TPC", "Gaine annelée", "Tube annelé"],
+        nom_en: "Corrugated cable duct / HDPE duct",
+        description: "Tube annelé en polyéthylène haute densité rouge pour l'électricité, utilisé pour la protection des câbles enterrés.",
+        materiaux: ["PVC-PE"],
+        environnements: ["Outdoor", "Zone humide"],
+        usages: ["BT", "MT"],
+        notes_epc: ["Couleur normalisée (rouge = élec)", "Diamètre 40 à 200mm courant", "Résistance à l'écrasement SN4/SN8"],
+        exemple_phrase_epc: "Les TPC shall être de couleur rouge NF, diamètre adapté et résistance SN8 sous voirie. / Corrugated ducts shall be NF red, appropriate diameter and SN8 rating under roads."
+      },
+      {
+        id: "reservation-beton-cables",
+        famille: "Enterré",
+        nom_fr: "Réservation béton pour câbles",
+        noms_alternatifs: ["Réservation de traversée", "Trémie câbles"],
+        nom_en: "Cable sleeve / Cable opening",
+        description: "Ouverture ou passage prévu dans les éléments en béton (dalles, murs, radiers) pour permettre le passage ultérieur des câbles.",
+        materiaux: ["Béton"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Puissance", "Data"],
+        notes_epc: ["Dimensions avec tolérance +50mm", "Ferraillage de renfort", "Rebouchage coupe-feu si nécessaire"],
+        exemple_phrase_epc: "Les réservations shall avoir des dimensions majorées de 50mm et un renfort de ferraillage périphérique. / Openings shall have dimensions increased by 50mm with peripheral reinforcement."
+      },
+
+      // D) Fermés / protégés
+      {
+        id: "goulotte-electrique",
+        famille: "Fermé",
+        nom_fr: "Goulotte électrique",
+        noms_alternatifs: ["Goulotte industrielle", "Goulotte technique", "Moulure industrielle"],
+        nom_en: "Cable trunking / Wireway",
+        description: "Profilé fermé avec couvercle clipsable ou vissé permettant le passage protégé des câbles, généralement fixé en apparent.",
+        materiaux: ["Acier", "PVC-PE", "Alu"],
+        environnements: ["Indoor"],
+        usages: ["BT", "Data", "Contrôle-commande"],
+        notes_epc: ["Indice de protection IP4X min.", "Cloisonnement si multi-courants", "Accessoires (angles, dérivations)"],
+        exemple_phrase_epc: "Les goulottes shall être IP4X minimum avec cloison de séparation puissance/data. / Cable trunking shall be min. IP4X with power/data separation partition."
+      },
+      {
+        id: "coffrage-cables",
+        famille: "Fermé",
+        nom_fr: "Coffrage de câbles",
+        noms_alternatifs: ["Habillage de câbles", "Capotage câbles"],
+        nom_en: "Cable enclosure / Cable boxing",
+        description: "Habillage métallique ou composite fermant un ensemble de câbles pour des raisons esthétiques, de protection ou de sécurité.",
+        materiaux: ["Acier", "Alu"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "Puissance"],
+        notes_epc: ["Démontable pour maintenance", "Ventilation si nécessaire", "Finition architecturale"],
+        exemple_phrase_epc: "Le coffrage shall être démontable sans outillage spécial et permettre l'accès aux câbles. / The enclosure shall be removable without special tools and allow cable access."
+      },
+      {
+        id: "chemin-cables-capote",
+        famille: "Fermé",
+        nom_fr: "Chemin de câbles capoté",
+        noms_alternatifs: ["CDC avec couvercle", "CDC protégé"],
+        nom_en: "Covered cable tray",
+        description: "Chemin de câbles standard équipé d'un couvercle de protection contre la poussière, les chutes d'objets ou les contacts accidentels.",
+        materiaux: ["Acier", "Inox", "Alu"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Puissance"],
+        notes_epc: ["Couvercle clipsé ou boulonné", "Ventilation latérale si fermé"],
+        exemple_phrase_epc: "Les chemins de câbles capotés shall avoir des couvercles facilement démontables et des ouïes de ventilation. / Covered cable trays shall have easily removable covers and ventilation slots."
+      },
+      {
+        id: "chemin-cables-ferme",
+        famille: "Fermé",
+        nom_fr: "Chemin de câbles fermé",
+        noms_alternatifs: ["CDC clos", "Gaine de câbles"],
+        nom_en: "Enclosed cable tray",
+        description: "Système de cheminement entièrement fermé offrant une protection IP élevée contre l'environnement agressif ou la poussière.",
+        materiaux: ["Acier", "Inox", "Alu"],
+        environnements: ["Outdoor", "Corrosif", "Zone humide"],
+        usages: ["BT", "MT", "Puissance"],
+        notes_epc: ["Indice IP selon environnement", "Joints d'étanchéité", "Purges condensation"],
+        exemple_phrase_epc: "Les chemins de câbles fermés shall offrir une protection IP55 minimum avec purges de condensation. / Enclosed cable trays shall provide min. IP55 protection with condensation drains."
+      },
+      {
+        id: "enveloppe-protection-cables",
+        famille: "Fermé",
+        nom_fr: "Enveloppe de protection de câbles",
+        noms_alternatifs: ["Blindage de câbles", "Caisson de protection"],
+        nom_en: "Cable protection enclosure",
+        description: "Dispositif de protection renforcée pour câbles dans les zones à risques mécaniques, chimiques ou d'explosion.",
+        materiaux: ["Acier", "Inox"],
+        environnements: ["Outdoor", "Corrosif", "Zone humide"],
+        usages: ["MT", "Puissance"],
+        notes_epc: ["Certification ATEX si zone explosible", "Résistance aux chocs IK10"],
+        exemple_phrase_epc: "Les enveloppes de protection shall être certifiées ATEX Zone 2 dans les zones classées. / Protection enclosures shall be ATEX Zone 2 certified in classified areas."
+      },
+
+      // E) Traversées
+      {
+        id: "traversee-paroi",
+        famille: "Traversée",
+        nom_fr: "Traversée de paroi",
+        noms_alternatifs: ["Passage de mur", "Pénétration murale"],
+        nom_en: "Wall penetration / Wall transit",
+        description: "Dispositif permettant le passage des câbles à travers une paroi verticale tout en maintenant les caractéristiques requises (étanchéité, coupe-feu).",
+        materiaux: ["Acier", "Mixte"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Data", "Puissance", "Contrôle-commande"],
+        notes_epc: ["Calfeutrement coupe-feu si REI", "Étanchéité si différentiel de pression", "Passage de câbles supplémentaires"],
+        exemple_phrase_epc: "Les traversées de paroi shall maintenir le degré coupe-feu de la paroi traversée (EI120 min.). / Wall penetrations shall maintain the fire rating of the penetrated wall (min. EI120)."
+      },
+      {
+        id: "traversee-dalle",
+        famille: "Traversée",
+        nom_fr: "Traversée de dalle",
+        noms_alternatifs: ["Passage de plancher", "Trémie de câbles"],
+        nom_en: "Floor penetration / Slab transit",
+        description: "Dispositif permettant le passage vertical des câbles à travers une dalle béton avec maintien des performances coupe-feu.",
+        materiaux: ["Acier", "Béton"],
+        environnements: ["Indoor"],
+        usages: ["BT", "MT", "Data", "Puissance"],
+        notes_epc: ["Cadre métallique de renfort", "Système coupe-feu certifié", "Rehausse si nécessaire"],
+        exemple_phrase_epc: "Les traversées de dalle shall être équipées de systèmes coupe-feu certifiés EI120 avec cadre renforcé. / Floor penetrations shall be fitted with EI120 certified firestop systems and reinforced frames."
+      },
+      {
+        id: "traversee-coupe-feu",
+        famille: "Traversée",
+        nom_fr: "Traversée coupe-feu",
+        noms_alternatifs: ["Transit CF", "Pénétration REI", "Obturation coupe-feu"],
+        nom_en: "Firestop penetration / Fire barrier transit",
+        description: "Système de traversée avec dispositif d'obturation coupe-feu (mastic, coussin, bloc) maintenant l'intégrité au feu de la paroi.",
+        materiaux: ["Mixte"],
+        environnements: ["Indoor"],
+        usages: ["BT", "MT", "Data", "Puissance", "Contrôle-commande"],
+        notes_epc: ["PV de classement au feu", "Compatible avec types de câbles", "Plan de calfeutrement"],
+        exemple_phrase_epc: "Les traversées coupe-feu shall utiliser des systèmes certifiés avec PV d'essai pour les câbles installés. / Firestop penetrations shall use certified systems with test reports for installed cable types."
+      },
+      {
+        id: "passe-cables",
+        famille: "Traversée",
+        nom_fr: "Passe-câbles",
+        noms_alternatifs: ["Passe-fil", "Grommet"],
+        nom_en: "Cable grommet / Cable entry",
+        description: "Élément souple (caoutchouc, élastomère) permettant le passage étanche d'un ou plusieurs câbles à travers une paroi mince ou tôle.",
+        materiaux: ["Mixte", "PVC-PE"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "Data", "Contrôle-commande"],
+        notes_epc: ["Diamètre adapté au câble", "Indice IP", "Résistance UV si outdoor"],
+        exemple_phrase_epc: "Les passe-câbles shall assurer une étanchéité IP67 et être résistants aux UV en extérieur. / Cable grommets shall provide IP67 sealing and be UV resistant for outdoor use."
+      },
+      {
+        id: "manchon-traversee",
+        famille: "Traversée",
+        nom_fr: "Manchon de traversée",
+        noms_alternatifs: ["Sleeve de traversée", "Tube de réservation"],
+        nom_en: "Sleeve / Wall sleeve",
+        description: "Tube métallique ou PVC scellé dans la paroi définissant le passage des câbles, permettant un calfeutrement ultérieur.",
+        materiaux: ["Acier", "PVC-PE"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Data", "Puissance"],
+        notes_epc: ["Diamètre majoré de 20mm min.", "Collerette anti-feu si nécessaire", "Pose avant coulage béton"],
+        exemple_phrase_epc: "Les manchons shall avoir un diamètre majoré de 30% et des collerettes d'étanchéité des deux côtés. / Sleeves shall have 30% increased diameter and sealing collars on both sides."
+      },
+      {
+        id: "fourreau-traversee",
+        famille: "Traversée",
+        nom_fr: "Fourreau de traversée",
+        noms_alternatifs: ["Conduit de traversée", "Tube de passage"],
+        nom_en: "Transit conduit / Crossing duct",
+        description: "Conduit installé à travers une paroi ou sous une voie de circulation pour permettre le passage protégé des câbles.",
+        materiaux: ["Acier", "PVC-PE"],
+        environnements: ["Outdoor", "Indoor"],
+        usages: ["BT", "MT", "Data"],
+        notes_epc: ["Résistance à l'écrasement sous voirie", "Bouchon d'obturation provisoire", "Aiguillage"],
+        exemple_phrase_epc: "Les fourreaux de traversée sous voirie shall être en acier ou PEHD classe SN8 minimum. / Transit conduits under roads shall be steel or HDPE min. SN8 class."
+      },
+      {
+        id: "penetration-electrique",
+        famille: "Traversée",
+        nom_fr: "Pénétration électrique",
+        noms_alternatifs: ["Transit électrique", "Passage câbles HT"],
+        nom_en: "Electrical penetration",
+        description: "Système de traversée spécialement conçu pour les câbles électriques haute ou moyenne tension avec exigences spécifiques.",
+        materiaux: ["Acier", "Mixte"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["MT", "Puissance"],
+        notes_epc: ["Distances d'isolement", "Mise à la terre", "Ventilation si échauffement"],
+        exemple_phrase_epc: "Les pénétrations électriques MT shall respecter les distances d'isolement selon IEC 60071. / MV electrical penetrations shall comply with clearance distances per IEC 60071."
+      },
+      {
+        id: "reservation-passage-cables",
+        famille: "Traversée",
+        nom_fr: "Réservation de passage de câbles",
+        noms_alternatifs: ["Réservation câbles", "Trémie réservée"],
+        nom_en: "Cable opening reservation",
+        description: "Espace prévu et dimensionné dans la structure pour le passage futur des câbles, avant coulage du béton.",
+        materiaux: ["Béton"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Data", "Puissance"],
+        notes_epc: ["Plans de réservation précoces", "Coffrage récupérable", "Marge de 30% minimum"],
+        exemple_phrase_epc: "Les réservations shall être dimensionnées avec 30% de marge et validées avant coulage béton. / Reservations shall be sized with 30% margin and approved before concrete pour."
+      },
+      {
+        id: "passe-cloison",
+        famille: "Traversée",
+        nom_fr: "Passe-cloison",
+        noms_alternatifs: ["Passe-mur", "Traversée cloison légère"],
+        nom_en: "Partition transit / Bulkhead fitting",
+        description: "Dispositif de traversée pour cloisons légères (plaques de plâtre, panneaux sandwich) avec finition esthétique.",
+        materiaux: ["Acier", "PVC-PE"],
+        environnements: ["Indoor"],
+        usages: ["BT", "Data", "Contrôle-commande"],
+        notes_epc: ["Adapté à l'épaisseur de cloison", "Finition affleurante", "Capacité d'ajout de câbles"],
+        exemple_phrase_epc: "Les passe-cloisons shall être adaptés à l'épaisseur de paroi et permettre l'ajout ultérieur de câbles. / Partition transits shall suit wall thickness and allow future cable additions."
+      },
+
+      // F) Raccordement / interface
+      {
+        id: "point-raccordement",
+        famille: "Raccordement",
+        nom_fr: "Point de raccordement",
+        noms_alternatifs: ["Point de connexion", "Point de branchement"],
+        nom_en: "Connection point / Termination point",
+        description: "Emplacement désigné où les câbles sont terminés et raccordés aux équipements ou au réseau de distribution.",
+        materiaux: ["Acier", "Mixte"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Data", "Puissance", "Contrôle-commande"],
+        notes_epc: ["Accessibilité maintenance", "Repérage et identification", "Espace de travail NFC 15-100"],
+        exemple_phrase_epc: "Les points de raccordement shall être accessibles et identifiés selon le plan de repérage approuvé. / Connection points shall be accessible and identified per the approved labeling plan."
+      },
+      {
+        id: "interface-electrique",
+        famille: "Raccordement",
+        nom_fr: "Interface électrique",
+        noms_alternatifs: ["Limite de fourniture", "Point de livraison"],
+        nom_en: "Electrical interface / Demarcation point",
+        description: "Point de séparation contractuelle entre deux lots, deux fournisseurs ou entre l'installation et le réseau public.",
+        materiaux: ["Mixte"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "MT", "Puissance"],
+        notes_epc: ["Définition claire des responsabilités", "Documentation interface", "Essais de réception"],
+        exemple_phrase_epc: "L'interface électrique shall être documentée avec schémas et répartition des responsabilités par lot. / The electrical interface shall be documented with diagrams and responsibilities per lot."
+      },
+      {
+        id: "zone-raccordement",
+        famille: "Raccordement",
+        nom_fr: "Zone de raccordement",
+        noms_alternatifs: ["Aire de raccordement", "Espace de terminaison"],
+        nom_en: "Termination area / Connection zone",
+        description: "Espace dédié aux opérations de raccordement des câbles, dimensionné pour permettre le travail en sécurité.",
+        materiaux: ["Mixte"],
+        environnements: ["Indoor"],
+        usages: ["BT", "MT", "Data", "Puissance", "Contrôle-commande"],
+        notes_epc: ["Dimensions selon NFC 15-100", "Éclairage 500 lux min.", "Prises de service"],
+        exemple_phrase_epc: "Les zones de raccordement shall avoir un éclairage de 500 lux et un accès dégagé sur 3 côtés min. / Termination areas shall have 500 lux lighting and clear access on min. 3 sides."
+      },
+      {
+        id: "boite-jonction",
+        famille: "Raccordement",
+        nom_fr: "Boîte de jonction",
+        noms_alternatifs: ["Boîte de connexion", "Boîte de raccordement"],
+        nom_en: "Junction box",
+        description: "Coffret permettant la connexion et la dérivation de plusieurs câbles avec protection des connexions.",
+        materiaux: ["Acier", "PVC-PE"],
+        environnements: ["Indoor", "Outdoor", "Corrosif"],
+        usages: ["BT", "Data", "Contrôle-commande"],
+        notes_epc: ["Indice IP adapté à l'environnement", "Borniers de raccordement", "Accessibilité pour maintenance"],
+        exemple_phrase_epc: "Les boîtes de jonction shall être IP55 minimum en extérieur avec borniers débrochables. / Junction boxes shall be min. IP55 outdoors with disconnectable terminals."
+      },
+      {
+        id: "boite-tirage",
+        famille: "Raccordement",
+        nom_fr: "Boîte de tirage",
+        noms_alternatifs: ["Chambre de tirage", "Regard de tirage"],
+        nom_en: "Pull box / Pulling chamber",
+        description: "Coffret ou chambre intermédiaire permettant de faciliter le tirage des câbles sur les longs parcours ou aux changements de direction.",
+        materiaux: ["Béton", "Acier"],
+        environnements: ["Indoor", "Outdoor", "Zone humide"],
+        usages: ["MT", "BT", "Data"],
+        notes_epc: ["Dimensions suffisantes pour rayon de courbure", "Tous les 50-80m selon câbles", "Drainage si enterrée"],
+        exemple_phrase_epc: "Les boîtes de tirage shall être installées tous les 50m et aux changements de direction >45°. / Pull boxes shall be installed every 50m and at direction changes >45°."
+      },
+      {
+        id: "boite-derivation",
+        famille: "Raccordement",
+        nom_fr: "Boîte de dérivation",
+        noms_alternatifs: ["Boîte de distribution", "Boîte de répartition"],
+        nom_en: "Distribution box / Branch box",
+        description: "Coffret permettant de dériver un circuit principal vers plusieurs circuits secondaires.",
+        materiaux: ["Acier", "PVC-PE"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "Contrôle-commande"],
+        notes_epc: ["Repérage des départs", "Sectionnement possible", "Protection des dérivations"],
+        exemple_phrase_epc: "Les boîtes de dérivation shall permettre le sectionnement individuel de chaque départ avec repérage. / Distribution boxes shall allow individual isolation of each outgoing circuit with labeling."
+      },
+      {
+        id: "coffret-interface",
+        famille: "Raccordement",
+        nom_fr: "Coffret d'interface",
+        noms_alternatifs: ["Armoire d'interface", "Coffret de raccordement"],
+        nom_en: "Interface cabinet / Marshalling cabinet",
+        description: "Armoire regroupant les raccordements entre différents systèmes ou entre câbles terrain et câbles de contrôle.",
+        materiaux: ["Acier", "Inox"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["Contrôle-commande", "Data", "BT"],
+        notes_epc: ["Borniers de marshalling", "Séparation des tensions", "Repérage détaillé"],
+        exemple_phrase_epc: "Les coffrets d'interface shall avoir des borniers à double étage avec repérage fil à fil. / Interface cabinets shall have double-tier terminals with wire-by-wire labeling."
+      },
+      {
+        id: "bornier-raccordement",
+        famille: "Raccordement",
+        nom_fr: "Bornier de raccordement",
+        noms_alternatifs: ["Réglette de bornes", "Rail de borniers"],
+        nom_en: "Terminal block / Terminal strip",
+        description: "Ensemble de bornes de connexion montées sur rail permettant le raccordement ordonné des conducteurs.",
+        materiaux: ["Mixte"],
+        environnements: ["Indoor"],
+        usages: ["BT", "Contrôle-commande", "Data"],
+        notes_epc: ["Section admissible des conducteurs", "Marquage des bornes", "Accessoires de test"],
+        exemple_phrase_epc: "Les borniers shall être de type débrochable avec marquage individuel et section 2.5mm² min. / Terminal blocks shall be disconnectable type with individual marking and min. 2.5mm² rating."
+      },
+      {
+        id: "point-livraison-bt",
+        famille: "Raccordement",
+        nom_fr: "Point de livraison BT (PCC)",
+        noms_alternatifs: ["PCC", "Point de comptage", "Limite de concession"],
+        nom_en: "Point of common coupling / Delivery point",
+        description: "Point contractuel de livraison de l'énergie électrique basse tension entre le distributeur et l'installation cliente.",
+        materiaux: ["Mixte"],
+        environnements: ["Indoor", "Outdoor"],
+        usages: ["BT", "Puissance"],
+        notes_epc: ["Comptage à définir avec distributeur", "Accessibilité releveur", "Protection amont/aval"],
+        exemple_phrase_epc: "Le PCC shall être conforme aux exigences du distributeur local avec accès 24h/24 pour relevé. / The PCC shall comply with local utility requirements with 24/7 access for meter reading."
+      },
+
+      // G) Busduct (barres préfabriquées)
+      {
+        id: "busduct-bt",
+        famille: "Busduct",
+        nom_fr: "Busduct BT",
+        noms_alternatifs: ["Canalisation électrique préfabriquée", "Barre blindée BT"],
+        nom_en: "LV busduct / LV busbar trunking",
+        description: "Système de distribution électrique préfabriqué en usine composé de barres conductrices isolées dans une enveloppe métallique.",
+        materiaux: ["Alu", "Acier"],
+        environnements: ["Indoor"],
+        usages: ["BT", "Puissance"],
+        notes_epc: ["Intensité nominale et de court-circuit", "Indice IP", "Linéaires et accessoires"],
+        exemple_phrase_epc: "Le busduct BT shall être dimensionné pour In=2500A et Icc=65kA pendant 1s. / LV busduct shall be rated for In=2500A and Isc=65kA for 1s."
+      },
+      {
+        id: "jeu-barres-prefabrique",
+        famille: "Busduct",
+        nom_fr: "Jeu de barres préfabriqué",
+        noms_alternatifs: ["Barres préfab", "Système de barres"],
+        nom_en: "Prefabricated busbar / Busbar assembly",
+        description: "Ensemble de conducteurs barres isolés et assemblés en usine, prêt à installer sur site avec connectique standardisée.",
+        materiaux: ["Alu", "Acier"],
+        environnements: ["Indoor"],
+        usages: ["BT", "Puissance"],
+        notes_epc: ["Essais usine FAT", "Transport et manutention", "Montage et serrage"],
+        exemple_phrase_epc: "Les jeux de barres shall être testés en usine (FAT) avec rapport d'essai joint à la livraison. / Busbar assemblies shall be factory tested (FAT) with test report included at delivery."
+      },
+      {
+        id: "busbar-trunking-system",
+        famille: "Busduct",
+        nom_fr: "Busbar trunking system (BTS)",
+        noms_alternatifs: ["Système BTS", "Canalisation barres"],
+        nom_en: "Busbar trunking system",
+        description: "Système modulaire complet de distribution par barres incluant éléments droits, coudes, dérivations et boîtes de raccordement.",
+        materiaux: ["Alu", "Acier"],
+        environnements: ["Indoor"],
+        usages: ["BT", "Puissance"],
+        notes_epc: ["Conformité IEC 61439-6", "Classe IP selon installation", "Dilatation thermique"],
+        exemple_phrase_epc: "Le BTS shall être conforme IEC 61439-6 avec joints de dilatation tous les 30m. / The BTS shall comply with IEC 61439-6 with expansion joints every 30m."
+      },
+      {
+        id: "ligne-barres",
+        famille: "Busduct",
+        nom_fr: "Ligne de barres",
+        noms_alternatifs: ["Canalisation de barres", "Distribution par barres"],
+        nom_en: "Busbar line / Busway",
+        description: "Parcours principal de distribution électrique par busduct reliant le transformateur ou le TGBT aux tableaux divisionnaires.",
+        materiaux: ["Alu", "Acier"],
+        environnements: ["Indoor"],
+        usages: ["Puissance", "BT"],
+        notes_epc: ["Tracé et supports", "Calcul de chute de tension", "Équilibrage des phases"],
+        exemple_phrase_epc: "La ligne de barres shall avoir une chute de tension max. de 1% entre TGBT et dernier tableau. / The busbar line shall have max. 1% voltage drop between MSB and last distribution board."
+      },
+      {
+        id: "chemin-busduct",
+        famille: "Busduct",
+        nom_fr: "Chemin de busduct",
+        noms_alternatifs: ["Tracé busduct", "Parcours busduct"],
+        nom_en: "Busduct routing",
+        description: "Itinéraire planifié pour l'installation du busduct incluant les changements de direction et les traversées.",
+        materiaux: ["Mixte"],
+        environnements: ["Indoor"],
+        usages: ["Puissance", "BT"],
+        notes_epc: ["Plan de cheminement 3D", "Coordination avec autres lots", "Réservations nécessaires"],
+        exemple_phrase_epc: "Le chemin de busduct shall être coordonné avec le lot CVC pour éviter les interférences. / Busduct routing shall be coordinated with HVAC lot to avoid interferences."
+      },
+      {
+        id: "support-busduct",
+        famille: "Busduct",
+        nom_fr: "Support de busduct",
+        noms_alternatifs: ["Console busduct", "Fixation busduct"],
+        nom_en: "Busduct support / Busduct hanger",
+        description: "Structure de supportage spécifique au busduct permettant de reprendre le poids et les efforts de dilatation.",
+        materiaux: ["Acier"],
+        environnements: ["Indoor"],
+        usages: ["Puissance", "BT"],
+        notes_epc: ["Espacement selon fabricant", "Point fixe et points glissants", "Charge admissible"],
+        exemple_phrase_epc: "Les supports shall être installés selon les prescriptions du fabricant avec alternance point fixe/glissant. / Supports shall be installed per manufacturer's specifications with alternating fixed/sliding points."
+      },
+      {
+        id: "coude-busduct",
+        famille: "Busduct",
+        nom_fr: "Coude de busduct",
+        noms_alternatifs: ["Angle busduct", "Changement de direction"],
+        nom_en: "Busduct elbow / Busduct bend",
+        description: "Élément préfabriqué permettant le changement de direction (horizontal ou vertical) du parcours du busduct.",
+        materiaux: ["Alu", "Acier"],
+        environnements: ["Indoor"],
+        usages: ["Puissance", "BT"],
+        notes_epc: ["Angle standard 90° ou sur mesure", "Maintien des caractéristiques électriques", "Accessibilité boulonnerie"],
+        exemple_phrase_epc: "Les coudes shall maintenir l'intensité nominale de la ligne droite sans déclassement. / Elbows shall maintain the straight section nominal current without derating."
+      },
+      {
+        id: "boite-raccordement-busduct",
+        famille: "Busduct",
+        nom_fr: "Boîte de raccordement busduct",
+        noms_alternatifs: ["Boîte de jonction busduct", "Coffret de raccordement barres"],
+        nom_en: "Busduct connection box / Busduct joint box",
+        description: "Coffret permettant la connexion du busduct aux équipements (transformateur, tableau) ou entre tronçons de busduct.",
+        materiaux: ["Acier"],
+        environnements: ["Indoor"],
+        usages: ["Puissance", "BT"],
+        notes_epc: ["Couple de serrage des connexions", "Indice IP", "Accès pour thermographie"],
+        exemple_phrase_epc: "Les boîtes de raccordement shall permettre le contrôle thermographique sans démontage du capot. / Connection boxes shall allow thermographic inspection without cover removal."
+      },
+      {
+        id: "tap-off-box",
+        famille: "Busduct",
+        nom_fr: "Tap-off box",
+        noms_alternatifs: ["Boîte de dérivation busduct", "Prise busduct"],
+        nom_en: "Tap-off box / Plug-in unit",
+        description: "Boîtier enfichable sur le busduct permettant de dériver l'alimentation vers un tableau ou un équipement.",
+        materiaux: ["Acier"],
+        environnements: ["Indoor"],
+        usages: ["BT", "Puissance"],
+        notes_epc: ["Calibre et type de protection", "Embrochage/débrochage sous tension si prévu", "Verrouillage mécanique"],
+        exemple_phrase_epc: "Les tap-off box shall être équipées de fusibles ou disjoncteurs calibrés selon la charge. / Tap-off boxes shall be fitted with fuses or circuit breakers rated for the load."
+      }
+    ];
+
+    // ============================================================
+    // FILTRES CONFIGURATION
+    // ============================================================
+    const filterConfig = {
+      famille: {
+        label: "Famille",
+        values: ["Générique", "Aérien", "Enterré", "Fermé", "Traversée", "Raccordement", "Busduct"]
+      },
+      materiaux: {
+        label: "Matériau",
+        values: ["Acier", "Inox", "Alu", "PVC-PE", "Béton", "Mixte"],
+        multi: true
+      },
+      environnements: {
+        label: "Environnement",
+        values: ["Indoor", "Outdoor", "Corrosif", "Zone humide"],
+        multi: true
+      },
+      usages: {
+        label: "Usage",
+        values: ["BT", "MT", "Data", "Puissance", "Contrôle-commande"],
+        multi: true
+      }
+    };
+
+    // ============================================================
+    // ÉTAT DE L'APPLICATION
+    // ============================================================
+    let activeFilters = {
+      famille: [],
+      materiaux: [],
+      environnements: [],
+      usages: []
+    };
+    let searchQuery = "";
+    let currentView = "cards";
+
+    // ============================================================
+    // FONCTIONS UTILITAIRES
+    // ============================================================
+    function normalizeText(text) {
+      return text.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, "");
+    }
+
+    function matchesSearch(item, query) {
+      if (!query) return true;
+      const normalizedQuery = normalizeText(query);
+      const searchFields = [
+        item.nom_fr,
+        item.nom_en || "",
+        item.description,
+        ...(item.noms_alternatifs || []),
+        ...(item.notes_epc || []),
+        ...(item.usages || [])
+      ].join(" ");
+      return normalizeText(searchFields).includes(normalizedQuery);
+    }
+
+    function matchesFilters(item, filters) {
+      // Famille (single select logic but stored as array)
+      if (filters.famille.length > 0 && !filters.famille.includes(item.famille)) {
+        return false;
+      }
+      // Multi-value fields (any match)
+      for (const key of ["materiaux", "environnements", "usages"]) {
+        if (filters[key].length > 0) {
+          const itemValues = item[key] || [];
+          const hasMatch = filters[key].some(f => itemValues.includes(f));
+          if (!hasMatch) return false;
+        }
+      }
+      return true;
+    }
+
+    function getFilteredData() {
+      return data.filter(item => 
+        matchesSearch(item, searchQuery) && matchesFilters(item, activeFilters)
+      );
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2000);
+    }
+
+    function copyToClipboard(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        btn.classList.add("copied");
+        btn.textContent = "✓ Copié !";
+        showToast("Phrase EPC copiée !");
+        setTimeout(() => {
+          btn.classList.remove("copied");
+          btn.textContent = "📋 Copier wording EPC";
+        }, 2000);
+      });
+    }
+
+    function downloadFile(content, filename, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ============================================================
+    // RENDU UI
+    // ============================================================
+    function renderFilters() {
+      const container = document.getElementById("filtersContainer");
+      container.innerHTML = "";
+
+      for (const [key, config] of Object.entries(filterConfig)) {
+        const group = document.createElement("div");
+        group.className = "filter-group";
+        group.innerHTML = `<h4>${config.label}</h4><div class="filter-options" id="filter-${key}"></div>`;
+        
+        const optionsContainer = group.querySelector(".filter-options");
+        config.values.forEach(value => {
+          const chip = document.createElement("span");
+          chip.className = "filter-chip" + (activeFilters[key].includes(value) ? " active" : "");
+          chip.textContent = value;
+          chip.addEventListener("click", () => toggleFilter(key, value));
+          optionsContainer.appendChild(chip);
+        });
+        
+        container.appendChild(group);
+      }
+    }
+
+    function toggleFilter(key, value) {
+      const index = activeFilters[key].indexOf(value);
+      if (index === -1) {
+        activeFilters[key].push(value);
+      } else {
+        activeFilters[key].splice(index, 1);
+      }
+      renderFilters();
+      renderContent();
+    }
+
+    function renderCards(items) {
+      const container = document.getElementById("cardsView");
+      container.innerHTML = "";
+
+      items.forEach(item => {
+        const card = document.createElement("article");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="card-header">
+            <h3>${item.nom_fr}</h3>
+            ${item.nom_en ? `<span class="nom-en">${item.nom_en}</span>` : ""}
+            <span class="famille-badge">${item.famille}</span>
+          </div>
+          <div class="card-body">
+            <div class="card-section">
+              <h4>Description</h4>
+              <p>${item.description}</p>
+            </div>
+            ${item.noms_alternatifs?.length ? `
+            <div class="card-section">
+              <h4>Synonymes</h4>
+              <div class="tags">${item.noms_alternatifs.map(n => `<span class="tag">${n}</span>`).join("")}</div>
+            </div>` : ""}
+            <div class="card-section">
+              <h4>Caractéristiques</h4>
+              <div class="tags">
+                ${(item.materiaux || []).map(m => `<span class="tag materiau">${m}</span>`).join("")}
+                ${(item.environnements || []).map(e => `<span class="tag env">${e}</span>`).join("")}
+              </div>
+            </div>
+            <div class="card-section">
+              <h4>Usages</h4>
+              <div class="tags">${(item.usages || []).map(u => `<span class="tag usage">${u}</span>`).join("")}</div>
+            </div>
+            ${item.notes_epc?.length ? `
+            <div class="card-section">
+              <h4>Notes EPC</h4>
+              <ul style="margin:0;padding-left:1.2rem;font-size:0.85rem;color:var(--text-light);">
+                ${item.notes_epc.map(n => `<li>${n}</li>`).join("")}
+              </ul>
+            </div>` : ""}
+          </div>
+          <div class="card-footer">
+            <button class="copy-btn" data-phrase="${encodeURIComponent(item.exemple_phrase_epc)}">📋 Copier wording EPC</button>
+          </div>
+        `;
+        
+        card.querySelector(".copy-btn").addEventListener("click", function() {
+          copyToClipboard(decodeURIComponent(this.dataset.phrase), this);
+        });
+        
+        container.appendChild(card);
+      });
+    }
+
+    function renderTable(items) {
+      const tbody = document.getElementById("tableBody");
+      tbody.innerHTML = "";
+
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="nom-cell">
+            ${item.nom_fr}
+            ${item.noms_alternatifs?.length ? `<div class="small-tags">${item.noms_alternatifs.slice(0, 2).map(n => `<span class="small-tag">${n}</span>`).join("")}</div>` : ""}
+          </td>
+          <td><span class="tag">${item.famille}</span></td>
+          <td style="max-width:300px;">${item.description.substring(0, 120)}...</td>
+          <td><div class="small-tags">${(item.usages || []).map(u => `<span class="small-tag">${u}</span>`).join("")}</div></td>
+          <td class="nom-en">${item.nom_en || "-"}</td>
+          <td><button class="table-copy-btn" data-phrase="${encodeURIComponent(item.exemple_phrase_epc)}">📋 Copier</button></td>
+        `;
+        
+        tr.querySelector(".table-copy-btn").addEventListener("click", function() {
+          copyToClipboard(decodeURIComponent(this.dataset.phrase), this);
+        });
+        
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderGlossaire() {
+      const tbody = document.getElementById("glossaireBody");
+      tbody.innerHTML = "";
+
+      data.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${item.nom_fr}</strong></td>
+          <td>${item.nom_en || "-"}</td>
+          <td><span class="tag">${item.famille}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderContent() {
+      const filtered = getFilteredData();
+      
+      document.getElementById("resultsCount").textContent = `${filtered.length} résultat${filtered.length > 1 ? "s" : ""}`;
+      
+      if (currentView === "cards") {
+        document.getElementById("cardsView").classList.remove("hidden");
+        document.getElementById("tableView").classList.add("hidden");
+        renderCards(filtered);
+      } else {
+        document.getElementById("cardsView").classList.add("hidden");
+        document.getElementById("tableView").classList.remove("hidden");
+        renderTable(filtered);
+      }
+    }
+
+    // ============================================================
+    // EXPORTS
+    // ============================================================
+    function exportJSON() {
+      const filtered = getFilteredData();
+      const json = JSON.stringify(filtered, null, 2);
+      downloadFile(json, "catalogue-cables-epc.json", "application/json");
+      showToast("Export JSON téléchargé !");
+    }
+
+    function exportCSV() {
+      const filtered = getFilteredData();
+      const headers = ["ID", "Famille", "Nom FR", "Nom EN", "Synonymes", "Description", "Matériaux", "Environnements", "Usages", "Notes EPC", "Phrase EPC"];
+      const rows = filtered.map(item => [
+        item.id,
+        item.famille,
+        item.nom_fr,
+        item.nom_en || "",
+        (item.noms_alternatifs || []).join("; "),
+        item.description.replace(/"/g, '""'),
+        (item.materiaux || []).join("; "),
+        (item.environnements || []).join("; "),
+        (item.usages || []).join("; "),
+        (item.notes_epc || []).join("; "),
+        item.exemple_phrase_epc.replace(/"/g, '""')
+      ]);
+      
+      const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+      downloadFile("\uFEFF" + csv, "catalogue-cables-epc.csv", "text/csv;charset=utf-8");
+      showToast("Export CSV téléchargé !");
+    }
+
+    function exportGlossaireCSV() {
+      const headers = ["Terme FR", "Terme EN", "Famille"];
+      const rows = data.map(item => [item.nom_fr, item.nom_en || "", item.famille]);
+      const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+      downloadFile("\uFEFF" + csv, "glossaire-epc-fr-en.csv", "text/csv;charset=utf-8");
+      showToast("Glossaire CSV téléchargé !");
+    }
+
+    // ============================================================
+    // ÉVÉNEMENTS
+    // ============================================================
+    document.getElementById("searchInput").addEventListener("input", (e) => {
+      searchQuery = e.target.value;
+      renderContent();
+    });
+
+    document.querySelectorAll(".view-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".view-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentView = btn.dataset.view;
+        renderContent();
+      });
+    });
+
+    document.getElementById("resetFilters").addEventListener("click", () => {
+      activeFilters = { famille: [], materiaux: [], environnements: [], usages: [] };
+      searchQuery = "";
+      document.getElementById("searchInput").value = "";
+      renderFilters();
+      renderContent();
+    });
+
+    document.getElementById("exportJson").addEventListener("click", exportJSON);
+    document.getElementById("exportCsv").addEventListener("click", exportCSV);
+    document.getElementById("exportGlossaire").addEventListener("click", exportGlossaireCSV);
+
+    // ============================================================
+    // INITIALISATION
+    // ============================================================
+    renderFilters();
+    renderContent();
+    renderGlossaire();
+  </script>
+</body>
+</html>

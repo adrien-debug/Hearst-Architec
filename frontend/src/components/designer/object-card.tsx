@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { Plus, Edit3 } from 'lucide-react';
@@ -33,14 +33,6 @@ function MiniPreview({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
-  
-  useFrame((_, delta) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.3;
-    } else if (meshRef.current) {
-      meshRef.current.rotation.y += delta * 0.3;
-    }
-  });
 
   const w = dimensions.width / 1000;
   const h = dimensions.height / 1000;

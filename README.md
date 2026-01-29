@@ -948,7 +948,7 @@ Proprietary - Hearst Corporation
 
 ---
 
-Hearst Mining Architect v2.0.0 - 🎨 DESIGNER 2.0 (Interface unifiée full-screen, Library Drawer, Properties Panel)
+Hearst Mining Architect v2.1.0 - 🔌 CÂBLAGE INTELLIGENT (Snap Points par équipement, Zones, Hauteurs auto, Chemins de câbles 3D)
 
 ---
 

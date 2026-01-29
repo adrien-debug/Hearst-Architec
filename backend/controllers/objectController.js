@@ -10,7 +10,7 @@ const { supabase } = require('../config/supabase');
 const logger = require('../utils/logger');
 
 // Categories disponibles (pour validation)
-const VALID_CATEGORIES = ['racks', 'pdu', 'cooling', 'networking', 'containers', 'transformers', 'powerblocks', 'modules', 'security', 'solar'];
+const VALID_CATEGORIES = ['racks', 'pdu', 'cooling', 'networking', 'containers', 'transformers', 'powerblocks', 'modules', 'security', 'solar', 'infrastructure'];
 
 // Object subtypes with default properties
 const OBJECT_SUBTYPES = {
@@ -588,6 +588,181 @@ const OBJECT_SUBTYPES = {
       panelAngle: 25,
       type: 'canopy',
       color: '#1e3a5f'
+    }
+  },
+  infrastructure: {
+    'road-concrete-6m': {
+      description: 'Route béton 6m de large (section 10m)',
+      manufacturer: 'Standard',
+      dimensions: { width: 10000, height: 200, depth: 6000 },
+      surfaceType: 'concrete',
+      laneWidth: 3000,
+      lanes: 2,
+      loadCapacity: 40, // tonnes
+      type: 'road',
+      color: '#9ca3af',
+      norme: 'NF P 98-170'
+    },
+    'road-concrete-8m': {
+      description: 'Route béton 8m de large (section 10m)',
+      manufacturer: 'Standard',
+      dimensions: { width: 10000, height: 200, depth: 8000 },
+      surfaceType: 'concrete',
+      laneWidth: 4000,
+      lanes: 2,
+      loadCapacity: 60, // tonnes
+      type: 'road',
+      color: '#9ca3af',
+      norme: 'NF P 98-170'
+    },
+    'road-asphalt-6m': {
+      description: 'Route asphalte 6m de large (section 10m)',
+      manufacturer: 'Standard',
+      dimensions: { width: 10000, height: 150, depth: 6000 },
+      surfaceType: 'asphalt',
+      laneWidth: 3000,
+      lanes: 2,
+      loadCapacity: 30, // tonnes
+      type: 'road',
+      color: '#374151',
+      norme: 'NF EN 13108'
+    },
+    'road-corner-90': {
+      description: 'Virage route 90° (rayon 8m)',
+      manufacturer: 'Standard',
+      dimensions: { width: 8000, height: 200, depth: 8000 },
+      surfaceType: 'concrete',
+      cornerRadius: 8000,
+      angle: 90,
+      type: 'road-corner',
+      color: '#9ca3af'
+    },
+    'loading-dock': {
+      description: 'Quai de chargement (conteneurs/camions)',
+      manufacturer: 'Industrial',
+      dimensions: { width: 15000, height: 1200, depth: 4000 },
+      dockType: 'elevated',
+      vehicleCapacity: 2, // camions
+      craneCapacity: 40, // tonnes
+      type: 'dock',
+      color: '#6b7280',
+      norme: 'NF E 52-109'
+    },
+    'loading-zone': {
+      description: 'Zone de déchargement au sol (20×15m)',
+      manufacturer: 'Standard',
+      dimensions: { width: 20000, height: 200, depth: 15000 },
+      surfaceType: 'reinforced-concrete',
+      loadCapacity: 80, // tonnes
+      vehicleCapacity: 4,
+      type: 'loading-zone',
+      color: '#fbbf24',
+      norme: 'DTU 13.3'
+    },
+    'parking-truck': {
+      description: 'Parking poids-lourds (3 places)',
+      manufacturer: 'Standard',
+      dimensions: { width: 15000, height: 150, depth: 20000 },
+      surfaceType: 'asphalt',
+      parkingSpaces: 3,
+      spaceWidth: 4000,
+      spaceDepth: 15000,
+      type: 'parking',
+      color: '#4b5563',
+      vehicleType: 'truck'
+    },
+    'parking-car': {
+      description: 'Parking véhicules légers (6 places)',
+      manufacturer: 'Standard',
+      dimensions: { width: 15000, height: 100, depth: 5000 },
+      surfaceType: 'asphalt',
+      parkingSpaces: 6,
+      spaceWidth: 2500,
+      spaceDepth: 5000,
+      type: 'parking',
+      color: '#4b5563',
+      vehicleType: 'car'
+    },
+    'gate-vehicle-6m': {
+      description: 'Portail véhicules coulissant 6m',
+      manufacturer: 'Industrial',
+      dimensions: { width: 6000, height: 2400, depth: 200 },
+      gateType: 'sliding',
+      motorized: true,
+      accessControl: true,
+      type: 'gate',
+      color: '#374151',
+      norme: 'NF EN 12453'
+    },
+    'gate-vehicle-8m': {
+      description: 'Portail véhicules coulissant 8m (poids-lourds)',
+      manufacturer: 'Industrial',
+      dimensions: { width: 8000, height: 3000, depth: 200 },
+      gateType: 'sliding',
+      motorized: true,
+      accessControl: true,
+      type: 'gate',
+      color: '#374151',
+      norme: 'NF EN 12453'
+    },
+    'guardhouse': {
+      description: 'Guérite de sécurité avec contrôle d\'accès',
+      manufacturer: 'Standard',
+      dimensions: { width: 3000, height: 2800, depth: 2500 },
+      type: 'guardhouse',
+      features: ['CCTV', 'barrier-control', 'intercom'],
+      color: '#1f2937'
+    },
+    'barrier-arm': {
+      description: 'Barrière levante automatique',
+      manufacturer: 'Industrial',
+      dimensions: { width: 6000, height: 1000, depth: 400 },
+      armLength: 6000,
+      motorized: true,
+      type: 'barrier',
+      color: '#dc2626',
+      norme: 'NF EN 12453'
+    },
+    'speed-bump': {
+      description: 'Ralentisseur (dos d\'âne)',
+      manufacturer: 'Standard',
+      dimensions: { width: 6000, height: 70, depth: 500 },
+      type: 'speed-bump',
+      color: '#fbbf24',
+      norme: 'NF P 98-300'
+    },
+    'road-marking-arrow': {
+      description: 'Marquage au sol - Flèche directionnelle',
+      manufacturer: 'Standard',
+      dimensions: { width: 4000, height: 10, depth: 1500 },
+      markingType: 'arrow',
+      type: 'marking',
+      color: '#ffffff'
+    },
+    'road-marking-stop': {
+      description: 'Marquage au sol - Ligne STOP',
+      manufacturer: 'Standard',
+      dimensions: { width: 6000, height: 10, depth: 500 },
+      markingType: 'stop-line',
+      type: 'marking',
+      color: '#ffffff'
+    },
+    'bollard-steel': {
+      description: 'Borne anti-intrusion acier',
+      manufacturer: 'Industrial',
+      dimensions: { width: 200, height: 1000, depth: 200 },
+      type: 'bollard',
+      material: 'steel',
+      color: '#fbbf24',
+      norme: 'NF P 98-430'
+    },
+    'curb-concrete': {
+      description: 'Bordure béton (section 1m)',
+      manufacturer: 'Standard',
+      dimensions: { width: 1000, height: 250, depth: 150 },
+      type: 'curb',
+      color: '#d1d5db',
+      norme: 'NF EN 1340'
     }
   }
 };

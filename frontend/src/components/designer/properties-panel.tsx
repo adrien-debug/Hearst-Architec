@@ -62,6 +62,7 @@ export default function PropertiesPanel({
       });
       setLocalColor(object.color);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [object?.id]); // Only reset when object ID changes, not on every position update
 
   if (!object) return null;

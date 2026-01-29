@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useMemo, memo, useCallback } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment, Instances, Instance } from '@react-three/drei';
 import * as THREE from 'three';
 import { validateDimensions } from '../../lib/validation';
@@ -269,19 +269,8 @@ const BitmainCoolingSystem = memo(function BitmainCoolingSystem({
   const frameThickness = 0.12;
   const cornerPostSize = 0.12;
   
-  // Store refs to fan blade groups for animation
+  // Store refs to fan blade groups
   const fanBladesRefs = useRef<THREE.Group[]>([]);
-  
-  // Animate fans - optimized to directly access refs
-  useFrame((_, delta) => {
-    const speed = delta * 8; // Slower rotation
-    for (let i = 0; i < fanBladesRefs.current.length; i++) {
-      const bladeGroup = fanBladesRefs.current[i];
-      if (bladeGroup) {
-        bladeGroup.rotation.y += speed;
-      }
-    }
-  });
   
   // Pre-calculate panel and fan arrays
   const numPanels = Math.floor(w / 0.9); // ~13-14 panels for 12.2m
@@ -532,13 +521,6 @@ const AssembledModule = memo(function AssembledModule({
   autoRotate: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  
-  // Only animate when autoRotate is true
-  useFrame((_, delta) => {
-    if (groupRef.current && autoRotate) {
-      groupRef.current.rotation.y += delta * 0.12;
-    }
-  });
 
   const baseY = baseDimensions.height / 2000;
   
@@ -1806,17 +1788,6 @@ const PreviewBox = memo(function PreviewBox({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
-  
-  // Animation only when autoRotate is enabled
-  useFrame((_, delta) => {
-    if (!autoRotate) return;
-    const speed = delta * 0.15;
-    if (groupRef.current) {
-      groupRef.current.rotation.y += speed;
-    } else if (meshRef.current) {
-      meshRef.current.rotation.y += speed;
-    }
-  });
   
   // Memoize type detection
   const { isContainer, isCooling, isTransformer, isPowerBlock, isPDU, isCanopy, isCableTray, isJunctionBox, isRMU, isSecurityZone, isSecurityFence, isExtinguisher, isDangerSign, isEmergencyStop } = useMemo(() => {
@@ -3109,20 +3080,159 @@ const CableRoutingSystem = memo(function CableRoutingSystem({
 // ═══════════════════════════════════════════════════════════════════════════
 
 const securityMaterials = {
-  zoneHT: new THREE.MeshStandardMaterial({ color: '#dc2626', transparent: true, opacity: 0.4, side: THREE.DoubleSide }),
-  zoneBT: new THREE.MeshStandardMaterial({ color: '#f97316', transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
-  zoneOps: new THREE.MeshStandardMaterial({ color: '#eab308', transparent: true, opacity: 0.3, side: THREE.DoubleSide }),
-  zoneSafe: new THREE.MeshStandardMaterial({ color: '#22c55e', transparent: true, opacity: 0.25, side: THREE.DoubleSide }),
-  fenceSteel: new THREE.MeshStandardMaterial({ color: '#71717a', metalness: 0.7, roughness: 0.3 }),
-  fenceMesh: new THREE.MeshStandardMaterial({ color: '#52525b', metalness: 0.6, roughness: 0.4, wireframe: true }),
-  dangerYellow: new THREE.MeshStandardMaterial({ color: '#fbbf24', metalness: 0.3, roughness: 0.7 }),
-  dangerBlack: new THREE.MeshStandardMaterial({ color: '#1f2937', metalness: 0.3, roughness: 0.7 }),
-  emergencyRed: new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.4, roughness: 0.6 }),
-  extincteurRed: new THREE.MeshStandardMaterial({ color: '#b91c1c', metalness: 0.5, roughness: 0.5 }),
-  badgeReader: new THREE.MeshStandardMaterial({ color: '#1e3a5f', metalness: 0.5, roughness: 0.5 }),
-  ledGreen: new THREE.MeshStandardMaterial({ color: '#22c55e', emissive: '#22c55e', emissiveIntensity: 1 }),
-  ledRed: new THREE.MeshStandardMaterial({ color: '#dc2626', emissive: '#dc2626', emissiveIntensity: 0.8 }),
-  evacGreen: new THREE.MeshStandardMaterial({ color: '#16a34a', emissive: '#16a34a', emissiveIntensity: 0.5, transparent: true, opacity: 0.8 }),
+  // Zone materials with glow effect
+  zoneHT: new THREE.MeshStandardMaterial({ 
+    color: '#dc2626', 
+    emissive: '#dc2626', 
+    emissiveIntensity: 0.15,
+    transparent: true, 
+    opacity: 0.5, 
+    side: THREE.DoubleSide 
+  }),
+  zoneBT: new THREE.MeshStandardMaterial({ 
+    color: '#f97316', 
+    emissive: '#f97316', 
+    emissiveIntensity: 0.1,
+    transparent: true, 
+    opacity: 0.45, 
+    side: THREE.DoubleSide 
+  }),
+  zoneOps: new THREE.MeshStandardMaterial({ 
+    color: '#eab308', 
+    emissive: '#eab308', 
+    emissiveIntensity: 0.08,
+    transparent: true, 
+    opacity: 0.4, 
+    side: THREE.DoubleSide 
+  }),
+  zoneSafe: new THREE.MeshStandardMaterial({ 
+    color: '#22c55e', 
+    emissive: '#22c55e', 
+    emissiveIntensity: 0.05,
+    transparent: true, 
+    opacity: 0.35, 
+    side: THREE.DoubleSide 
+  }),
+  // Industrial fence materials
+  fenceSteel: new THREE.MeshStandardMaterial({ 
+    color: '#71717a', 
+    metalness: 0.85, 
+    roughness: 0.2,
+    envMapIntensity: 1.2
+  }),
+  fenceMesh: new THREE.MeshStandardMaterial({ 
+    color: '#52525b', 
+    metalness: 0.75, 
+    roughness: 0.3, 
+    wireframe: true 
+  }),
+  // Danger signage materials with glow
+  dangerYellow: new THREE.MeshStandardMaterial({ 
+    color: '#fbbf24', 
+    emissive: '#fbbf24', 
+    emissiveIntensity: 0.2,
+    metalness: 0.4, 
+    roughness: 0.5 
+  }),
+  dangerBlack: new THREE.MeshStandardMaterial({ 
+    color: '#0f0f0f', 
+    metalness: 0.2, 
+    roughness: 0.8 
+  }),
+  // Emergency stop with intense glow
+  emergencyRed: new THREE.MeshStandardMaterial({ 
+    color: '#dc2626', 
+    emissive: '#dc2626', 
+    emissiveIntensity: 0.4,
+    metalness: 0.3, 
+    roughness: 0.4 
+  }),
+  emergencyYellow: new THREE.MeshStandardMaterial({ 
+    color: '#facc15', 
+    emissive: '#facc15', 
+    emissiveIntensity: 0.25,
+    metalness: 0.3, 
+    roughness: 0.5 
+  }),
+  // Fire extinguisher
+  extincteurRed: new THREE.MeshStandardMaterial({ 
+    color: '#b91c1c', 
+    emissive: '#7f1d1d', 
+    emissiveIntensity: 0.1,
+    metalness: 0.6, 
+    roughness: 0.4 
+  }),
+  extincteurChrome: new THREE.MeshStandardMaterial({ 
+    color: '#e5e5e5', 
+    metalness: 0.95, 
+    roughness: 0.1 
+  }),
+  // Badge reader materials
+  badgeReader: new THREE.MeshStandardMaterial({ 
+    color: '#1e293b', 
+    metalness: 0.7, 
+    roughness: 0.3 
+  }),
+  badgeScreen: new THREE.MeshStandardMaterial({ 
+    color: '#0f172a', 
+    emissive: '#1e40af', 
+    emissiveIntensity: 0.15,
+    metalness: 0.5, 
+    roughness: 0.2 
+  }),
+  // LED materials with strong glow
+  ledGreen: new THREE.MeshStandardMaterial({ 
+    color: '#22c55e', 
+    emissive: '#22c55e', 
+    emissiveIntensity: 2.0,
+    transparent: true,
+    opacity: 0.95
+  }),
+  ledRed: new THREE.MeshStandardMaterial({ 
+    color: '#ef4444', 
+    emissive: '#ef4444', 
+    emissiveIntensity: 2.0,
+    transparent: true,
+    opacity: 0.95
+  }),
+  ledBlue: new THREE.MeshStandardMaterial({ 
+    color: '#3b82f6', 
+    emissive: '#3b82f6', 
+    emissiveIntensity: 1.5,
+    transparent: true,
+    opacity: 0.9
+  }),
+  ledOrange: new THREE.MeshStandardMaterial({ 
+    color: '#f97316', 
+    emissive: '#f97316', 
+    emissiveIntensity: 1.8,
+    transparent: true,
+    opacity: 0.95
+  }),
+  // Evacuation arrow
+  evacGreen: new THREE.MeshStandardMaterial({ 
+    color: '#16a34a', 
+    emissive: '#16a34a', 
+    emissiveIntensity: 0.8, 
+    transparent: true, 
+    opacity: 0.9 
+  }),
+  // RMU materials
+  rmuBody: new THREE.MeshStandardMaterial({ 
+    color: '#1f2937', 
+    metalness: 0.75, 
+    roughness: 0.25 
+  }),
+  rmuPanel: new THREE.MeshStandardMaterial({ 
+    color: '#374151', 
+    metalness: 0.6, 
+    roughness: 0.4 
+  }),
+  rmuVentilation: new THREE.MeshStandardMaterial({ 
+    color: '#111827', 
+    metalness: 0.5, 
+    roughness: 0.5 
+  }),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3452,68 +3562,120 @@ const DangerSign3D = memo(function DangerSign3D({
 }) {
   const s = size / 1000;
   
+  // Create triangle shape for ISO 7010
+  const triangleShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    const h = s * 0.9;
+    const w = s * 0.9;
+    shape.moveTo(0, h * 0.5);
+    shape.lineTo(-w * 0.5, -h * 0.35);
+    shape.lineTo(w * 0.5, -h * 0.35);
+    shape.closePath();
+    return shape;
+  }, [s]);
+  
+  // Inner triangle (yellow fill)
+  const innerTriangleShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    const h = s * 0.75;
+    const w = s * 0.75;
+    shape.moveTo(0, h * 0.45);
+    shape.lineTo(-w * 0.45, -h * 0.3);
+    shape.lineTo(w * 0.45, -h * 0.3);
+    shape.closePath();
+    return shape;
+  }, [s]);
+  
   return (
     <group position={position} rotation={rotation}>
-      {/* Sign backing plate */}
-      <mesh castShadow>
-        <boxGeometry args={[s, s, 0.008]} />
-        <meshStandardMaterial color="#fbbf24" metalness={0.2} roughness={0.8} />
+      {/* Aluminum backing plate */}
+      <mesh position={[0, 0, -0.003]} castShadow>
+        <boxGeometry args={[s * 1.1, s * 1.1, 0.004]} />
+        <meshStandardMaterial color="#e5e5e5" metalness={0.8} roughness={0.2} />
       </mesh>
       
-      {/* Black border (triangle approximation with box) */}
-      <mesh position={[0, 0, 0.005]}>
-        <boxGeometry args={[s * 0.9, s * 0.9, 0.002]} />
-        <meshStandardMaterial color="#fbbf24" metalness={0.2} roughness={0.8} />
+      {/* Black triangle border */}
+      <mesh position={[0, -s * 0.05, 0]} castShadow>
+        <shapeGeometry args={[triangleShape]} />
+        <primitive object={securityMaterials.dangerBlack} attach="material" />
       </mesh>
       
-      {/* Lightning bolt symbol (simplified) */}
-      {type === 'electrical' && (
-        <group position={[0, 0, 0.006]}>
-          {/* Main bolt */}
-          <mesh position={[0, s * 0.1, 0]} rotation={[0, 0, 0.3]}>
-            <boxGeometry args={[s * 0.08, s * 0.4, 0.003]} />
-            <meshStandardMaterial color="#1f2937" />
+      {/* Yellow triangle fill with glow */}
+      <mesh position={[0, -s * 0.05, 0.003]}>
+        <shapeGeometry args={[innerTriangleShape]} />
+        <primitive object={securityMaterials.dangerYellow} attach="material" />
+      </mesh>
+      
+      {/* Lightning bolt symbol (electrical) */}
+      {(type === 'electrical' || type === 'high-voltage') && (
+        <group position={[0, -s * 0.08, 0.006]}>
+          {/* Realistic lightning bolt shape */}
+          <mesh position={[s * 0.02, s * 0.12, 0]} rotation={[0, 0, 0.15]}>
+            <boxGeometry args={[s * 0.06, s * 0.18, 0.004]} />
+            <primitive object={securityMaterials.dangerBlack} attach="material" />
           </mesh>
-          <mesh position={[s * 0.05, -s * 0.15, 0]} rotation={[0, 0, -0.3]}>
-            <boxGeometry args={[s * 0.08, s * 0.25, 0.003]} />
-            <meshStandardMaterial color="#1f2937" />
+          <mesh position={[-s * 0.03, s * 0.02, 0]} rotation={[0, 0, -0.5]}>
+            <boxGeometry args={[s * 0.12, s * 0.05, 0.004]} />
+            <primitive object={securityMaterials.dangerBlack} attach="material" />
           </mesh>
-          {/* Arrow head */}
-          <mesh position={[0, -s * 0.3, 0]}>
-            <coneGeometry args={[s * 0.08, s * 0.12, 3]} />
-            <meshStandardMaterial color="#1f2937" />
+          <mesh position={[s * 0.02, -s * 0.08, 0]} rotation={[0, 0, 0.15]}>
+            <boxGeometry args={[s * 0.06, s * 0.15, 0.004]} />
+            <primitive object={securityMaterials.dangerBlack} attach="material" />
+          </mesh>
+          {/* Arrow tip */}
+          <mesh position={[s * 0.04, -s * 0.18, 0]} rotation={[0, 0, Math.PI]}>
+            <coneGeometry args={[s * 0.05, s * 0.08, 3]} />
+            <primitive object={securityMaterials.dangerBlack} attach="material" />
           </mesh>
         </group>
       )}
       
-      {/* High voltage text plate (optional) */}
+      {/* High voltage text plate */}
       {type === 'high-voltage' && (
-        <mesh position={[0, -s * 0.55, 0.004]}>
-          <boxGeometry args={[s * 1.2, s * 0.25, 0.006]} />
-          <meshStandardMaterial color="#ffffff" metalness={0.1} roughness={0.9} />
-        </mesh>
-      )}
-      
-      {/* No entry (red circle with bar) */}
-      {type === 'no-entry' && (
-        <group position={[0, 0, 0.006]}>
-          <mesh rotation={[0, 0, 0]}>
-            <torusGeometry args={[s * 0.35, s * 0.06, 8, 24]} />
-            <meshStandardMaterial color="#dc2626" />
+        <group position={[0, -s * 0.6, 0]}>
+          <mesh castShadow>
+            <boxGeometry args={[s * 1.3, s * 0.28, 0.006]} />
+            <meshStandardMaterial color="#ffffff" metalness={0.1} roughness={0.9} />
           </mesh>
-          <mesh rotation={[0, 0, Math.PI / 4]}>
-            <boxGeometry args={[s * 0.6, s * 0.1, 0.003]} />
-            <meshStandardMaterial color="#dc2626" />
+          {/* "DANGER" text bar */}
+          <mesh position={[0, 0, 0.004]}>
+            <boxGeometry args={[s * 1.2, s * 0.08, 0.002]} />
+            <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.2} />
           </mesh>
         </group>
       )}
       
-      {/* Mounting holes */}
-      {[[-s * 0.35, s * 0.35], [s * 0.35, s * 0.35], [-s * 0.35, -s * 0.35], [s * 0.35, -s * 0.35]].map(([x, y], i) => (
-        <mesh key={`hole-${i}`} position={[x, y, 0.005]}>
-          <cylinderGeometry args={[0.008, 0.008, 0.01, 8]} />
-          <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.2} />
-        </mesh>
+      {/* No entry (red circle with white bar) */}
+      {type === 'no-entry' && (
+        <group position={[0, -s * 0.05, 0.006]}>
+          {/* Red circle */}
+          <mesh>
+            <torusGeometry args={[s * 0.28, s * 0.05, 12, 32]} />
+            <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.3} />
+          </mesh>
+          {/* White bar */}
+          <mesh rotation={[0, 0, 0]}>
+            <boxGeometry args={[s * 0.5, s * 0.08, 0.004]} />
+            <meshStandardMaterial color="#ffffff" />
+          </mesh>
+        </group>
+      )}
+      
+      {/* Reflective corner rivets */}
+      {[
+        [-s * 0.48, s * 0.48], [s * 0.48, s * 0.48], 
+        [-s * 0.48, -s * 0.48], [s * 0.48, -s * 0.48]
+      ].map(([x, y], i) => (
+        <group key={`rivet-${i}`} position={[x, y, 0.002]}>
+          <mesh>
+            <cylinderGeometry args={[0.012, 0.012, 0.008, 12]} />
+            <meshStandardMaterial color="#4b5563" metalness={0.9} roughness={0.1} />
+          </mesh>
+          <mesh position={[0, 0, 0.005]}>
+            <cylinderGeometry args={[0.006, 0.006, 0.004, 8]} />
+            <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.2} />
+          </mesh>
+        </group>
       ))}
     </group>
   );
@@ -3534,34 +3696,72 @@ const EmergencyStop3D = memo(function EmergencyStop3D({
 }) {
   return (
     <group position={position} rotation={rotation}>
-      {/* Yellow backing plate (collerette) */}
+      {/* Yellow backing plate (collerette) with glow */}
       <mesh castShadow>
-        <boxGeometry args={[0.12, 0.12, 0.015]} />
-        <primitive object={securityMaterials.dangerYellow} attach="material" />
+        <boxGeometry args={[0.14, 0.14, 0.012]} />
+        <primitive object={securityMaterials.emergencyYellow} attach="material" />
       </mesh>
       
-      {/* Gray housing */}
-      <mesh position={[0, 0, 0.02]} castShadow>
-        <cylinderGeometry args={[0.04, 0.04, 0.03, 16]} />
-        <meshStandardMaterial color="#4b5563" metalness={0.5} roughness={0.5} />
+      {/* Black/Yellow hazard stripes on corners */}
+      {[[-0.055, -0.055], [0.055, -0.055], [-0.055, 0.055], [0.055, 0.055]].map(([x, y], i) => (
+        <mesh key={`stripe-${i}`} position={[x, y, 0.007]} rotation={[0, 0, Math.PI / 4]}>
+          <boxGeometry args={[0.025, 0.025, 0.002]} />
+          <primitive object={securityMaterials.dangerBlack} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* Metal housing base */}
+      <mesh position={[0, 0, 0.015]} castShadow>
+        <cylinderGeometry args={[0.048, 0.052, 0.02, 24]} />
+        <meshStandardMaterial color="#374151" metalness={0.7} roughness={0.3} />
       </mesh>
       
-      {/* Red mushroom button */}
-      <mesh position={[0, 0, pressed ? 0.03 : 0.045]} castShadow>
-        <cylinderGeometry args={[0.035, 0.03, pressed ? 0.02 : 0.03, 16]} />
+      {/* Housing ring */}
+      <mesh position={[0, 0, 0.026]} castShadow>
+        <cylinderGeometry args={[0.044, 0.044, 0.012, 24]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* Red mushroom button with intense glow */}
+      <mesh position={[0, 0, pressed ? 0.035 : 0.05]} castShadow>
+        <cylinderGeometry args={[0.038, 0.032, pressed ? 0.015 : 0.025, 24]} />
         <primitive object={securityMaterials.emergencyRed} attach="material" />
       </mesh>
       
-      {/* Button top (dome) */}
-      <mesh position={[0, 0, pressed ? 0.04 : 0.06]}>
-        <sphereGeometry args={[0.03, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <primitive object={securityMaterials.emergencyRed} attach="material" />
+      {/* Button dome top with glow */}
+      <mesh position={[0, 0, pressed ? 0.045 : 0.065]}>
+        <sphereGeometry args={[0.034, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial 
+          color="#dc2626" 
+          emissive="#dc2626" 
+          emissiveIntensity={pressed ? 0.6 : 0.35}
+          metalness={0.2} 
+          roughness={0.4} 
+        />
       </mesh>
       
-      {/* STOP text (simplified as white ring) */}
-      <mesh position={[0, 0, pressed ? 0.042 : 0.062]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.02, 0.003, 8, 16]} />
-        <meshStandardMaterial color="#ffffff" />
+      {/* STOP text ring on button */}
+      <mesh position={[0, 0, pressed ? 0.047 : 0.067]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.022, 0.004, 12, 24]} />
+        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.3} />
+      </mesh>
+      
+      {/* Center dot on button */}
+      <mesh position={[0, 0, pressed ? 0.05 : 0.072]}>
+        <cylinderGeometry args={[0.008, 0.008, 0.003, 12]} />
+        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.2} />
+      </mesh>
+      
+      {/* LED indicator ring (glows when active) */}
+      <mesh position={[0, 0, 0.028]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.05, 0.004, 8, 32]} />
+        <meshStandardMaterial 
+          color={pressed ? "#22c55e" : "#dc2626"} 
+          emissive={pressed ? "#22c55e" : "#dc2626"} 
+          emissiveIntensity={1.5}
+          transparent
+          opacity={0.9}
+        />
       </mesh>
     </group>
   );
@@ -3569,7 +3769,7 @@ const EmergencyStop3D = memo(function EmergencyStop3D({
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BADGE READER 3D - Access control reader
-// Lecteur de badge RFID avec LED status
+// Lecteur de badge RFID avec LED status et écran
 // ═══════════════════════════════════════════════════════════════════════════
 const BadgeReader3D = memo(function BadgeReader3D({ 
   position = [0, 0, 0] as [number, number, number],
@@ -3584,56 +3784,107 @@ const BadgeReader3D = memo(function BadgeReader3D({
     switch (status) {
       case 'granted': return securityMaterials.ledGreen;
       case 'denied': return securityMaterials.ledRed;
-      default: return new THREE.MeshStandardMaterial({ color: '#374151', metalness: 0.5, roughness: 0.5 });
+      default: return securityMaterials.ledBlue;
     }
   }, [status]);
   
   return (
     <group position={position} rotation={rotation}>
-      {/* Main housing */}
+      {/* Wall mount bracket */}
+      <mesh position={[0, 0, -0.015]} castShadow>
+        <boxGeometry args={[0.095, 0.14, 0.008]} />
+        <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* Main housing - sleek design */}
       <mesh castShadow>
-        <boxGeometry args={[0.08, 0.12, 0.025]} />
+        <boxGeometry args={[0.085, 0.13, 0.022]} />
         <primitive object={securityMaterials.badgeReader} attach="material" />
       </mesh>
       
-      {/* Front panel (lighter) */}
-      <mesh position={[0, 0, 0.014]}>
-        <boxGeometry args={[0.07, 0.11, 0.003]} />
-        <meshStandardMaterial color="#374151" metalness={0.4} roughness={0.6} />
+      {/* Beveled front panel */}
+      <mesh position={[0, 0, 0.012]}>
+        <boxGeometry args={[0.075, 0.12, 0.004]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.4} />
       </mesh>
       
-      {/* Card scan area */}
-      <mesh position={[0, -0.01, 0.016]}>
-        <boxGeometry args={[0.055, 0.06, 0.002]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.3} roughness={0.7} />
+      {/* RFID scan zone with glow */}
+      <mesh position={[0, 0.01, 0.015]}>
+        <boxGeometry args={[0.06, 0.055, 0.002]} />
+        <primitive object={securityMaterials.badgeScreen} attach="material" />
       </mesh>
       
-      {/* Status LED */}
-      <mesh position={[0, 0.04, 0.016]}>
-        <sphereGeometry args={[0.008, 12, 12]} />
-        <primitive object={ledMaterial} attach="material" />
-      </mesh>
-      
-      {/* LED housing ring */}
-      <mesh position={[0, 0.04, 0.014]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.01, 0.002, 8, 16]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Keypad (4 buttons) */}
-      {[[-0.015, 0.02], [0.015, 0.02], [-0.015, 0], [0.015, 0]].map(([x, y], i) => (
-        <mesh key={`btn-${i}`} position={[x, y - 0.04, 0.016]}>
-          <boxGeometry args={[0.018, 0.015, 0.003]} />
-          <meshStandardMaterial color="#52525b" metalness={0.4} roughness={0.6} />
+      {/* RFID icon (concentric circles) */}
+      {[0.018, 0.012, 0.006].map((r, i) => (
+        <mesh key={`rfid-${i}`} position={[0, 0.01, 0.017]} rotation={[0, 0, 0]}>
+          <torusGeometry args={[r, 0.0015, 8, 24]} />
+          <meshStandardMaterial 
+            color="#60a5fa" 
+            emissive="#60a5fa" 
+            emissiveIntensity={0.8 - i * 0.2}
+            transparent
+            opacity={0.7}
+          />
         </mesh>
       ))}
       
-      {/* Mounting screws */}
-      {[[0.03, 0.05], [-0.03, 0.05], [0.03, -0.05], [-0.03, -0.05]].map(([x, y], i) => (
-        <mesh key={`screw-${i}`} position={[x, y, 0.016]}>
-          <cylinderGeometry args={[0.004, 0.004, 0.004, 8]} />
-          <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.2} />
+      {/* LED strip (top) */}
+      <mesh position={[0, 0.048, 0.015]}>
+        <boxGeometry args={[0.055, 0.008, 0.003]} />
+        <primitive object={ledMaterial} attach="material" />
+      </mesh>
+      
+      {/* Individual status LEDs */}
+      {[[-0.02, 0.048], [0, 0.048], [0.02, 0.048]].map(([x, y], i) => (
+        <mesh key={`led-${i}`} position={[x, y, 0.018]}>
+          <sphereGeometry args={[0.004, 12, 12]} />
+          <primitive object={i === 1 ? ledMaterial : securityMaterials.ledBlue} attach="material" />
         </mesh>
+      ))}
+      
+      {/* Numeric keypad (3x4 grid) */}
+      <group position={[0, -0.035, 0.015]}>
+        {[
+          [-0.018, 0.022], [0, 0.022], [0.018, 0.022],
+          [-0.018, 0.008], [0, 0.008], [0.018, 0.008],
+          [-0.018, -0.006], [0, -0.006], [0.018, -0.006],
+          [-0.018, -0.02], [0, -0.02], [0.018, -0.02],
+        ].map(([x, y], i) => (
+          <mesh key={`key-${i}`} position={[x, y, 0]}>
+            <boxGeometry args={[0.012, 0.01, 0.003]} />
+            <meshStandardMaterial 
+              color="#475569" 
+              metalness={0.3} 
+              roughness={0.6}
+              emissive="#475569"
+              emissiveIntensity={0.05}
+            />
+          </mesh>
+        ))}
+      </group>
+      
+      {/* Speaker grille */}
+      <mesh position={[0, -0.055, 0.015]}>
+        <boxGeometry args={[0.04, 0.008, 0.002]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.4} roughness={0.6} />
+      </mesh>
+      
+      {/* Tamper-proof screws */}
+      {[
+        [0.035, 0.055], [-0.035, 0.055], 
+        [0.035, -0.055], [-0.035, -0.055]
+      ].map(([x, y], i) => (
+        <group key={`screw-${i}`} position={[x, y, 0.014]}>
+          <mesh>
+            <cylinderGeometry args={[0.005, 0.005, 0.006, 6]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.8} roughness={0.2} />
+          </mesh>
+          {/* Torx head pattern */}
+          <mesh position={[0, 0, 0.004]}>
+            <cylinderGeometry args={[0.003, 0.003, 0.002, 6]} />
+            <meshStandardMaterial color="#374151" metalness={0.7} roughness={0.3} />
+          </mesh>
+        </group>
       ))}
     </group>
   );
@@ -3654,86 +3905,200 @@ const FireExtinguisher3D = memo(function FireExtinguisher3D({
   type?: 'CO2' | 'powder' | 'water';
   wallMounted?: boolean;
 }) {
-  const h = 0.6;  // 600mm height
-  const r = 0.08; // 80mm radius
+  const h = 0.58;  // 580mm cylinder height
+  const r = 0.08;  // 80mm radius
+  
+  // Type-specific colors
+  const bodyColor = type === 'CO2' ? '#b91c1c' : type === 'powder' ? '#dc2626' : '#b91c1c';
+  const labelColor = type === 'CO2' ? '#1f2937' : type === 'powder' ? '#facc15' : '#3b82f6';
   
   return (
     <group position={position} rotation={rotation}>
       {/* Wall bracket (if mounted) */}
       {wallMounted && (
-        <group position={[0, h * 0.4, -0.08]}>
+        <group position={[0, h * 0.45, -r - 0.02]}>
+          {/* Bracket backplate */}
           <mesh castShadow>
-            <boxGeometry args={[0.15, 0.25, 0.03]} />
-            <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
+            <boxGeometry args={[0.18, 0.28, 0.025]} />
+            <meshStandardMaterial color="#dc2626" emissive="#7f1d1d" emissiveIntensity={0.1} metalness={0.5} roughness={0.5} />
           </mesh>
-          {/* Hook */}
-          <mesh position={[0, 0.08, 0.04]} castShadow>
+          {/* Upper hook arm */}
+          <mesh position={[0, 0.1, 0.035]} castShadow>
+            <boxGeometry args={[0.14, 0.025, 0.05]} />
+            <meshStandardMaterial color="#dc2626" metalness={0.5} roughness={0.5} />
+          </mesh>
+          {/* Lower support */}
+          <mesh position={[0, -0.08, 0.04]} castShadow>
             <boxGeometry args={[0.12, 0.04, 0.06]} />
-            <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
+            <meshStandardMaterial color="#dc2626" metalness={0.5} roughness={0.5} />
+          </mesh>
+          {/* Mounting holes */}
+          {[[-0.06, 0.12], [0.06, 0.12], [-0.06, -0.12], [0.06, -0.12]].map(([x, y], i) => (
+            <mesh key={`hole-${i}`} position={[x, y, 0.014]}>
+              <cylinderGeometry args={[0.008, 0.008, 0.004, 8]} />
+              <meshStandardMaterial color="#1f2937" metalness={0.8} roughness={0.2} />
+            </mesh>
+          ))}
+        </group>
+      )}
+      
+      {/* Main cylinder body */}
+      <mesh position={[0, h/2, 0]} castShadow>
+        <cylinderGeometry args={[r, r, h, 24]} />
+        <meshStandardMaterial 
+          color={bodyColor} 
+          emissive="#7f1d1d" 
+          emissiveIntensity={0.08}
+          metalness={0.55} 
+          roughness={0.45} 
+        />
+      </mesh>
+      
+      {/* Bottom dome (pressure vessel) */}
+      <mesh position={[0, 0, 0]}>
+        <sphereGeometry args={[r, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+        <meshStandardMaterial 
+          color={bodyColor} 
+          emissive="#7f1d1d" 
+          emissiveIntensity={0.08}
+          metalness={0.55} 
+          roughness={0.45} 
+        />
+      </mesh>
+      
+      {/* Top shoulder (tapered) */}
+      <mesh position={[0, h + 0.015, 0]} castShadow>
+        <cylinderGeometry args={[0.045, r, 0.05, 24]} />
+        <meshStandardMaterial 
+          color={bodyColor} 
+          emissive="#7f1d1d" 
+          emissiveIntensity={0.08}
+          metalness={0.55} 
+          roughness={0.45} 
+        />
+      </mesh>
+      
+      {/* Valve assembly (brass/chrome) */}
+      <group position={[0, h + 0.06, 0]}>
+        {/* Valve body */}
+        <mesh castShadow>
+          <cylinderGeometry args={[0.035, 0.04, 0.06, 16]} />
+          <primitive object={securityMaterials.extincteurChrome} attach="material" />
+        </mesh>
+        {/* Valve neck */}
+        <mesh position={[0, 0.04, 0]} castShadow>
+          <cylinderGeometry args={[0.025, 0.035, 0.03, 16]} />
+          <primitive object={securityMaterials.extincteurChrome} attach="material" />
+        </mesh>
+      </group>
+      
+      {/* Pressure gauge with dial */}
+      <group position={[r * 0.7, h + 0.04, 0]} rotation={[0, -Math.PI / 4, 0]}>
+        {/* Gauge body */}
+        <mesh castShadow>
+          <cylinderGeometry args={[0.022, 0.022, 0.018, 16]} />
+          <meshStandardMaterial color="#f5f5f5" metalness={0.3} roughness={0.7} />
+        </mesh>
+        {/* Gauge glass */}
+        <mesh position={[0, 0.01, 0]}>
+          <cylinderGeometry args={[0.018, 0.018, 0.004, 16]} />
+          <meshStandardMaterial color="#ffffff" transparent opacity={0.8} metalness={0.1} roughness={0.1} />
+        </mesh>
+        {/* Green zone indicator */}
+        <mesh position={[0.005, 0.012, 0]}>
+          <boxGeometry args={[0.008, 0.002, 0.012]} />
+          <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.5} />
+        </mesh>
+        {/* Needle */}
+        <mesh position={[0.003, 0.013, 0]} rotation={[0, 0, Math.PI / 6]}>
+          <boxGeometry args={[0.012, 0.001, 0.001]} />
+          <meshStandardMaterial color="#dc2626" />
+        </mesh>
+      </group>
+      
+      {/* Handle assembly */}
+      <group position={[0, h + 0.1, 0]}>
+        {/* Trigger guard */}
+        <mesh position={[0, 0, 0.025]} castShadow>
+          <boxGeometry args={[0.07, 0.05, 0.018]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        {/* Squeeze lever */}
+        <mesh position={[0, 0.035, 0.015]} rotation={[0.25, 0, 0]} castShadow>
+          <boxGeometry args={[0.085, 0.012, 0.045]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.65} roughness={0.35} />
+        </mesh>
+        {/* Carry handle */}
+        <mesh position={[0, 0.055, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[0.04, 0.008, 8, 16, Math.PI]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+        </mesh>
+      </group>
+      
+      {/* Hose and horn (CO2 style) */}
+      {type === 'CO2' && (
+        <group position={[r * 0.5, h + 0.05, -0.01]}>
+          {/* Hose connector */}
+          <mesh rotation={[Math.PI / 3, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.012, 0.015, 0.04, 8]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+          </mesh>
+          {/* Flexible hose (curved) */}
+          <mesh position={[0.03, -0.08, -0.03]} rotation={[0.5, 0, 0.3]}>
+            <cylinderGeometry args={[0.01, 0.01, 0.15, 8]} />
+            <meshStandardMaterial color="#1f2937" roughness={0.8} />
+          </mesh>
+          {/* Horn/nozzle */}
+          <mesh position={[0.06, -0.18, -0.06]} rotation={[0.8, 0, 0]}>
+            <coneGeometry args={[0.04, 0.08, 12]} />
+            <meshStandardMaterial color="#0f0f0f" metalness={0.3} roughness={0.7} />
           </mesh>
         </group>
       )}
       
-      {/* Main cylinder */}
-      <mesh position={[0, h/2, 0]} castShadow>
-        <cylinderGeometry args={[r, r, h, 16]} />
-        <primitive object={securityMaterials.extincteurRed} attach="material" />
-      </mesh>
-      
-      {/* Bottom dome */}
-      <mesh position={[0, 0, 0]}>
-        <sphereGeometry args={[r, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-        <primitive object={securityMaterials.extincteurRed} attach="material" />
-      </mesh>
-      
-      {/* Top valve assembly */}
-      <mesh position={[0, h + 0.03, 0]} castShadow>
-        <cylinderGeometry args={[0.04, 0.05, 0.08, 12]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Pressure gauge */}
-      <mesh position={[0.05, h + 0.02, 0]} rotation={[0, 0, Math.PI / 4]} castShadow>
-        <cylinderGeometry args={[0.02, 0.02, 0.015, 12]} />
-        <meshStandardMaterial color="#f5f5f5" metalness={0.3} roughness={0.7} />
-      </mesh>
-      
-      {/* Handle/trigger */}
-      <mesh position={[0, h + 0.08, 0.03]} castShadow>
-        <boxGeometry args={[0.06, 0.04, 0.02]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Lever */}
-      <mesh position={[0, h + 0.11, 0.02]} rotation={[0.3, 0, 0]} castShadow>
-        <boxGeometry args={[0.08, 0.015, 0.05]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Hose connector */}
-      <mesh position={[0.04, h + 0.04, -0.02]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.012, 0.012, 0.04, 8]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.5} />
-      </mesh>
-      
-      {/* Label band (white with type text) */}
-      <mesh position={[0, h * 0.6, r + 0.002]}>
-        <boxGeometry args={[r * 1.5, 0.12, 0.002]} />
-        <meshStandardMaterial color="#ffffff" />
-      </mesh>
-      
-      {/* Type indicator */}
-      {type === 'CO2' && (
-        <mesh position={[0, h * 0.35, r + 0.003]}>
-          <boxGeometry args={[0.05, 0.03, 0.001]} />
-          <meshStandardMaterial color="#1f2937" />
+      {/* Main label band */}
+      <group position={[0, h * 0.55, 0]}>
+        {/* White background band */}
+        <mesh rotation={[0, 0, 0]}>
+          <cylinderGeometry args={[r + 0.002, r + 0.002, 0.14, 24, 1, true]} />
+          <meshStandardMaterial color="#ffffff" side={THREE.DoubleSide} />
         </mesh>
-      )}
+        {/* Type label */}
+        <mesh position={[0, 0, r + 0.004]}>
+          <boxGeometry args={[0.08, 0.05, 0.002]} />
+          <meshStandardMaterial color={labelColor} />
+        </mesh>
+      </group>
       
-      {/* Safety pin */}
-      <mesh position={[-0.03, h + 0.1, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <torusGeometry args={[0.015, 0.003, 6, 12]} />
-        <meshStandardMaterial color="#fbbf24" metalness={0.5} roughness={0.5} />
+      {/* CO2/Type indicator band */}
+      <mesh position={[0, h * 0.35, 0]}>
+        <cylinderGeometry args={[r + 0.003, r + 0.003, 0.04, 24, 1, true]} />
+        <meshStandardMaterial color={labelColor} emissive={labelColor} emissiveIntensity={0.1} side={THREE.DoubleSide} />
+      </mesh>
+      
+      {/* Safety pin with tag */}
+      <group position={[-0.04, h + 0.12, 0.015]}>
+        {/* Pin ring */}
+        <mesh rotation={[0, 0, Math.PI / 2]}>
+          <torusGeometry args={[0.018, 0.004, 8, 16]} />
+          <meshStandardMaterial color="#facc15" emissive="#facc15" emissiveIntensity={0.3} metalness={0.6} roughness={0.4} />
+        </mesh>
+        {/* Pin shaft */}
+        <mesh position={[0.02, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.003, 0.003, 0.025, 6]} />
+          <meshStandardMaterial color="#facc15" metalness={0.7} roughness={0.3} />
+        </mesh>
+        {/* Tag */}
+        <mesh position={[-0.025, 0, 0]}>
+          <boxGeometry args={[0.025, 0.035, 0.002]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+      </group>
+      
+      {/* Inspection collar */}
+      <mesh position={[0, h * 0.15, 0]}>
+        <cylinderGeometry args={[r + 0.004, r + 0.004, 0.02, 24, 1, true]} />
+        <meshStandardMaterial color="#dc2626" metalness={0.4} roughness={0.6} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -3741,7 +4106,7 @@ const FireExtinguisher3D = memo(function FireExtinguisher3D({
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EVACUATION ARROW 3D - Floor marking for evacuation routes
-// Green arrow with phosphorescent effect
+// Green arrow with phosphorescent glow effect (ISO 7010)
 // ═══════════════════════════════════════════════════════════════════════════
 const EvacuationArrow3D = memo(function EvacuationArrow3D({ 
   position = [0, 0, 0] as [number, number, number],
@@ -3754,26 +4119,87 @@ const EvacuationArrow3D = memo(function EvacuationArrow3D({
 }) {
   const s = size / 1000;
   
+  // Create arrow shape
+  const arrowShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    const w = s * 0.4;
+    const h = s * 0.9;
+    const headW = s * 0.6;
+    const headH = s * 0.35;
+    const bodyW = s * 0.22;
+    
+    // Start at bottom center
+    shape.moveTo(-bodyW/2, -h/2);
+    shape.lineTo(-bodyW/2, h/2 - headH);
+    shape.lineTo(-headW/2, h/2 - headH);
+    shape.lineTo(0, h/2);
+    shape.lineTo(headW/2, h/2 - headH);
+    shape.lineTo(bodyW/2, h/2 - headH);
+    shape.lineTo(bodyW/2, -h/2);
+    shape.closePath();
+    return shape;
+  }, [s]);
+  
   return (
     <group position={position} rotation={rotation}>
-      {/* Arrow body */}
-      <mesh position={[0, 0.005, -s * 0.15]} rotation={[-Math.PI / 2, 0, 0]}>
-        <boxGeometry args={[s * 0.25, s * 0.5, 0.01]} />
+      {/* Base glow (larger, softer) */}
+      <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <shapeGeometry args={[arrowShape]} />
+        <meshStandardMaterial 
+          color="#16a34a" 
+          emissive="#16a34a" 
+          emissiveIntensity={0.4}
+          transparent 
+          opacity={0.5}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      
+      {/* Main arrow */}
+      <mesh position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <shapeGeometry args={[arrowShape]} />
         <primitive object={securityMaterials.evacGreen} attach="material" />
       </mesh>
       
-      {/* Arrow head */}
-      <mesh position={[0, 0.005, s * 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[s * 0.3, s * 0.35, 3]} />
-        <primitive object={securityMaterials.evacGreen} attach="material" />
+      {/* Inner arrow (brighter core) */}
+      <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.7, 0.7, 1]}>
+        <shapeGeometry args={[arrowShape]} />
+        <meshStandardMaterial 
+          color="#4ade80" 
+          emissive="#4ade80" 
+          emissiveIntensity={1.2}
+          transparent 
+          opacity={0.85}
+        />
       </mesh>
+      
+      {/* Phosphorescent border dots */}
+      {[
+        [-s * 0.15, 0, -s * 0.35],
+        [s * 0.15, 0, -s * 0.35],
+        [-s * 0.15, 0, 0],
+        [s * 0.15, 0, 0],
+        [-s * 0.25, 0, s * 0.15],
+        [s * 0.25, 0, s * 0.15],
+      ].map(([x, y, z], i) => (
+        <mesh key={`dot-${i}`} position={[x, 0.015, z]}>
+          <sphereGeometry args={[0.015, 12, 12]} />
+          <meshStandardMaterial 
+            color="#86efac" 
+            emissive="#86efac" 
+            emissiveIntensity={1.5}
+            transparent 
+            opacity={0.9}
+          />
+        </mesh>
+      ))}
     </group>
   );
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RMU 3D - Ring Main Unit (Cellule HT compacte)
-// Schneider RM6 style - compact MV switchgear
+// Schneider RM6 / ABB SafeRing style - compact MV switchgear
 // ═══════════════════════════════════════════════════════════════════════════
 const RMU3D = memo(function RMU3D({ 
   dimensions = { width: 1200, height: 1800, depth: 900 },
@@ -3794,84 +4220,865 @@ const RMU3D = memo(function RMU3D({
   
   return (
     <group position={position} rotation={rotation}>
-      {/* Main cabinet */}
-      <mesh position={[0, h/2, 0]} castShadow receiveShadow>
+      {/* Base plinth (concrete) */}
+      <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w + 0.1, 0.1, d + 0.1]} />
+        <meshStandardMaterial color="#6b7280" roughness={0.9} />
+      </mesh>
+      
+      {/* Main cabinet body */}
+      <mesh position={[0, h/2 + 0.1, 0]} castShadow receiveShadow>
         <boxGeometry args={[w, h, d]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+        <primitive object={securityMaterials.rmuBody} attach="material" />
+      </mesh>
+      
+      {/* Top cover with ventilation */}
+      <mesh position={[0, h + 0.12, 0]} castShadow>
+        <boxGeometry args={[w + 0.02, 0.04, d + 0.02]} />
+        <meshStandardMaterial color="#374151" metalness={0.7} roughness={0.3} />
       </mesh>
       
       {/* Front panels (per function) */}
       {Array.from({ length: functions }).map((_, i) => {
         const xPos = -w/2 + funcWidth/2 + i * funcWidth;
+        const isMainSwitch = i === 0;
         return (
-          <group key={`func-${i}`} position={[xPos, h/2, d/2 + 0.005]}>
-            {/* Panel */}
+          <group key={`func-${i}`} position={[xPos, h/2 + 0.1, d/2 + 0.003]}>
+            {/* Recessed panel */}
             <mesh castShadow>
-              <boxGeometry args={[funcWidth * 0.9, h * 0.85, 0.01]} />
-              <meshStandardMaterial color="#374151" metalness={0.5} roughness={0.5} />
+              <boxGeometry args={[funcWidth * 0.92, h * 0.9, 0.008]} />
+              <primitive object={securityMaterials.rmuPanel} attach="material" />
             </mesh>
             
-            {/* Function indicator window */}
-            <mesh position={[0, h * 0.25, 0.006]}>
-              <boxGeometry args={[funcWidth * 0.5, 0.08, 0.005]} />
-              <meshStandardMaterial color="#0f172a" />
+            {/* Panel frame */}
+            <mesh position={[0, 0, 0.005]}>
+              <boxGeometry args={[funcWidth * 0.88, h * 0.86, 0.004]} />
+              <meshStandardMaterial color="#4b5563" metalness={0.5} roughness={0.5} />
             </mesh>
             
-            {/* Status LED */}
-            <mesh position={[funcWidth * 0.3, h * 0.35, 0.008]}>
-              <sphereGeometry args={[0.01, 8, 8]} />
-              <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} />
+            {/* Mimic diagram window (shows circuit status) */}
+            <mesh position={[0, h * 0.25, 0.01]}>
+              <boxGeometry args={[funcWidth * 0.6, 0.12, 0.006]} />
+              <meshStandardMaterial 
+                color="#0f172a" 
+                emissive="#1e3a8a" 
+                emissiveIntensity={0.1}
+              />
             </mesh>
             
-            {/* Operating handle */}
-            <mesh position={[0, 0, 0.015]} castShadow>
-              <cylinderGeometry args={[0.03, 0.03, 0.04, 8]} />
-              <meshStandardMaterial color="#dc2626" metalness={0.4} roughness={0.6} />
+            {/* Function label */}
+            <mesh position={[0, h * 0.35, 0.01]}>
+              <boxGeometry args={[funcWidth * 0.5, 0.025, 0.003]} />
+              <meshStandardMaterial color="#ffffff" />
             </mesh>
             
-            {/* Handle lever */}
-            <mesh position={[0, 0, 0.04]} rotation={[0, 0, 0]} castShadow>
-              <boxGeometry args={[0.08, 0.02, 0.015]} />
-              <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+            {/* Status LEDs row */}
+            {[
+              { offset: -funcWidth * 0.25, color: '#22c55e', label: 'ON' },
+              { offset: 0, color: '#f97316', label: 'TRIP' },
+              { offset: funcWidth * 0.25, color: '#dc2626', label: 'FAULT' }
+            ].map((led, li) => (
+              <group key={`led-${li}`} position={[led.offset, h * 0.15, 0.01]}>
+                <mesh>
+                  <sphereGeometry args={[0.012, 16, 16]} />
+                  <meshStandardMaterial 
+                    color={led.color} 
+                    emissive={led.color} 
+                    emissiveIntensity={li === 0 ? 1.5 : 0.3}
+                    transparent
+                    opacity={0.9}
+                  />
+                </mesh>
+                {/* LED bezel */}
+                <mesh position={[0, 0, -0.002]} rotation={[Math.PI / 2, 0, 0]}>
+                  <torusGeometry args={[0.015, 0.003, 8, 16]} />
+                  <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+                </mesh>
+              </group>
+            ))}
+            
+            {/* Operating mechanism */}
+            <group position={[0, -h * 0.1, 0.02]}>
+              {/* Rotary handle base */}
+              <mesh castShadow>
+                <cylinderGeometry args={[0.04, 0.045, 0.025, 24]} />
+                <meshStandardMaterial 
+                  color={isMainSwitch ? "#dc2626" : "#facc15"} 
+                  emissive={isMainSwitch ? "#dc2626" : "#facc15"} 
+                  emissiveIntensity={0.2}
+                  metalness={0.3} 
+                  roughness={0.5} 
+                />
+              </mesh>
+              {/* Handle lever */}
+              <mesh position={[0, 0, 0.02]} rotation={[0, 0, Math.PI / 6]} castShadow>
+                <boxGeometry args={[0.1, 0.018, 0.012]} />
+                <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+              </mesh>
+              {/* Position indicator */}
+              <mesh position={[0.035, 0, 0.015]}>
+                <cylinderGeometry args={[0.006, 0.006, 0.008, 8]} />
+                <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.3} />
+              </mesh>
+            </group>
+            
+            {/* Voltage indicator */}
+            <mesh position={[funcWidth * 0.32, h * 0.32, 0.01]}>
+              <boxGeometry args={[0.035, 0.035, 0.008]} />
+              <meshStandardMaterial 
+                color="#22c55e" 
+                emissive="#22c55e" 
+                emissiveIntensity={1.2}
+                transparent
+                opacity={0.85}
+              />
+            </mesh>
+            
+            {/* Lock-out / Tag-out point */}
+            <mesh position={[-funcWidth * 0.32, -h * 0.1, 0.025]}>
+              <torusGeometry args={[0.015, 0.004, 8, 16]} />
+              <meshStandardMaterial color="#71717a" metalness={0.8} roughness={0.2} />
             </mesh>
           </group>
         );
       })}
       
-      {/* Cable entry (bottom) */}
+      {/* Cable entry chambers (bottom) */}
       {Array.from({ length: functions }).map((_, i) => {
         const xPos = -w/2 + funcWidth/2 + i * funcWidth;
         return (
-          <mesh key={`cable-${i}`} position={[xPos, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.04, 0.04, 0.15, 12]} />
-            <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.5} />
-          </mesh>
+          <group key={`cable-${i}`} position={[xPos, 0.1, 0]}>
+            {/* Cable gland */}
+            <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.05, 0.055, 0.12, 16]} />
+              <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+            </mesh>
+            {/* Cable entry ring */}
+            <mesh position={[0, -0.06, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.04, 0.008, 8, 16]} />
+              <meshStandardMaterial color="#374151" metalness={0.7} roughness={0.3} />
+            </mesh>
+          </group>
         );
       })}
       
-      {/* Top vent */}
-      <mesh position={[0, h + 0.02, 0]} castShadow>
-        <boxGeometry args={[w * 0.8, 0.04, d * 0.6]} />
-        <meshStandardMaterial color="#4b5563" metalness={0.5} roughness={0.5} />
-      </mesh>
+      {/* Side ventilation grilles */}
+      {[-1, 1].map((side) => (
+        <group key={`vent-${side}`} position={[side * (w/2 + 0.003), h * 0.6, 0]}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <mesh key={`slot-${i}`} position={[0, (i - 3.5) * 0.05, 0]} rotation={[0, side * Math.PI / 2, 0]}>
+              <boxGeometry args={[0.002, 0.015, d * 0.6]} />
+              <primitive object={securityMaterials.rmuVentilation} attach="material" />
+            </mesh>
+          ))}
+        </group>
+      ))}
       
-      {/* Nameplate */}
-      <mesh position={[0, h * 0.85, d/2 + 0.008]}>
-        <boxGeometry args={[w * 0.5, 0.06, 0.003]} />
-        <meshStandardMaterial color="#f5f5f5" />
-      </mesh>
+      {/* Manufacturer nameplate */}
+      <group position={[0, h * 0.92, d/2 + 0.01]}>
+        <mesh>
+          <boxGeometry args={[w * 0.4, 0.05, 0.004]} />
+          <meshStandardMaterial color="#e5e5e5" metalness={0.6} roughness={0.3} />
+        </mesh>
+        {/* Logo emboss */}
+        <mesh position={[0, 0, 0.003]}>
+          <boxGeometry args={[0.06, 0.025, 0.002]} />
+          <meshStandardMaterial color="#1f2937" />
+        </mesh>
+      </group>
       
-      {/* HV warning sign */}
+      {/* HV warning signs */}
       <DangerSign3D 
-        position={[-w/3, h * 0.6, d/2 + 0.015]}
+        position={[-w/3, h * 0.55, d/2 + 0.015]}
         type="high-voltage"
-        size={200}
+        size={180}
       />
       
       {/* Earth terminal */}
       <mesh position={[w/2 - 0.08, 0.15, d/2 + 0.01]}>
         <cylinderGeometry args={[0.015, 0.015, 0.02, 8]} />
         <meshStandardMaterial color="#22c55e" metalness={0.6} roughness={0.4} />
+      </mesh>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INFRASTRUCTURE - ROADS, LOADING ZONES, PARKING, GATES
+// Voirie et accès pour site industriel mining
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Materials for infrastructure
+const infrastructureMaterials = {
+  concrete: new THREE.MeshStandardMaterial({ color: '#9ca3af', roughness: 0.9, metalness: 0.1 }),
+  asphalt: new THREE.MeshStandardMaterial({ color: '#374151', roughness: 0.85, metalness: 0.05 }),
+  marking: new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.15, roughness: 0.6 }),
+  markingYellow: new THREE.MeshStandardMaterial({ color: '#fbbf24', emissive: '#fbbf24', emissiveIntensity: 0.2, roughness: 0.6 }),
+  steel: new THREE.MeshStandardMaterial({ color: '#374151', metalness: 0.8, roughness: 0.3 }),
+  guardhouse: new THREE.MeshStandardMaterial({ color: '#1f2937', metalness: 0.4, roughness: 0.6 }),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROAD 3D - Route béton/asphalte avec marquage
+// ═══════════════════════════════════════════════════════════════════════════
+const Road3D = memo(function Road3D({ 
+  dimensions = { width: 10000, height: 200, depth: 6000 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  surfaceType = 'concrete',
+  lanes = 2,
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  surfaceType?: 'concrete' | 'asphalt';
+  lanes?: number;
+}) {
+  const w = dimensions.width / 1000;   // longueur route
+  const h = dimensions.height / 1000;  // épaisseur
+  const d = dimensions.depth / 1000;   // largeur route
+  
+  const material = surfaceType === 'asphalt' ? infrastructureMaterials.asphalt : infrastructureMaterials.concrete;
+  const laneWidth = d / lanes;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Base de route */}
+      <mesh position={[0, h/2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w, h, d]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+      
+      {/* Bordures latérales */}
+      {[-1, 1].map((side) => (
+        <mesh key={`curb-${side}`} position={[0, h + 0.06, side * (d/2 + 0.075)]} castShadow>
+          <boxGeometry args={[w, 0.12, 0.15]} />
+          <meshStandardMaterial color="#d1d5db" roughness={0.85} />
+        </mesh>
+      ))}
+      
+      {/* Ligne centrale (pointillée si 2 voies) */}
+      {lanes >= 2 && (
+        <group position={[0, h + 0.01, 0]}>
+          {Array.from({ length: Math.floor(w / 1) }).map((_, i) => (
+            i % 2 === 0 && (
+              <mesh key={`center-${i}`} position={[-w/2 + 0.5 + i * 1, 0, 0]}>
+                <boxGeometry args={[0.8, 0.015, 0.12]} />
+                <primitive object={infrastructureMaterials.marking} attach="material" />
+              </mesh>
+            )
+          ))}
+        </group>
+      )}
+      
+      {/* Lignes de rive (continues) */}
+      {[-1, 1].map((side) => (
+        <mesh key={`edge-${side}`} position={[0, h + 0.01, side * (d/2 - 0.15)]}>
+          <boxGeometry args={[w, 0.015, 0.12]} />
+          <primitive object={infrastructureMaterials.marking} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* Joints de dilatation (béton uniquement) */}
+      {surfaceType === 'concrete' && (
+        Array.from({ length: Math.floor(w / 3) }).map((_, i) => (
+          <mesh key={`joint-${i}`} position={[-w/2 + 1.5 + i * 3, h + 0.005, 0]}>
+            <boxGeometry args={[0.02, 0.01, d]} />
+            <meshStandardMaterial color="#6b7280" />
+          </mesh>
+        ))
+      )}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LOADING ZONE 3D - Zone de chargement/déchargement
+// ═══════════════════════════════════════════════════════════════════════════
+const LoadingZone3D = memo(function LoadingZone3D({ 
+  dimensions = { width: 20000, height: 200, depth: 15000 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const w = dimensions.width / 1000;
+  const h = dimensions.height / 1000;
+  const d = dimensions.depth / 1000;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Dalle béton renforcé */}
+      <mesh position={[0, h/2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w, h, d]} />
+        <meshStandardMaterial color="#9ca3af" roughness={0.85} />
+      </mesh>
+      
+      {/* Marquage zone jaune/noir (hachures danger) */}
+      {Array.from({ length: Math.floor((w + d) * 2 / 0.8) }).map((_, i) => {
+        const isHorizontal = i < Math.floor(w * 2 / 0.8);
+        return (
+          <mesh 
+            key={`stripe-${i}`} 
+            position={[
+              isHorizontal ? -w/2 + 0.2 + (i % Math.floor(w / 0.4)) * 0.8 : (i % 2 === 0 ? -w/2 + 0.15 : w/2 - 0.15),
+              h + 0.008,
+              isHorizontal ? (Math.floor(i / Math.floor(w / 0.4)) % 2 === 0 ? -d/2 + 0.15 : d/2 - 0.15) : -d/2 + 0.2 + ((i - Math.floor(w * 2 / 0.8)) % Math.floor(d / 0.4)) * 0.8
+            ]}
+            rotation={[0, isHorizontal ? 0 : Math.PI / 2, 0]}
+          >
+            <boxGeometry args={[0.4, 0.012, 0.3]} />
+            <primitive object={(i % 2 === 0) ? infrastructureMaterials.markingYellow : sharedMaterials.darkFrame} attach="material" />
+          </mesh>
+        );
+      }).slice(0, 40)}
+      
+      {/* Texte "ZONE DE CHARGEMENT" (représenté par bandes) */}
+      <mesh position={[0, h + 0.01, 0]}>
+        <boxGeometry args={[w * 0.6, 0.015, 0.8]} />
+        <primitive object={infrastructureMaterials.markingYellow} attach="material" />
+      </mesh>
+      
+      {/* Points d'ancrage (4 coins) */}
+      {[
+        [-w/2 + 1, -d/2 + 1], [w/2 - 1, -d/2 + 1],
+        [-w/2 + 1, d/2 - 1], [w/2 - 1, d/2 - 1]
+      ].map(([x, z], i) => (
+        <mesh key={`anchor-${i}`} position={[x, h + 0.02, z]}>
+          <cylinderGeometry args={[0.08, 0.08, 0.04, 16]} />
+          <meshStandardMaterial color="#f59e0b" metalness={0.7} roughness={0.3} />
+        </mesh>
+      ))}
+      
+      {/* Bornes de délimitation */}
+      {[
+        [-w/2 + 0.3, -d/2 + 0.3], [w/2 - 0.3, -d/2 + 0.3],
+        [-w/2 + 0.3, d/2 - 0.3], [w/2 - 0.3, d/2 - 0.3]
+      ].map(([x, z], i) => (
+        <group key={`bollard-${i}`} position={[x, 0, z]}>
+          <mesh position={[0, h + 0.4, 0]} castShadow>
+            <cylinderGeometry args={[0.1, 0.1, 0.8, 12]} />
+            <meshStandardMaterial color="#fbbf24" metalness={0.4} roughness={0.5} />
+          </mesh>
+          {/* Bandes réfléchissantes */}
+          <mesh position={[0, h + 0.65, 0]}>
+            <cylinderGeometry args={[0.11, 0.11, 0.1, 12]} />
+            <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.3} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LOADING DOCK 3D - Quai de chargement surélevé
+// ═══════════════════════════════════════════════════════════════════════════
+const LoadingDock3D = memo(function LoadingDock3D({ 
+  dimensions = { width: 15000, height: 1200, depth: 4000 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const w = dimensions.width / 1000;
+  const h = dimensions.height / 1000;
+  const d = dimensions.depth / 1000;
+  
+  const dockBays = Math.max(1, Math.floor(w / 5)); // 1 baie tous les 5m
+  const bayWidth = w / dockBays;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Structure principale du quai */}
+      <mesh position={[0, h/2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w, h, d]} />
+        <meshStandardMaterial color="#6b7280" roughness={0.8} />
+      </mesh>
+      
+      {/* Surface de roulement */}
+      <mesh position={[0, h + 0.05, 0]} castShadow>
+        <boxGeometry args={[w, 0.1, d]} />
+        <meshStandardMaterial color="#9ca3af" roughness={0.85} />
+      </mesh>
+      
+      {/* Butoirs de quai (par baie) */}
+      {Array.from({ length: dockBays }).map((_, i) => {
+        const xPos = -w/2 + bayWidth/2 + i * bayWidth;
+        return (
+          <group key={`bay-${i}`} position={[xPos, 0, -d/2]}>
+            {/* Butoirs caoutchouc */}
+            {[-0.6, 0.6].map((offset, bi) => (
+              <mesh key={`bumper-${bi}`} position={[offset, h/2, -0.15]} castShadow>
+                <boxGeometry args={[0.2, h * 0.6, 0.3]} />
+                <meshStandardMaterial color="#1f2937" roughness={0.95} />
+              </mesh>
+            ))}
+            
+            {/* Niveleur de quai */}
+            <mesh position={[0, h + 0.02, -0.3]} rotation={[-0.1, 0, 0]}>
+              <boxGeometry args={[2.2, 0.08, 0.5]} />
+              <meshStandardMaterial color="#4b5563" metalness={0.6} roughness={0.4} />
+            </mesh>
+            
+            {/* Marquage numéro de quai */}
+            <mesh position={[0, h + 0.06, d/2 - 0.5]}>
+              <boxGeometry args={[0.8, 0.02, 0.8]} />
+              <primitive object={infrastructureMaterials.marking} attach="material" />
+            </mesh>
+          </group>
+        );
+      })}
+      
+      {/* Garde-corps arrière */}
+      <group position={[0, h + 0.5, d/2 - 0.1]}>
+        <mesh castShadow>
+          <boxGeometry args={[w, 0.05, 0.05]} />
+          <primitive object={infrastructureMaterials.steel} attach="material" />
+        </mesh>
+        {/* Poteaux */}
+        {Array.from({ length: Math.ceil(w / 2) + 1 }).map((_, i) => (
+          <mesh key={`post-${i}`} position={[-w/2 + i * 2, -0.25, 0]} castShadow>
+            <boxGeometry args={[0.05, 0.5, 0.05]} />
+            <primitive object={infrastructureMaterials.steel} attach="material" />
+          </mesh>
+        ))}
+      </group>
+      
+      {/* Escalier d'accès (côté) */}
+      <group position={[w/2 + 0.6, 0, 0]}>
+        {Array.from({ length: Math.ceil(h / 0.2) }).map((_, i) => (
+          <mesh key={`step-${i}`} position={[i * 0.3, 0.1 + i * 0.2, 0]} castShadow>
+            <boxGeometry args={[0.35, 0.04, 1]} />
+            <meshStandardMaterial color="#4b5563" metalness={0.5} roughness={0.5} />
+          </mesh>
+        ))}
+        {/* Rampe */}
+        <mesh position={[Math.ceil(h / 0.2) * 0.15, h/2 + 0.5, -0.55]} rotation={[0, 0, Math.atan2(h, Math.ceil(h / 0.2) * 0.3)]}>
+          <boxGeometry args={[Math.sqrt(h*h + Math.pow(Math.ceil(h / 0.2) * 0.3, 2)), 0.04, 0.04]} />
+          <primitive object={infrastructureMaterials.steel} attach="material" />
+        </mesh>
+      </group>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARKING ZONE 3D - Zone de stationnement avec marquage
+// ═══════════════════════════════════════════════════════════════════════════
+const ParkingZone3D = memo(function ParkingZone3D({ 
+  dimensions = { width: 15000, height: 150, depth: 5000 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  vehicleType = 'car',
+  parkingSpaces = 6,
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  vehicleType?: 'car' | 'truck';
+  parkingSpaces?: number;
+}) {
+  const w = dimensions.width / 1000;
+  const h = dimensions.height / 1000;
+  const d = dimensions.depth / 1000;
+  
+  const spaceWidth = w / parkingSpaces;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Surface asphalte */}
+      <mesh position={[0, h/2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w, h, d]} />
+        <primitive object={infrastructureMaterials.asphalt} attach="material" />
+      </mesh>
+      
+      {/* Lignes de séparation des places */}
+      {Array.from({ length: parkingSpaces + 1 }).map((_, i) => (
+        <mesh key={`line-${i}`} position={[-w/2 + i * spaceWidth, h + 0.01, 0]}>
+          <boxGeometry args={[0.1, 0.015, d * 0.9]} />
+          <primitive object={infrastructureMaterials.marking} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* Numéros de place */}
+      {Array.from({ length: parkingSpaces }).map((_, i) => (
+        <mesh key={`num-${i}`} position={[-w/2 + spaceWidth/2 + i * spaceWidth, h + 0.01, -d/2 + 0.5]}>
+          <boxGeometry args={[0.5, 0.015, 0.5]} />
+          <primitive object={infrastructureMaterials.marking} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* Butées de roue (voitures uniquement) */}
+      {vehicleType === 'car' && Array.from({ length: parkingSpaces }).map((_, i) => (
+        <mesh key={`stop-${i}`} position={[-w/2 + spaceWidth/2 + i * spaceWidth, h + 0.05, d/2 - 0.8]}>
+          <boxGeometry args={[1.5, 0.1, 0.15]} />
+          <meshStandardMaterial color="#fbbf24" roughness={0.7} />
+        </mesh>
+      ))}
+      
+      {/* Signalétique P */}
+      <group position={[-w/2 - 0.3, 0, 0]}>
+        <mesh position={[0, 1.2, 0]} castShadow>
+          <cylinderGeometry args={[0.04, 0.04, 2.4, 12]} />
+          <primitive object={infrastructureMaterials.steel} attach="material" />
+        </mesh>
+        <mesh position={[0, 2.5, 0]}>
+          <boxGeometry args={[0.5, 0.5, 0.03]} />
+          <meshStandardMaterial color="#2563eb" />
+        </mesh>
+        <mesh position={[0, 2.5, 0.02]}>
+          <boxGeometry args={[0.3, 0.35, 0.01]} />
+          <primitive object={infrastructureMaterials.marking} attach="material" />
+        </mesh>
+      </group>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VEHICLE GATE 3D - Portail coulissant motorisé
+// ═══════════════════════════════════════════════════════════════════════════
+const VehicleGate3D = memo(function VehicleGate3D({ 
+  dimensions = { width: 6000, height: 2400, depth: 200 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  isOpen = false,
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  isOpen?: boolean;
+}) {
+  const w = dimensions.width / 1000;
+  const h = dimensions.height / 1000;
+  
+  const gateOffset = isOpen ? w * 0.95 : 0;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Pilier gauche */}
+      <mesh position={[-w/2 - 0.2, h/2, 0]} castShadow>
+        <boxGeometry args={[0.4, h, 0.4]} />
+        <meshStandardMaterial color="#374151" metalness={0.3} roughness={0.7} />
+      </mesh>
+      
+      {/* Pilier droit */}
+      <mesh position={[w/2 + 0.2, h/2, 0]} castShadow>
+        <boxGeometry args={[0.4, h, 0.4]} />
+        <meshStandardMaterial color="#374151" metalness={0.3} roughness={0.7} />
+      </mesh>
+      
+      {/* Rail au sol */}
+      <mesh position={[w/4, 0.02, 0]}>
+        <boxGeometry args={[w * 1.5, 0.04, 0.08]} />
+        <primitive object={infrastructureMaterials.steel} attach="material" />
+      </mesh>
+      
+      {/* Portail coulissant */}
+      <group position={[gateOffset, 0, 0]}>
+        {/* Cadre principal */}
+        <mesh position={[0, h/2, 0]} castShadow>
+          <boxGeometry args={[w, h, 0.08]} />
+          <primitive object={infrastructureMaterials.steel} attach="material" />
+        </mesh>
+        
+        {/* Barreaux verticaux */}
+        {Array.from({ length: Math.floor(w / 0.15) }).map((_, i) => (
+          <mesh key={`bar-${i}`} position={[-w/2 + 0.075 + i * 0.15, h/2, 0]} castShadow>
+            <boxGeometry args={[0.03, h * 0.85, 0.03]} />
+            <primitive object={infrastructureMaterials.steel} attach="material" />
+          </mesh>
+        ))}
+        
+        {/* Traverse horizontale haute */}
+        <mesh position={[0, h - 0.1, 0]} castShadow>
+          <boxGeometry args={[w, 0.1, 0.1]} />
+          <primitive object={infrastructureMaterials.steel} attach="material" />
+        </mesh>
+        
+        {/* Traverse horizontale basse */}
+        <mesh position={[0, 0.15, 0]} castShadow>
+          <boxGeometry args={[w, 0.08, 0.08]} />
+          <primitive object={infrastructureMaterials.steel} attach="material" />
+        </mesh>
+        
+        {/* Roues de guidage */}
+        {[-w/2 + 0.3, w/2 - 0.3].map((xPos, i) => (
+          <mesh key={`wheel-${i}`} position={[xPos, 0.06, 0]} rotation={[0, 0, Math.PI/2]}>
+            <cylinderGeometry args={[0.06, 0.06, 0.04, 16]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+      </group>
+      
+      {/* Moteur */}
+      <mesh position={[w/2 + 0.5, 0.3, 0.2]} castShadow>
+        <boxGeometry args={[0.4, 0.35, 0.3]} />
+        <meshStandardMaterial color="#f59e0b" metalness={0.4} roughness={0.5} />
+      </mesh>
+      
+      {/* Feu clignotant */}
+      <group position={[-w/2 - 0.2, h + 0.15, 0]}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.08, 0.08, 0.15, 16]} />
+          <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.5} />
+        </mesh>
+      </group>
+      
+      {/* Lecteur badge */}
+      <BadgeReader3D position={[-w/2 - 0.5, h * 0.5, 0.25]} />
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GUARDHOUSE 3D - Guérite de sécurité
+// ═══════════════════════════════════════════════════════════════════════════
+const Guardhouse3D = memo(function Guardhouse3D({ 
+  dimensions = { width: 3000, height: 2800, depth: 2500 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const w = dimensions.width / 1000;
+  const h = dimensions.height / 1000;
+  const d = dimensions.depth / 1000;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Base/fondation */}
+      <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w + 0.2, 0.2, d + 0.2]} />
+        <meshStandardMaterial color="#6b7280" roughness={0.9} />
+      </mesh>
+      
+      {/* Corps principal */}
+      <mesh position={[0, h/2 + 0.2, 0]} castShadow>
+        <boxGeometry args={[w, h, d]} />
+        <primitive object={infrastructureMaterials.guardhouse} attach="material" />
+      </mesh>
+      
+      {/* Toit */}
+      <mesh position={[0, h + 0.3, 0]} castShadow>
+        <boxGeometry args={[w + 0.3, 0.15, d + 0.3]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.5} />
+      </mesh>
+      
+      {/* Fenêtres panoramiques */}
+      {[
+        [0, h * 0.55, -d/2 - 0.02],           // Avant
+        [-w/2 - 0.02, h * 0.55, 0],           // Gauche
+        [w/2 + 0.02, h * 0.55, 0],            // Droite
+      ].map(([x, y, z], i) => (
+        <mesh key={`window-${i}`} position={[x, y, z]} rotation={[0, i === 0 ? 0 : Math.PI/2, 0]}>
+          <boxGeometry args={[i === 0 ? w * 0.8 : d * 0.7, h * 0.5, 0.04]} />
+          <meshStandardMaterial color="#1e3a5f" transparent opacity={0.7} metalness={0.3} roughness={0.1} />
+        </mesh>
+      ))}
+      
+      {/* Porte */}
+      <mesh position={[0, h * 0.4 + 0.2, d/2 + 0.02]} castShadow>
+        <boxGeometry args={[0.9, h * 0.75, 0.05]} />
+        <meshStandardMaterial color="#374151" metalness={0.4} roughness={0.6} />
+      </mesh>
+      
+      {/* Climatisation */}
+      <mesh position={[w/2 - 0.3, h + 0.5, 0]} castShadow>
+        <boxGeometry args={[0.5, 0.35, 0.4]} />
+        <meshStandardMaterial color="#e5e5e5" roughness={0.7} />
+      </mesh>
+      
+      {/* Antenne */}
+      <mesh position={[-w/2 + 0.2, h + 0.8, 0]} castShadow>
+        <cylinderGeometry args={[0.02, 0.02, 1, 8]} />
+        <primitive object={infrastructureMaterials.steel} attach="material" />
+      </mesh>
+      
+      {/* Caméra CCTV */}
+      <group position={[w/2 + 0.15, h, d/2 - 0.3]}>
+        <mesh rotation={[0, Math.PI/4, 0]} castShadow>
+          <boxGeometry args={[0.15, 0.1, 0.2]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.5} />
+        </mesh>
+        <mesh position={[0.1, 0, 0]} rotation={[0, Math.PI/4, 0]}>
+          <cylinderGeometry args={[0.03, 0.04, 0.08, 12]} />
+          <meshStandardMaterial color="#0f172a" metalness={0.7} roughness={0.3} />
+        </mesh>
+      </group>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BARRIER ARM 3D - Barrière levante automatique
+// ═══════════════════════════════════════════════════════════════════════════
+const BarrierArm3D = memo(function BarrierArm3D({ 
+  dimensions = { width: 6000, height: 1000, depth: 400 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  isOpen = false,
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  isOpen?: boolean;
+}) {
+  const armLength = dimensions.width / 1000;
+  const armAngle = isOpen ? -Math.PI / 2 : 0;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Boîtier moteur */}
+      <mesh position={[0, 0.5, 0]} castShadow>
+        <boxGeometry args={[0.4, 1, 0.35]} />
+        <meshStandardMaterial color="#dc2626" metalness={0.3} roughness={0.6} />
+      </mesh>
+      
+      {/* Capot supérieur */}
+      <mesh position={[0, 1.05, 0]} castShadow>
+        <boxGeometry args={[0.45, 0.1, 0.4]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.4} />
+      </mesh>
+      
+      {/* Bras de barrière */}
+      <group position={[0, 1, 0]} rotation={[armAngle, 0, 0]}>
+        <mesh position={[armLength/2, 0, 0]} castShadow>
+          <boxGeometry args={[armLength, 0.08, 0.06]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        
+        {/* Bandes rouges */}
+        {Array.from({ length: Math.floor(armLength / 0.5) }).map((_, i) => (
+          i % 2 === 0 && (
+            <mesh key={`stripe-${i}`} position={[0.25 + i * 0.5, 0, 0.035]} castShadow>
+              <boxGeometry args={[0.4, 0.08, 0.01]} />
+              <meshStandardMaterial color="#dc2626" />
+            </mesh>
+          )
+        ))}
+        
+        {/* Réflecteur bout de bras */}
+        <mesh position={[armLength - 0.1, 0, 0.04]}>
+          <boxGeometry args={[0.15, 0.06, 0.02]} />
+          <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.5} />
+        </mesh>
+      </group>
+      
+      {/* Feu clignotant */}
+      <mesh position={[0, 1.2, 0]} castShadow>
+        <cylinderGeometry args={[0.06, 0.06, 0.1, 16]} />
+        <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.6} />
+      </mesh>
+      
+      {/* Base béton */}
+      <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.6, 0.1, 0.5]} />
+        <meshStandardMaterial color="#6b7280" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SPEED BUMP 3D - Ralentisseur (dos d'âne)
+// ═══════════════════════════════════════════════════════════════════════════
+const SpeedBump3D = memo(function SpeedBump3D({ 
+  dimensions = { width: 6000, height: 70, depth: 500 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const w = dimensions.width / 1000;
+  const h = dimensions.height / 1000;
+  const d = dimensions.depth / 1000;
+  
+  const stripeCount = Math.floor(w / 0.3);
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Corps du ralentisseur */}
+      <mesh position={[0, h/2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w, h, d]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.8} />
+      </mesh>
+      
+      {/* Bandes jaunes réfléchissantes */}
+      {Array.from({ length: stripeCount }).map((_, i) => (
+        i % 2 === 0 && (
+          <mesh key={`stripe-${i}`} position={[-w/2 + 0.15 + i * 0.3, h + 0.005, 0]}>
+            <boxGeometry args={[0.25, 0.01, d * 0.95]} />
+            <primitive object={infrastructureMaterials.markingYellow} attach="material" />
+          </mesh>
+        )
+      ))}
+      
+      {/* Fixations au sol */}
+      {[-w/2 + 0.2, w/2 - 0.2].map((xPos, i) => (
+        <mesh key={`bolt-${i}`} position={[xPos, h + 0.01, 0]}>
+          <cylinderGeometry args={[0.02, 0.02, 0.02, 8]} />
+          <meshStandardMaterial color="#4b5563" metalness={0.8} roughness={0.2} />
+        </mesh>
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BOLLARD 3D - Borne anti-intrusion
+// ═══════════════════════════════════════════════════════════════════════════
+const Bollard3D = memo(function Bollard3D({ 
+  dimensions = { width: 200, height: 1000, depth: 200 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const h = dimensions.height / 1000;
+  const r = dimensions.width / 2000;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Borne principale */}
+      <mesh position={[0, h/2, 0]} castShadow>
+        <cylinderGeometry args={[r, r * 1.1, h, 16]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.5} roughness={0.5} />
+      </mesh>
+      
+      {/* Bande réfléchissante haute */}
+      <mesh position={[0, h - 0.08, 0]}>
+        <cylinderGeometry args={[r + 0.005, r + 0.005, 0.1, 16]} />
+        <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.3} />
+      </mesh>
+      
+      {/* Bande réfléchissante basse */}
+      <mesh position={[0, 0.15, 0]}>
+        <cylinderGeometry args={[r + 0.005, r * 1.1 + 0.005, 0.1, 16]} />
+        <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.3} />
+      </mesh>
+      
+      {/* Capuchon */}
+      <mesh position={[0, h + 0.02, 0]}>
+        <sphereGeometry args={[r, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* Base béton */}
+      <mesh position={[0, 0.05, 0]} receiveShadow>
+        <cylinderGeometry args={[r * 1.5, r * 1.5, 0.1, 16]} />
+        <meshStandardMaterial color="#6b7280" roughness={0.9} />
       </mesh>
     </group>
   );
@@ -3903,4 +5110,14 @@ export {
   FireExtinguisher3D,
   EvacuationArrow3D,
   RMU3D,
+  // Infrastructure - Roads & Access
+  Road3D,
+  LoadingZone3D,
+  LoadingDock3D,
+  ParkingZone3D,
+  VehicleGate3D,
+  Guardhouse3D,
+  BarrierArm3D,
+  SpeedBump3D,
+  Bollard3D,
 };

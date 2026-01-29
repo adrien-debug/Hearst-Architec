@@ -1,7 +1,6 @@
 'use client';
 
 import { memo, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
 import { Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { CableRoute, CableSegment, CablePoint } from './cable-routing-tool';
@@ -22,7 +21,78 @@ const cableMaterials = {
   cableGreen: new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.2, roughness: 0.8 }),
   selected: new THREE.MeshStandardMaterial({ color: '#22c55e', metalness: 0.5, roughness: 0.4, emissive: '#22c55e', emissiveIntensity: 0.3 }),
   preview: new THREE.MeshStandardMaterial({ color: '#3b82f6', metalness: 0.3, roughness: 0.5, transparent: true, opacity: 0.6 }),
+  // Supports
+  supportPost: new THREE.MeshStandardMaterial({ color: '#374151', metalness: 0.7, roughness: 0.3 }),
+  supportBracket: new THREE.MeshStandardMaterial({ color: '#4b5563', metalness: 0.6, roughness: 0.4 }),
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SUPPORT / POTEAU 3D
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CableSupport3D = memo(function CableSupport3D({
+  position,
+  height,
+  trayWidth,
+  type = 'floor',
+}: {
+  position: THREE.Vector3;
+  height: number;  // Hauteur du chemin (Y)
+  trayWidth: number;  // Largeur du chemin en mètres
+  type?: 'floor' | 'ceiling' | 'wall';
+}) {
+  const postRadius = 0.04;
+  const bracketWidth = trayWidth + 0.1;
+  
+  return (
+    <group position={position.toArray()}>
+      {/* Poteau vertical */}
+      <mesh position={[0, height / 2, 0]} castShadow>
+        <cylinderGeometry args={[postRadius, postRadius, height, 8]} />
+        <primitive object={cableMaterials.supportPost} attach="material" />
+      </mesh>
+      
+      {/* Platine au sol */}
+      <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.12, 0.12, 0.02, 12]} />
+        <primitive object={cableMaterials.supportPost} attach="material" />
+      </mesh>
+      
+      {/* Boulons platine */}
+      {[0, Math.PI/2, Math.PI, Math.PI*1.5].map((angle, i) => (
+        <mesh 
+          key={i} 
+          position={[Math.cos(angle) * 0.08, 0.015, Math.sin(angle) * 0.08]}
+        >
+          <cylinderGeometry args={[0.012, 0.012, 0.02, 6]} />
+          <primitive object={cableMaterials.cableBlack} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* Console support (bracket) */}
+      <group position={[0, height - 0.05, 0]}>
+        {/* Bras horizontal */}
+        <mesh castShadow>
+          <boxGeometry args={[0.05, 0.05, bracketWidth]} />
+          <primitive object={cableMaterials.supportBracket} attach="material" />
+        </mesh>
+        
+        {/* Goussets (triangles de renfort) */}
+        {[-1, 1].map((side) => (
+          <mesh 
+            key={side} 
+            position={[0, -0.08, side * bracketWidth * 0.35]}
+            rotation={[0, 0, side * Math.PI / 4]}
+            castShadow
+          >
+            <boxGeometry args={[0.015, 0.12, 0.015]} />
+            <primitive object={cableMaterials.supportBracket} attach="material" />
+          </mesh>
+        ))}
+      </group>
+    </group>
+  );
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CABLE TRAY SEGMENT 3D
@@ -34,6 +104,7 @@ const CableTraySegment3D = memo(function CableTraySegment3D({
   endPoint,
   isSelected,
   showDimensions,
+  showSupports = true,
   onClick,
 }: {
   segment: CableSegment;
@@ -41,22 +112,30 @@ const CableTraySegment3D = memo(function CableTraySegment3D({
   endPoint: THREE.Vector3;
   isSelected: boolean;
   showDimensions: boolean;
+  showSupports?: boolean;
   onClick?: () => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   
   // Calculate segment properties
-  const { length, midPoint, rotation, direction } = useMemo(() => {
+  const { length, midPoint, rotation, direction, isInclined, inclineAngle } = useMemo(() => {
     const dir = endPoint.clone().sub(startPoint);
     const len = dir.length();
     const mid = startPoint.clone().add(endPoint).multiplyScalar(0.5);
-    const angle = Math.atan2(dir.z, dir.x);
+    const horizontalAngle = Math.atan2(dir.z, dir.x);
+    
+    // Calcul de l'inclinaison (différence de hauteur)
+    const heightDiff = endPoint.y - startPoint.y;
+    const horizontalDist = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
+    const verticalAngle = Math.atan2(heightDiff, horizontalDist);
     
     return {
       length: len,
       midPoint: mid,
-      rotation: new THREE.Euler(0, -angle, 0),
+      rotation: new THREE.Euler(verticalAngle, -horizontalAngle, 0, 'YXZ'),
       direction: dir.normalize(),
+      isInclined: Math.abs(heightDiff) > 0.1,
+      inclineAngle: verticalAngle,
     };
   }, [startPoint, endPoint]);
   
@@ -69,6 +148,20 @@ const CableTraySegment3D = memo(function CableTraySegment3D({
     Array.from({ length: rungCount }, (_, i) => i), 
     [rungCount]
   );
+  
+  // Supports positions - tous les 3m
+  const supportSpacing = 3; // mètres
+  const supportPositions = useMemo(() => {
+    const positions: THREE.Vector3[] = [];
+    const numSupports = Math.max(2, Math.ceil(length / supportSpacing) + 1);
+    
+    for (let i = 0; i < numSupports; i++) {
+      const t = i / (numSupports - 1);
+      const pos = new THREE.Vector3().lerpVectors(startPoint, endPoint, t);
+      positions.push(pos);
+    }
+    return positions;
+  }, [startPoint, endPoint, length]);
   
   // Cable count based on width
   const cableCount = Math.min(segment.cableCount, Math.floor((w - 0.02) / 0.025));
@@ -90,6 +183,7 @@ const CableTraySegment3D = memo(function CableTraySegment3D({
   if (!segment.visible) return null;
   
   return (
+    <>
     <group 
       ref={groupRef}
       position={midPoint.toArray()}
@@ -219,11 +313,24 @@ const CableTraySegment3D = memo(function CableTraySegment3D({
           distanceFactor={10}
         >
           <div className="bg-slate-900/90 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap">
-            {length.toFixed(2)}m
+            {length.toFixed(2)}m {isInclined && `(${(Math.abs(inclineAngle) * 180 / Math.PI).toFixed(0)}°)`}
           </div>
         </Html>
       )}
+      
+      {/* Supports / Poteaux - rendus séparément car non-rotatés */}
     </group>
+    
+    {/* SUPPORTS (hors du groupe principal car ils doivent rester verticaux) */}
+    {showSupports && supportPositions.map((pos, i) => (
+      <CableSupport3D
+        key={`support-${segment.id}-${i}`}
+        position={new THREE.Vector3(pos.x, 0, pos.z)}
+        height={pos.y}
+        trayWidth={w}
+      />
+    ))}
+    </>
   );
 });
 
@@ -245,13 +352,6 @@ const CablePoint3D = memo(function CablePoint3D({
   onClick?: () => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  
-  // Animate selected/hovered points
-  useFrame((_, delta) => {
-    if (meshRef.current && (isSelected || isHovered)) {
-      meshRef.current.rotation.y += delta * 2;
-    }
-  });
   
   const getPointColor = () => {
     if (isSelected) return '#22c55e';
@@ -458,102 +558,113 @@ const IntelligentSnapPoint3D = memo(function IntelligentSnapPoint3D({
   onClick?: () => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const arrowRef = useRef<THREE.Group>(null);
   
-  // Animation pour les points actifs/hover
-  useFrame((_, delta) => {
-    if (meshRef.current && (isActive || isHovered)) {
-      meshRef.current.rotation.y += delta * 3;
-    }
-  });
+  // OPTIMISATION: Pas d'animation continue - trop lourd avec beaucoup de points
   
   const color = CONNECTION_TYPE_COLORS[snapPoint.connectionType] || '#6b7280';
-  const size = isActive ? 0.18 : isHovered ? 0.14 : 0.10;
+  // Taille BEAUCOUP plus grande pour être visible
+  const baseSize = 0.25;
+  const size = isActive ? baseSize * 1.5 : isHovered ? baseSize * 1.3 : baseSize;
   const isFull = snapPoint.currentCables >= snapPoint.maxCables;
-  
-  // Forme selon type
-  const getShape = () => {
-    switch (snapPoint.connectionType) {
-      case 'power-ht':
-      case 'power-bt':
-        return <boxGeometry args={[size, size, size]} />;
-      case 'earth':
-        return <coneGeometry args={[size * 0.7, size, 4]} />;
-      case 'data':
-        return <dodecahedronGeometry args={[size * 0.8]} />;
-      default:
-        return <octahedronGeometry args={[size * 0.9]} />;
-    }
-  };
   
   return (
     <group position={snapPoint.position.toArray()}>
-      {/* Point principal */}
+      {/* Pilier vertical vers le sol pour repérer facilement */}
+      <mesh position={[0, -snapPoint.position.y / 2 + 0.1, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, snapPoint.position.y - 0.2, 8]} />
+        <meshStandardMaterial 
+          color={color}
+          transparent
+          opacity={0.3}
+        />
+      </mesh>
+      
+      {/* Anneau au sol */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -snapPoint.position.y + 0.02, 0]}>
+        <ringGeometry args={[0.3, 0.5, 16]} />
+        <meshStandardMaterial 
+          color={color}
+          transparent
+          opacity={0.5}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      
+      {/* Point principal - GROS et visible */}
       <mesh 
         ref={meshRef}
         onClick={(e) => { e.stopPropagation(); onClick?.(); }}
         castShadow
       >
-        {getShape()}
+        <sphereGeometry args={[size, 16, 16]} />
         <meshStandardMaterial 
           color={isFull ? '#6b7280' : color}
-          metalness={0.4}
-          roughness={0.5}
-          emissive={isActive ? color : undefined}
-          emissiveIntensity={isActive ? 0.6 : 0}
+          metalness={0.3}
+          roughness={0.4}
+          emissive={color}
+          emissiveIntensity={isActive ? 0.8 : 0.4}
           transparent={isFull}
           opacity={isFull ? 0.4 : 1}
         />
       </mesh>
       
-      {/* Flèche de direction (si priorité 1) */}
-      {snapPoint.priority === 1 && (
-        <group ref={arrowRef}>
-          <mesh 
-            position={snapPoint.direction.clone().multiplyScalar(size + 0.08).toArray()}
-            rotation={[
-              Math.atan2(
-                Math.sqrt(snapPoint.direction.x ** 2 + snapPoint.direction.z ** 2),
-                snapPoint.direction.y
-              ),
-              Math.atan2(snapPoint.direction.x, snapPoint.direction.z),
-              0
-            ]}
-          >
-            <coneGeometry args={[0.04, 0.1, 8]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-        </group>
-      )}
-      
-      {/* Anneau de capacité */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
-        <ringGeometry args={[size * 1.1, size * 1.4, 16]} />
+      {/* Anneau autour - statique */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[size * 1.2, size * 1.5, 16]} />
         <meshStandardMaterial 
           color={color}
           transparent
-          opacity={isActive ? 0.8 : 0.3}
+          opacity={isActive ? 0.9 : 0.5}
           side={THREE.DoubleSide}
         />
       </mesh>
       
-      {/* Label avec info de capacité */}
-      {showLabels && (isActive || isHovered) && (
+      {/* Icône du type au centre (petit texte) */}
+      <Html
+        position={[0, 0, 0]}
+        center
+        distanceFactor={6}
+        style={{ pointerEvents: 'none' }}
+      >
+        <div 
+          className="text-white font-bold text-[14px] drop-shadow-lg"
+          style={{ textShadow: '0 0 4px black' }}
+        >
+          {snapPoint.connectionType === 'power-ht' ? '⚡' :
+           snapPoint.connectionType === 'power-bt' ? '🔌' :
+           snapPoint.connectionType === 'data' ? '📡' :
+           snapPoint.connectionType === 'control' ? '🎛️' :
+           snapPoint.connectionType === 'earth' ? '⏚' : '●'}
+        </div>
+      </Html>
+      
+      {/* Label TOUJOURS visible */}
+      <Html
+        position={[0, size + 0.3, 0]}
+        center
+        distanceFactor={10}
+      >
+        <div 
+          className="text-white text-[11px] px-2 py-1 rounded-full shadow-lg whitespace-nowrap font-medium"
+          style={{ backgroundColor: color }}
+        >
+          {snapPoint.label}
+        </div>
+      </Html>
+      
+      {/* Info détaillée au hover */}
+      {(isActive || isHovered) && (
         <Html
-          position={[0, size + 0.15, 0]}
+          position={[0, size + 0.7, 0]}
           center
           distanceFactor={8}
         >
-          <div className="bg-slate-900/95 text-white text-[10px] px-2 py-1 rounded-lg shadow-lg whitespace-nowrap border border-slate-700">
-            <div className="font-semibold">{snapPoint.label}</div>
-            <div className="flex items-center gap-2 mt-0.5 text-[9px] text-slate-400">
-              <span 
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              <span>{snapPoint.connectionType}</span>
+          <div className="bg-slate-900/95 text-white text-[10px] px-3 py-2 rounded-lg shadow-lg whitespace-nowrap border border-slate-600">
+            <div className="font-semibold text-[12px]">{snapPoint.objectName}</div>
+            <div className="flex items-center gap-2 mt-1 text-slate-300">
+              <span>Largeur: {snapPoint.cableWidth}mm</span>
               <span>•</span>
-              <span>{snapPoint.currentCables}/{snapPoint.maxCables}</span>
+              <span>Capacité: {snapPoint.currentCables}/{snapPoint.maxCables}</span>
             </div>
           </div>
         </Html>
@@ -834,21 +945,21 @@ const CableScene = memo(function CableScene({
         />
       )}
       
-      {/* Legacy snap points (compatibilité) */}
-      {isDrawing && snapPoints.length > 0 && intelligentSnapPoints.length === 0 && (
+      {/* Legacy snap points (compatibilité) - Affichage permanent en mode câblage */}
+      {snapPoints.length > 0 && intelligentSnapPoints.length === 0 && (
         <SnapPointsVisualization
           snapPoints={snapPoints}
           activeSnapPoint={activeSnapPoint}
         />
       )}
       
-      {/* Intelligent snap points (nouveau système) */}
-      {isDrawing && intelligentSnapPoints.length > 0 && (
+      {/* Intelligent snap points (nouveau système) - TOUJOURS VISIBLES en mode câblage */}
+      {intelligentSnapPoints.length > 0 && (
         <IntelligentSnapPointsVisualization
           snapPoints={intelligentSnapPoints}
           activeSnapPointId={activeIntelligentSnapPointId}
           hoveredSnapPointId={hoveredSnapPointId}
-          showLabels={showLabels}
+          showLabels={true}
           filterTypes={filterConnectionTypes}
           onSnapPointClick={onIntelligentSnapPointClick}
         />
@@ -881,6 +992,7 @@ export {
   CableScene, 
   CableTraySegment3D, 
   CablePoint3D, 
+  CableSupport3D,
   DrawingPreview, 
   SnapPointsVisualization,
   IntelligentSnapPointsVisualization,

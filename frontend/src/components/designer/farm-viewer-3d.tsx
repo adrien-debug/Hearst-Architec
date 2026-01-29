@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, memo, useMemo, useCallback } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, PerspectiveCamera, Environment, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -45,13 +45,6 @@ interface FarmViewer3DProps {
 const ASICMachine = memo(function ASICMachine({ machine, onClick }: { machine: PlacedMachine; onClick: () => void }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-
-  // Only animate when hovered
-  useFrame((state) => {
-    if (meshRef.current && hovered) {
-      meshRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 2) * 0.1;
-    }
-  });
 
   const handleClick = useCallback((e: any) => {
     e.stopPropagation();

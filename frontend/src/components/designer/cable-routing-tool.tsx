@@ -204,7 +204,50 @@ const findNearestSnapPoint = (
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CABLE TRAY PRESETS
+// CABLE TRAY STYLES (Types de chemins de câbles)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type CableTrayStyle = 'ladder' | 'wire-mesh' | 'conduit' | 'busbar';
+
+const TRAY_STYLES: Record<CableTrayStyle, { 
+  name: string; 
+  description: string;
+  icon: string;
+  color: string;
+  supportsPerMeter: number; // Supports tous les X mètres
+}> = {
+  'ladder': {
+    name: 'Échelle',
+    description: 'Chemin échelle galvanisé pour câbles de puissance',
+    icon: '🪜',
+    color: '#71717a',
+    supportsPerMeter: 3, // Support tous les 3m
+  },
+  'wire-mesh': {
+    name: 'Grillagé',
+    description: 'Chemin grillagé pour câbles data/contrôle',
+    icon: '🔲',
+    color: '#3b82f6',
+    supportsPerMeter: 2.5, // Support tous les 2.5m
+  },
+  'conduit': {
+    name: 'Conduit',
+    description: 'Tube rigide pour câbles sensibles',
+    icon: '🔵',
+    color: '#f59e0b',
+    supportsPerMeter: 2, // Support tous les 2m
+  },
+  'busbar': {
+    name: 'Busbar',
+    description: 'Jeu de barres pour distribution HT',
+    icon: '⚡',
+    color: '#b45309',
+    supportsPerMeter: 4, // Support tous les 4m
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CABLE TRAY PRESETS (Configurations prédéfinies)
 // ═══════════════════════════════════════════════════════════════════════════
 
 const TRAY_PRESETS = {
@@ -328,6 +371,89 @@ const PresetButton = memo(function PresetButton({
   );
 });
 
+// Style de chemin de câbles - Sélecteur visuel
+const StyleSelector = memo(function StyleSelector({
+  selectedStyle,
+  onStyleChange,
+  selectedWidth,
+  onWidthChange,
+}: {
+  selectedStyle: CableTrayStyle;
+  onStyleChange: (style: CableTrayStyle) => void;
+  selectedWidth: number;
+  onWidthChange: (width: number) => void;
+}) {
+  const widthOptions = [100, 150, 200, 300, 400, 600];
+  
+  return (
+    <div className="space-y-3">
+      {/* Sélecteur de style */}
+      <div>
+        <p className="text-xs text-slate-500 font-semibold mb-2">STYLE DU CHEMIN</p>
+        <div className="grid grid-cols-2 gap-2">
+          {(Object.keys(TRAY_STYLES) as CableTrayStyle[]).map((style) => {
+            const config = TRAY_STYLES[style];
+            const isActive = selectedStyle === style;
+            return (
+              <button
+                key={style}
+                onClick={() => onStyleChange(style)}
+                className={`
+                  flex items-center gap-2 p-2.5 rounded-xl text-left transition-all border-2
+                  ${isActive 
+                    ? 'border-emerald-500 bg-emerald-50 shadow-sm' 
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}
+                `}
+              >
+                <span className="text-xl">{config.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-semibold ${isActive ? 'text-emerald-700' : 'text-slate-700'}`}>
+                    {config.name}
+                  </p>
+                  <p className="text-[10px] text-slate-500 truncate">
+                    {config.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      
+      {/* Sélecteur de largeur */}
+      <div>
+        <p className="text-xs text-slate-500 font-semibold mb-2">LARGEUR (mm)</p>
+        <div className="flex flex-wrap gap-1.5">
+          {widthOptions.map((w) => (
+            <button
+              key={w}
+              onClick={() => onWidthChange(w)}
+              className={`
+                px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+                ${selectedWidth === w 
+                  ? 'bg-slate-900 text-white' 
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
+              `}
+            >
+              {w}
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      {/* Info supports */}
+      <div className="bg-slate-50 rounded-lg p-2 text-xs text-slate-600">
+        <div className="flex items-center gap-2">
+          <span>📐</span>
+          <span>
+            Supports automatiques tous les <strong>{TRAY_STYLES[selectedStyle].supportsPerMeter}m</strong>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 const StatDisplay = memo(function StatDisplay({
   label,
   value,
@@ -396,7 +522,10 @@ export default function CableRoutingTool({
   });
   
   const [activePreset, setActivePreset] = useState<keyof typeof TRAY_PRESETS>('power-branch');
+  const [selectedStyle, setSelectedStyle] = useState<CableTrayStyle>('ladder');
+  const [selectedWidth, setSelectedWidth] = useState(300);
   const [showSettings, setShowSettings] = useState(false);
+  const [showStylePanel, setShowStylePanel] = useState(true);
   const [showRouteList, setShowRouteList] = useState(true);
   const [showSnapPointsPanel, setShowSnapPointsPanel] = useState(false);
   const [filterTypes, setFilterTypes] = useState<ConnectionType[]>([]);
@@ -676,127 +805,117 @@ export default function CableRoutingTool({
   return (
     <div className="absolute right-4 top-20 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-40">
       {/* ═══ HEADER ═══ */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-4 py-3">
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Cable className="w-5 h-5 text-emerald-400" />
-            <h2 className="font-bold">Câblage Intelligent</h2>
+            <Cable className="w-5 h-5" />
+            <h2 className="font-bold">🔌 Câblage</h2>
           </div>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+              className="p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
-        <p className="text-xs text-slate-400 mt-1">
-          Tracé professionnel • Raccordement automatique
-        </p>
       </div>
       
-      {/* ═══ TOOLBAR ═══ */}
-      <div className="px-3 py-2 border-b border-slate-200 bg-slate-50">
-        <div className="flex items-center gap-1">
-          <ToolButton 
-            icon={MousePointer} 
-            label="Sélection (V)" 
-            active={state.mode === 'select'} 
-            onClick={() => setMode('select')} 
-          />
-          <ToolButton 
-            icon={PenTool} 
-            label="Tracer (P)" 
-            active={state.mode === 'draw'} 
-            onClick={() => setMode('draw')} 
-          />
-          <ToolButton 
-            icon={Move} 
-            label="Éditer (E)" 
-            active={state.mode === 'edit'} 
-            onClick={() => setMode('edit')} 
-          />
-          <ToolButton 
-            icon={GitBranch} 
-            label="Jonction (J)" 
-            active={state.mode === 'junction'} 
-            onClick={() => setMode('junction')} 
-          />
-          <ToolButton 
-            icon={Trash2} 
-            label="Supprimer (Del)" 
-            active={state.mode === 'delete'} 
-            onClick={() => setMode('delete')} 
-          />
-          
-          <div className="w-px h-6 bg-slate-300 mx-1" />
-          
-          <ToolButton 
-            icon={Magnet} 
-            label="Snap (S)" 
-            active={state.snapEnabled} 
-            onClick={() => toggleSetting('snapEnabled')} 
-          />
-          <ToolButton 
-            icon={Grid} 
-            label="Grille (G)" 
-            active={state.gridSnap} 
-            onClick={() => toggleSetting('gridSnap')} 
-          />
-          <ToolButton 
-            icon={Ruler} 
-            label="Dimensions" 
-            active={state.showDimensions} 
-            onClick={() => toggleSetting('showDimensions')} 
-          />
-          
-          <div className="w-px h-6 bg-slate-300 mx-1" />
-          
-          <ToolButton 
-            icon={Settings} 
-            label="Paramètres" 
-            active={showSettings} 
-            onClick={() => setShowSettings(!showSettings)} 
-          />
+      {/* ═══ INSTRUCTIONS SIMPLES ═══ */}
+      <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-200">
+        <div className="flex items-start gap-3">
+          <div className="text-2xl">👆</div>
+          <div>
+            <p className="font-semibold text-emerald-800 text-sm">
+              Cliquez sur les points colorés
+            </p>
+            <p className="text-xs text-emerald-600 mt-0.5">
+              Les sphères sur les équipements sont les points de connexion. Cliquez pour tracer un câble.
+            </p>
+          </div>
         </div>
       </div>
       
-      {/* ═══ PRESETS ═══ */}
-      <div className="px-3 py-2 border-b border-slate-200">
-        <p className="text-xs text-slate-500 font-medium mb-2">TYPE DE CHEMIN</p>
-        <div className="flex flex-wrap gap-1.5">
-          <PresetButton 
-            preset="power-main" 
-            label="Principal" 
-            active={activePreset === 'power-main'} 
-            onClick={() => handlePresetChange('power-main')} 
-          />
-          <PresetButton 
-            preset="power-branch" 
-            label="Dérivation" 
-            active={activePreset === 'power-branch'} 
-            onClick={() => handlePresetChange('power-branch')} 
-          />
-          <PresetButton 
-            preset="data-main" 
-            label="Data" 
-            active={activePreset === 'data-main'} 
-            onClick={() => handlePresetChange('data-main')} 
-          />
-          <PresetButton 
-            preset="control" 
-            label="Contrôle" 
-            active={activePreset === 'control'} 
-            onClick={() => handlePresetChange('control')} 
-          />
-          <PresetButton 
-            preset="busbar" 
-            label="Busbar" 
-            active={activePreset === 'busbar'} 
-            onClick={() => handlePresetChange('busbar')} 
-          />
+      {/* ═══ TOOLBAR SIMPLIFIÉE ═══ */}
+      <div className="px-3 py-2 border-b border-slate-200 bg-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <ToolButton 
+              icon={PenTool} 
+              label="Tracer" 
+              active={state.mode === 'draw'} 
+              onClick={() => setMode('draw')} 
+            />
+            <ToolButton 
+              icon={MousePointer} 
+              label="Sélection" 
+              active={state.mode === 'select'} 
+              onClick={() => setMode('select')} 
+            />
+            <ToolButton 
+              icon={Trash2} 
+              label="Supprimer" 
+              active={state.mode === 'delete'} 
+              onClick={() => setMode('delete')} 
+            />
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <ToolButton 
+              icon={Magnet} 
+              label="Snap" 
+              active={state.snapEnabled} 
+              onClick={() => toggleSetting('snapEnabled')} 
+              size="sm"
+            />
+            <ToolButton 
+              icon={Settings} 
+              label="Options" 
+              active={showSettings} 
+              onClick={() => setShowSettings(!showSettings)} 
+              size="sm"
+            />
+          </div>
         </div>
+      </div>
+      
+      {/* ═══ SÉLECTEUR DE STYLE ═══ */}
+      <div className="border-b border-slate-200">
+        <button
+          onClick={() => setShowStylePanel(!showStylePanel)}
+          className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{TRAY_STYLES[selectedStyle].icon}</span>
+            <div>
+              <span className="text-sm font-semibold text-slate-800">{TRAY_STYLES[selectedStyle].name}</span>
+              <span className="text-xs text-slate-500 ml-2">{selectedWidth}mm</span>
+            </div>
+          </div>
+          {showStylePanel ? (
+            <ChevronUp className="w-4 h-4 text-slate-400" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-400" />
+          )}
+        </button>
+        
+        {showStylePanel && (
+          <div className="px-3 pb-3">
+            <StyleSelector
+              selectedStyle={selectedStyle}
+              onStyleChange={(style) => {
+                setSelectedStyle(style);
+                setState(prev => ({ ...prev, defaultTrayType: style }));
+              }}
+              selectedWidth={selectedWidth}
+              onWidthChange={(w) => {
+                setSelectedWidth(w);
+                setState(prev => ({ ...prev, defaultWidth: w }));
+              }}
+            />
+          </div>
+        )}
       </div>
       
       {/* ═══ SETTINGS PANEL (Collapsible) ═══ */}
@@ -1120,10 +1239,32 @@ export default function CableRoutingTool({
         </div>
       </div>
       
-      {/* ═══ QUICK TIPS ═══ */}
-      <div className="px-3 py-2 bg-slate-100 border-t border-slate-200">
-        <p className="text-xs text-slate-500">
-          💡 <strong>Raccourcis:</strong> P=Tracer, V=Sélection, S=Snap, G=Grille, Entrée=Terminer, Échap=Annuler
+      {/* ═══ LÉGENDE COULEURS ═══ */}
+      <div className="px-3 py-2 bg-slate-50 border-t border-slate-200">
+        <p className="text-[10px] text-slate-500 font-medium mb-1.5">LÉGENDE DES POINTS</p>
+        <div className="flex flex-wrap gap-2">
+          <span className="flex items-center gap-1 text-[10px]">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500" /> HT
+          </span>
+          <span className="flex items-center gap-1 text-[10px]">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> BT
+          </span>
+          <span className="flex items-center gap-1 text-[10px]">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Data
+          </span>
+          <span className="flex items-center gap-1 text-[10px]">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Ctrl
+          </span>
+          <span className="flex items-center gap-1 text-[10px]">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Terre
+          </span>
+        </div>
+      </div>
+      
+      {/* ═══ RACCOURCIS ═══ */}
+      <div className="px-3 py-2 bg-slate-100">
+        <p className="text-[10px] text-slate-400">
+          <strong>Entrée</strong> = Terminer • <strong>Échap</strong> = Annuler
         </p>
       </div>
     </div>
@@ -1134,5 +1275,5 @@ export default function CableRoutingTool({
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export { TRAY_PRESETS };
+export { TRAY_PRESETS, TRAY_STYLES };
 export type { CableRoutingToolProps };

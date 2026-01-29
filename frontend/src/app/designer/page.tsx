@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { Canvas, useThree, useFrame, useLoader } from '@react-three/fiber';
+import { Canvas, useThree, useLoader } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import { 
   OrbitControls, 
@@ -2125,9 +2125,26 @@ export default function DesignerPage() {
       return;
     }
     
-    if (!cableActiveRouteId) {
-      console.log('⚠️ No active route - please create or select a route first');
-      return;
+    // AUTO-CRÉER une route si aucune n'existe ou n'est sélectionnée
+    let activeRouteIdToUse = cableActiveRouteId;
+    if (!activeRouteIdToUse) {
+      console.log('🆕 Auto-création d\'une nouvelle route...');
+      const newRouteId = `cable-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newRoute: CableRoute = {
+        id: newRouteId,
+        name: `Route ${cableRoutes.length + 1}`,
+        segments: [],
+        points: [],
+        routeType: 'main',
+        voltage: 'lv',
+        totalLength: 0,
+        color: '#71717a',
+        visible: true,
+      };
+      setCableRoutes(prev => [...prev, newRoute]);
+      setCableActiveRouteId(newRouteId);
+      activeRouteIdToUse = newRouteId;
+      console.log('✅ Route auto-créée:', newRouteId);
     }
     
     // Calculer la hauteur optimale si auto-calcul activé
@@ -2161,7 +2178,7 @@ export default function DesignerPage() {
       const prevPoint = currentPoints[currentPoints.length - 1];
       
       setCableRoutes(prev => prev.map(route => {
-        if (route.id !== cableActiveRouteId) return route;
+        if (route.id !== activeRouteIdToUse) return route;
         
         const timestamp = Date.now();
         const startPointId = `point-${timestamp}-start`;
@@ -2211,7 +2228,7 @@ export default function DesignerPage() {
     } else {
       console.log('📍 First point placed - click again to create a segment');
     }
-  }, [showCableRouting, cableActiveRouteId, autoCalculateHeight, cableZones, currentCableHeight]);
+  }, [showCableRouting, cableActiveRouteId, autoCalculateHeight, cableZones, currentCableHeight, cableRoutes.length]);
   
   // Project state
   const [projectName, setProjectName] = useState('Untitled Project');
@@ -3016,6 +3033,7 @@ export default function DesignerPage() {
     } finally {
       setAiLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiUserPrompt, aiDimensions, aiTargetPower, objects, aiAvailableObjects, aiEngineerProfile]);
 
   const selectedObject = objects.find(o => o.id === selectedId) || null;
@@ -3408,7 +3426,15 @@ export default function DesignerPage() {
             intelligentSnapPoints={intelligentSnapPoints}
             activeIntelligentSnapPointId={selectedIntelligentSnapPoint?.id || null}
             hoveredSnapPointId={hoveredSnapPointId}
-            onIntelligentSnapPointClick={setSelectedIntelligentSnapPoint}
+            onIntelligentSnapPointClick={(snapPoint) => {
+              // Sélectionner visuellement le point
+              setSelectedIntelligentSnapPoint(snapPoint);
+              // TRACER LE CÂBLE vers ce point
+              if (showCableRouting) {
+                console.log('🎯 Snap point cliqué:', snapPoint.label, snapPoint.position);
+                handleCableFloorClick(snapPoint.position);
+              }
+            }}
             filterConnectionTypes={filterConnectionTypes}
             cableZones={cableZones}
             showForbiddenZones={showForbiddenZones}
