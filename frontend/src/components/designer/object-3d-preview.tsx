@@ -251,7 +251,7 @@ const ISOContainer = memo(function ISOContainer({
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BITMAIN EC2-DT COOLING SYSTEM (Blue panels + top fans)
-// Goes on TOP of the container
+// Goes on TOP of the container - SAME WIDTH/DEPTH as container
 // ═══════════════════════════════════════════════════════════════════════════
 const BitmainCoolingSystem = memo(function BitmainCoolingSystem({ 
   dimensions, 
@@ -260,16 +260,21 @@ const BitmainCoolingSystem = memo(function BitmainCoolingSystem({
   dimensions: { width: number; height: number; depth: number }; 
   position?: [number, number, number];
 }) {
-  const w = dimensions.width / 1000;
-  const h = dimensions.height / 1000;
-  const d = dimensions.depth / 1000;
+  // Use same width/depth as container (12192 x 2438), height is cooling-specific
+  const w = dimensions.width / 1000;   // 12.192m (same as container)
+  const h = dimensions.height / 1000;  // 1.2m cooling height
+  const d = dimensions.depth / 1000;   // 2.438m (same as container)
+  
+  // Frame thickness - same as container for consistency
+  const frameThickness = 0.12;
+  const cornerPostSize = 0.12;
   
   // Store refs to fan blade groups for animation
   const fanBladesRefs = useRef<THREE.Group[]>([]);
   
   // Animate fans - optimized to directly access refs
   useFrame((_, delta) => {
-    const speed = delta * 12;
+    const speed = delta * 8; // Slower rotation
     for (let i = 0; i < fanBladesRefs.current.length; i++) {
       const bladeGroup = fanBladesRefs.current[i];
       if (bladeGroup) {
@@ -279,14 +284,16 @@ const BitmainCoolingSystem = memo(function BitmainCoolingSystem({
   });
   
   // Pre-calculate panel and fan arrays
-  const numPanels = 12;
-  const panelWidth = (w * 0.85) / numPanels;
-  const panelHeight = h * 0.65;
-  const fansPerRow = 6;
+  const numPanels = Math.floor(w / 0.9); // ~13-14 panels for 12.2m
+  const panelWidth = (w - cornerPostSize * 2) / numPanels;
+  const panelHeight = h * 0.7;
+  
+  // Fans layout - proportional to width
+  const fansPerRow = Math.max(4, Math.floor(w / 2)); // ~6 fans per row
   const fanRows = 2;
-  const fanRadius = 0.32;
-  const fanSpacingX = w / fansPerRow;
-  const fanSpacingZ = d / (fanRows + 1);
+  const fanRadius = Math.min(0.28, (d * 0.35) / fanRows); // Scale fans to fit
+  const fanSpacingX = (w - 1) / fansPerRow;
+  const fanSpacingZ = (d - 0.5) / (fanRows + 1);
   
   const panelIndices = useMemo(() => Array.from({ length: numPanels }, (_, i) => i), [numPanels]);
   
@@ -295,8 +302,8 @@ const BitmainCoolingSystem = memo(function BitmainCoolingSystem({
     for (let rowIdx = 0; rowIdx < fanRows; rowIdx++) {
       for (let colIdx = 0; colIdx < fansPerRow; colIdx++) {
         positions.push({
-          xPos: -w/2 + fanSpacingX/2 + colIdx * fanSpacingX,
-          zPos: -d/2 + fanSpacingZ * (rowIdx + 1),
+          xPos: -w/2 + 0.5 + fanSpacingX/2 + colIdx * fanSpacingX,
+          zPos: -d/2 + 0.25 + fanSpacingZ * (rowIdx + 1),
           key: `fan-${rowIdx}-${colIdx}`
         });
       }
@@ -304,172 +311,207 @@ const BitmainCoolingSystem = memo(function BitmainCoolingSystem({
     return positions;
   }, [w, d, fanSpacingX, fanSpacingZ, fanRows, fansPerRow]);
   
-  const bladeAngles = useMemo(() => [0, 1, 2, 3, 4, 5, 6].map(i => (i * Math.PI * 2) / 7), []);
+  const bladeAngles = useMemo(() => [0, 1, 2, 3, 4, 5].map(i => (i * Math.PI * 2) / 6), []);
   
+  // Corner positions - same as container
   const cornerPositions = useMemo(() => [
-    [-w/2, 0, -d/2], [w/2, 0, -d/2],
-    [-w/2, 0, d/2], [w/2, 0, d/2],
+    [-w/2 + cornerPostSize/2, 0, -d/2 + cornerPostSize/2],
+    [w/2 - cornerPostSize/2, 0, -d/2 + cornerPostSize/2],
+    [-w/2 + cornerPostSize/2, 0, d/2 - cornerPostSize/2],
+    [w/2 - cornerPostSize/2, 0, d/2 - cornerPostSize/2],
   ] as [number, number, number][], [w, d]);
+  
+  // ISO corner casting positions (8 corners) - same as container
+  const castingPositions = useMemo(() => [
+    [-w/2, -h/2, -d/2], [w/2, -h/2, -d/2], [-w/2, -h/2, d/2], [w/2, -h/2, d/2],
+    [-w/2, h/2, -d/2], [w/2, h/2, -d/2], [-w/2, h/2, d/2], [w/2, h/2, d/2],
+  ] as [number, number, number][], [w, h, d]);
   
   return (
     <group position={position}>
-      {/* === MAIN BODY (White top section) === */}
-      <mesh position={[0, h * 0.2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[w, h * 0.4, d]} />
-        <primitive object={sharedMaterials.white} attach="material" />
-      </mesh>
-      
-      {/* === BLUE THERMAL PANELS BASE === */}
-      <mesh position={[0, -h * 0.2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[w, h * 0.5, d]} />
+      {/* === MAIN BODY (Blue thermal section) === */}
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[w - 0.02, h - 0.02, d - 0.02]} />
         <primitive object={sharedMaterials.bluePanel} attach="material" />
       </mesh>
       
-      {/* === BLUE THERMAL EXCHANGE PANELS (Front Side) === */}
+      {/* === BLACK METALLIC FRAME - Same architecture as container === */}
+      
+      {/* Bottom frame - front/back */}
+      <mesh position={[0, -h/2 + frameThickness/2, -d/2 + 0.05]} castShadow>
+        <boxGeometry args={[w, frameThickness, 0.1]} />
+        <primitive object={sharedMaterials.darkFrame} attach="material" />
+      </mesh>
+      <mesh position={[0, -h/2 + frameThickness/2, d/2 - 0.05]} castShadow>
+        <boxGeometry args={[w, frameThickness, 0.1]} />
+        <primitive object={sharedMaterials.darkFrame} attach="material" />
+      </mesh>
+      
+      {/* Bottom frame - sides */}
+      <mesh position={[-w/2 + 0.05, -h/2 + frameThickness/2, 0]} castShadow>
+        <boxGeometry args={[0.1, frameThickness, d]} />
+        <primitive object={sharedMaterials.darkFrame} attach="material" />
+      </mesh>
+      <mesh position={[w/2 - 0.05, -h/2 + frameThickness/2, 0]} castShadow>
+        <boxGeometry args={[0.1, frameThickness, d]} />
+        <primitive object={sharedMaterials.darkFrame} attach="material" />
+      </mesh>
+      
+      {/* Top frame - front/back */}
+      <mesh position={[0, h/2 - frameThickness/2, -d/2 + 0.04]} castShadow>
+        <boxGeometry args={[w, frameThickness * 0.8, 0.08]} />
+        <primitive object={sharedMaterials.darkFrame} attach="material" />
+      </mesh>
+      <mesh position={[0, h/2 - frameThickness/2, d/2 - 0.04]} castShadow>
+        <boxGeometry args={[w, frameThickness * 0.8, 0.08]} />
+        <primitive object={sharedMaterials.darkFrame} attach="material" />
+      </mesh>
+      
+      {/* Top frame - sides */}
+      <mesh position={[-w/2 + 0.04, h/2 - frameThickness/2, 0]} castShadow>
+        <boxGeometry args={[0.08, frameThickness * 0.8, d]} />
+        <primitive object={sharedMaterials.darkFrame} attach="material" />
+      </mesh>
+      <mesh position={[w/2 - 0.04, h/2 - frameThickness/2, 0]} castShadow>
+        <boxGeometry args={[0.08, frameThickness * 0.8, d]} />
+        <primitive object={sharedMaterials.darkFrame} attach="material" />
+      </mesh>
+      
+      {/* Corner posts (4 vertical) - same as container */}
+      {cornerPositions.map((pos, i) => (
+        <mesh key={`post-${i}`} position={pos} castShadow>
+          <boxGeometry args={[cornerPostSize, h + 0.02, cornerPostSize]} />
+          <primitive object={sharedMaterials.darkFrame} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* ISO Corner castings (8 corners) - same as container */}
+      {castingPositions.map((pos, i) => (
+        <mesh key={`casting-${i}`} position={pos} castShadow>
+          <boxGeometry args={[0.18, 0.1, 0.18]} />
+          <primitive object={sharedMaterials.darkFrame} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* === BLUE THERMAL EXCHANGE PANELS (Front Side) - Offset to avoid z-fighting === */}
       {panelIndices.map((i) => (
         <group key={`front-panel-${i}`}>
           <mesh 
-            position={[-w/2 + w*0.075 + panelWidth/2 + i * panelWidth, -h * 0.15, -d/2 - 0.025]}
+            position={[-w/2 + cornerPostSize + panelWidth/2 + i * panelWidth, 0, -d/2 - 0.04]}
             castShadow
           >
-            <boxGeometry args={[panelWidth * 0.88, panelHeight, 0.05]} />
+            <boxGeometry args={[panelWidth * 0.85, panelHeight, 0.06]} />
             <primitive object={i % 2 === 0 ? sharedMaterials.bluePanel : sharedMaterials.bluePanelLight} attach="material" />
           </mesh>
-          <mesh position={[-w/2 + w*0.075 + i * panelWidth, -h * 0.15, -d/2 - 0.01]}>
-            <boxGeometry args={[0.02, panelHeight + 0.05, 0.02]} />
+          {/* Vertical divider */}
+          <mesh position={[-w/2 + cornerPostSize + i * panelWidth, 0, -d/2 - 0.02]}>
+            <boxGeometry args={[0.025, panelHeight + 0.08, 0.03]} />
             <primitive object={sharedMaterials.darkFrame} attach="material" />
           </mesh>
         </group>
       ))}
       
-      {/* === BLUE THERMAL EXCHANGE PANELS (Back Side) === */}
+      {/* === BLUE THERMAL EXCHANGE PANELS (Back Side) - Offset to avoid z-fighting === */}
       {panelIndices.map((i) => (
         <group key={`back-panel-${i}`}>
           <mesh 
-            position={[-w/2 + w*0.075 + panelWidth/2 + i * panelWidth, -h * 0.15, d/2 + 0.025]}
+            position={[-w/2 + cornerPostSize + panelWidth/2 + i * panelWidth, 0, d/2 + 0.04]}
             castShadow
           >
-            <boxGeometry args={[panelWidth * 0.88, panelHeight, 0.05]} />
+            <boxGeometry args={[panelWidth * 0.85, panelHeight, 0.06]} />
             <primitive object={i % 2 === 0 ? sharedMaterials.bluePanel : sharedMaterials.bluePanelLight} attach="material" />
           </mesh>
-          <mesh position={[-w/2 + w*0.075 + i * panelWidth, -h * 0.15, d/2 + 0.01]}>
-            <boxGeometry args={[0.02, panelHeight + 0.05, 0.02]} />
+          {/* Vertical divider */}
+          <mesh position={[-w/2 + cornerPostSize + i * panelWidth, 0, d/2 + 0.02]}>
+            <boxGeometry args={[0.025, panelHeight + 0.08, 0.03]} />
             <primitive object={sharedMaterials.darkFrame} attach="material" />
           </mesh>
         </group>
       ))}
       
-      {/* === TOP WHITE SECTION === */}
-      <mesh position={[0, h * 0.1, -d/2 - 0.01]} castShadow>
-        <boxGeometry args={[w * 0.98, h * 0.25, 0.02]} />
-        <primitive object={sharedMaterials.white} attach="material" />
-      </mesh>
-      <mesh position={[0, h * 0.1, d/2 + 0.01]} castShadow>
-        <boxGeometry args={[w * 0.98, h * 0.25, 0.02]} />
-        <primitive object={sharedMaterials.white} attach="material" />
-      </mesh>
-      
-      {/* === FAN PLATFORM === */}
-      <mesh position={[0, h * 0.42, 0]} castShadow>
-        <boxGeometry args={[w * 1.01, 0.06, d * 1.01]} />
+      {/* === FAN PLATFORM (Top grill) === */}
+      <mesh position={[0, h/2 + 0.03, 0]} castShadow>
+        <boxGeometry args={[w - cornerPostSize * 2, 0.04, d - cornerPostSize * 2]} />
         <primitive object={sharedMaterials.darkFrame} attach="material" />
       </mesh>
       
       {/* === FANS GROUP === */}
-      <group position={[0, h * 0.48, 0]}>
+      <group position={[0, h/2 + 0.08, 0]}>
         {fanPositions.map(({ xPos, zPos, key }, fanIdx) => (
-          <group key={key} position={[xPos, 0.12, zPos]}>
+          <group key={key} position={[xPos, 0, zPos]}>
             {/* Fan housing (square) */}
             <mesh castShadow>
-              <boxGeometry args={[fanRadius * 2.3, 0.2, fanRadius * 2.3]} />
+              <boxGeometry args={[fanRadius * 2.2, 0.15, fanRadius * 2.2]} />
               <primitive object={sharedMaterials.fanHousingGray} attach="material" />
             </mesh>
             
             {/* Fan shroud (circular) */}
-            <mesh position={[0, 0.11, 0]}>
-              <cylinderGeometry args={[fanRadius + 0.02, fanRadius + 0.02, 0.04, 24]} />
+            <mesh position={[0, 0.08, 0]}>
+              <cylinderGeometry args={[fanRadius, fanRadius, 0.03, 20]} />
               <primitive object={sharedMaterials.fanBlue} attach="material" />
             </mesh>
             
             {/* Rotating fan blades - ref for animation */}
             <group 
-              position={[0, 0.15, 0]} 
+              position={[0, 0.12, 0]} 
               ref={(el) => { if (el) fanBladesRefs.current[fanIdx] = el; }}
             >
               {bladeAngles.map((angle, bladeIdx) => (
-                <mesh key={bladeIdx} rotation={[0, angle, Math.PI / 10]}>
-                  <boxGeometry args={[fanRadius * 0.8, 0.012, 0.07]} />
+                <mesh key={bladeIdx} rotation={[0, angle, Math.PI / 12]}>
+                  <boxGeometry args={[fanRadius * 0.75, 0.01, 0.05]} />
                   <primitive object={sharedMaterials.fanBlue} attach="material" />
                 </mesh>
               ))}
               {/* Hub */}
               <mesh>
-                <primitive object={sharedGeometries.fanHub} attach="geometry" />
+                <cylinderGeometry args={[0.04, 0.04, 0.04, 12]} />
                 <primitive object={sharedMaterials.darkFrame} attach="material" />
               </mesh>
             </group>
             
             {/* Protective grill */}
-            <mesh position={[0, 0.18, 0]}>
-              <cylinderGeometry args={[fanRadius - 0.02, fanRadius - 0.02, 0.015, 24]} />
+            <mesh position={[0, 0.14, 0]}>
+              <cylinderGeometry args={[fanRadius - 0.02, fanRadius - 0.02, 0.01, 20]} />
               <meshStandardMaterial color="#4b5563" metalness={0.5} roughness={0.5} wireframe />
             </mesh>
           </group>
         ))}
       </group>
       
-      {/* === CORNER POSTS === */}
-      {cornerPositions.map((pos, i) => (
-        <mesh key={`corner-${i}`} position={[pos[0], 0, pos[2]]} castShadow>
-          <boxGeometry args={[0.1, h, 0.1]} />
-          <primitive object={sharedMaterials.darkFrame} attach="material" />
-        </mesh>
-      ))}
-      
-      {/* === BOTTOM FRAME === */}
-      <mesh position={[0, -h/2, -d/2]} castShadow>
-        <boxGeometry args={[w, 0.12, 0.1]} />
-        <primitive object={sharedMaterials.darkFrame} attach="material" />
-      </mesh>
-      <mesh position={[0, -h/2, d/2]} castShadow>
-        <boxGeometry args={[w, 0.12, 0.1]} />
-        <primitive object={sharedMaterials.darkFrame} attach="material" />
-      </mesh>
-      
-      {/* === PIPE CONNECTIONS (Right side) === */}
+      {/* === PIPE CONNECTIONS (Right side) - Offset to avoid z-fighting === */}
       {/* Inlet (red - hot) */}
-      <group position={[w/2 + 0.1, -h * 0.25, -d/4]}>
+      <group position={[w/2 + 0.15, -h * 0.15, -d/4]}>
         <mesh rotation={[0, 0, Math.PI/2]}>
-          <primitive object={sharedGeometries.pipe} attach="geometry" />
+          <cylinderGeometry args={[0.06, 0.06, 0.25, 12]} />
           <primitive object={sharedMaterials.red} attach="material" />
         </mesh>
-        <mesh position={[0.1, 0, 0]} rotation={[0, 0, Math.PI/2]}>
-          <primitive object={sharedGeometries.flange} attach="geometry" />
+        <mesh position={[0.12, 0, 0]} rotation={[0, 0, Math.PI/2]}>
+          <cylinderGeometry args={[0.09, 0.09, 0.03, 12]} />
           <primitive object={sharedMaterials.darkFrame} attach="material" />
         </mesh>
       </group>
       
       {/* Outlet (blue - cold) */}
-      <group position={[w/2 + 0.1, -h * 0.25, d/4]}>
+      <group position={[w/2 + 0.15, -h * 0.15, d/4]}>
         <mesh rotation={[0, 0, Math.PI/2]}>
-          <primitive object={sharedGeometries.pipe} attach="geometry" />
+          <cylinderGeometry args={[0.06, 0.06, 0.25, 12]} />
           <primitive object={sharedMaterials.blue} attach="material" />
         </mesh>
-        <mesh position={[0.1, 0, 0]} rotation={[0, 0, Math.PI/2]}>
-          <primitive object={sharedGeometries.flange} attach="geometry" />
+        <mesh position={[0.12, 0, 0]} rotation={[0, 0, Math.PI/2]}>
+          <cylinderGeometry args={[0.09, 0.09, 0.03, 12]} />
           <primitive object={sharedMaterials.darkFrame} attach="material" />
         </mesh>
       </group>
       
-      {/* === ANTSPACE LOGO === */}
-      <mesh position={[w * 0.2, h * 0.08, -d/2 - 0.02]}>
-        <boxGeometry args={[1.2, 0.1, 0.01]} />
-        <meshStandardMaterial color="#48bb78" emissive="#48bb78" emissiveIntensity={0.25} />
+      {/* === ANTSPACE LOGO - Offset to avoid z-fighting === */}
+      <mesh position={[w * 0.15, h * 0.15, -d/2 - 0.08]}>
+        <boxGeometry args={[1.0, 0.08, 0.01]} />
+        <meshStandardMaterial color="#48bb78" emissive="#48bb78" emissiveIntensity={0.2} />
       </mesh>
       
-      {/* === BITMAIN LOGO === */}
-      <mesh position={[w/2 - 0.6, -h * 0.38, -d/2 - 0.03]}>
-        <boxGeometry args={[0.7, 0.07, 0.01]} />
+      {/* === BITMAIN LOGO - Offset to avoid z-fighting === */}
+      <mesh position={[w/2 - 0.8, -h * 0.25, -d/2 - 0.08]}>
+        <boxGeometry args={[0.6, 0.06, 0.01]} />
         <primitive object={sharedMaterials.darkFrame} attach="material" />
       </mesh>
     </group>
@@ -501,12 +543,15 @@ const AssembledModule = memo(function AssembledModule({
   const baseY = baseDimensions.height / 2000;
   
   // Pre-calculate attachment positions
+  // Default cooling dimensions: EC2-DT = 12192 x 1200 x 2438 (1.2m height)
   const attachmentPositions = useMemo(() => {
     return attachments.map((att) => {
-      const attDims = att.dimensions || { width: 12192, height: 2896, depth: 2438 };
+      // Default to EC2-DT cooling dimensions (1.2m height, not container height)
+      const attDims = att.dimensions || { width: 12192, height: 1200, depth: 2438 };
       let position: [number, number, number] = [0, 0, 0];
       
       if (att.mountPoint === 'top') {
+        // Position cooling on top of container: container height + half cooling height
         const yOffset = (baseDimensions.height / 1000) + (attDims.height / 2000);
         position = [0, yOffset, 0];
       } else if (att.mountPoint === 'side' || att.mountPoint === 'side-right') {
@@ -1337,6 +1382,415 @@ const SolarCanopy = memo(function SolarCanopy({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// GENERATOR 5MW (Diesel/Gas Generator for mining operations)
+// Industrial power generation unit with radiator, exhaust, and control panel
+// ═══════════════════════════════════════════════════════════════════════════
+const Generator5MW = memo(function Generator5MW({ 
+  dimensions, 
+  position = [0, 0, 0],
+  powerMW = 5
+}: { 
+  dimensions: { width: number; height: number; depth: number }; 
+  position?: [number, number, number];
+  powerMW?: number;
+}) {
+  const w = dimensions.width / 1000;  // ~6m
+  const h = dimensions.height / 1000; // ~3m
+  const d = dimensions.depth / 1000;  // ~2.5m
+  
+  // Colors
+  const frameColor = '#1f2937';       // Dark frame
+  const bodyColor = '#374151';        // Gray body
+  const engineColor = '#4b5563';      // Engine block
+  const radiatorColor = '#6b7280';    // Radiator fins
+  const exhaustColor = '#292524';     // Exhaust stack
+  const panelColor = '#1e3a5f';       // Control panel blue
+  const copperColor = '#b45309';      // Copper connections
+  const greenLed = '#22c55e';
+  const yellowLed = '#eab308';
+  
+  // Pre-calculate radiator fin count
+  const finCount = 24;
+  const finSpacing = (d * 0.7) / finCount;
+  const finIndices = useMemo(() => Array.from({ length: finCount }, (_, i) => i), []);
+  
+  return (
+    <group position={position}>
+      {/* === BASE SKID (Steel frame) === */}
+      <mesh position={[0, -h * 0.45, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w * 1.05, h * 0.1, d * 1.05]} />
+        <meshStandardMaterial color={frameColor} metalness={0.7} roughness={0.3} />
+      </mesh>
+      
+      {/* Skid rails */}
+      {[-d * 0.4, d * 0.4].map((zPos, i) => (
+        <mesh key={`rail-${i}`} position={[0, -h * 0.48, zPos]} castShadow>
+          <boxGeometry args={[w * 1.1, 0.08, 0.15]} />
+          <meshStandardMaterial color={frameColor} metalness={0.8} roughness={0.2} />
+        </mesh>
+      ))}
+      
+      {/* === MAIN ENGINE HOUSING === */}
+      <mesh position={[0, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w * 0.85, h * 0.75, d * 0.85]} />
+        <meshStandardMaterial color={bodyColor} metalness={0.5} roughness={0.5} />
+      </mesh>
+      
+      {/* === ENGINE BLOCK (visible through side vents) === */}
+      <mesh position={[-w * 0.1, -h * 0.05, 0]} castShadow>
+        <boxGeometry args={[w * 0.45, h * 0.5, d * 0.6]} />
+        <meshStandardMaterial color={engineColor} metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* Engine cylinders (V-configuration hint) */}
+      {[-1, 1].map((side, i) => (
+        <mesh 
+          key={`cylinder-${i}`} 
+          position={[-w * 0.1, h * 0.08, side * d * 0.15]}
+          rotation={[0, 0, side * 0.3]}
+          castShadow
+        >
+          <boxGeometry args={[w * 0.35, h * 0.2, d * 0.15]} />
+          <meshStandardMaterial color="#374151" metalness={0.55} roughness={0.45} />
+        </mesh>
+      ))}
+      
+      {/* === ALTERNATOR (Right side) === */}
+      <mesh position={[w * 0.25, 0, 0]} castShadow rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[d * 0.25, d * 0.25, w * 0.25, 24]} />
+        <meshStandardMaterial color="#1e40af" metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* Alternator end cap */}
+      <mesh position={[w * 0.38, 0, 0]} castShadow rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[d * 0.22, d * 0.22, 0.08, 24]} />
+        <meshStandardMaterial color="#1e3a5f" metalness={0.5} roughness={0.5} />
+      </mesh>
+      
+      {/* === RADIATOR SECTION (Left end) === */}
+      <group position={[-w * 0.45, 0, 0]}>
+        {/* Radiator frame */}
+        <mesh castShadow>
+          <boxGeometry args={[w * 0.15, h * 0.65, d * 0.8]} />
+          <meshStandardMaterial color={frameColor} metalness={0.6} roughness={0.4} />
+        </mesh>
+        
+        {/* Radiator fins (vertical) */}
+        {finIndices.map((i) => (
+          <mesh 
+            key={`fin-${i}`}
+            position={[-w * 0.085, 0, -d * 0.35 + i * finSpacing]}
+            castShadow
+          >
+            <boxGeometry args={[0.015, h * 0.55, 0.02]} />
+            <meshStandardMaterial color={radiatorColor} metalness={0.5} roughness={0.5} />
+          </mesh>
+        ))}
+        
+        {/* Radiator fan shroud */}
+        <mesh position={[-w * 0.1, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <cylinderGeometry args={[d * 0.32, d * 0.32, 0.08, 24]} />
+          <meshStandardMaterial color={frameColor} metalness={0.5} roughness={0.5} />
+        </mesh>
+        
+        {/* Fan blades hint */}
+        <mesh position={[-w * 0.12, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <cylinderGeometry args={[d * 0.25, d * 0.25, 0.02, 24]} />
+          <meshStandardMaterial color="#4b5563" metalness={0.4} roughness={0.6} />
+        </mesh>
+      </group>
+      
+      {/* === EXHAUST STACK === */}
+      <group position={[w * 0.1, h * 0.45, -d * 0.25]}>
+        {/* Main stack */}
+        <mesh castShadow>
+          <cylinderGeometry args={[0.12, 0.15, h * 0.4, 16]} />
+          <meshStandardMaterial color={exhaustColor} metalness={0.6} roughness={0.4} />
+        </mesh>
+        
+        {/* Rain cap */}
+        <mesh position={[0, h * 0.22, 0]} castShadow>
+          <cylinderGeometry args={[0.18, 0.12, 0.08, 16]} />
+          <meshStandardMaterial color={exhaustColor} metalness={0.5} roughness={0.5} />
+        </mesh>
+        
+        {/* Exhaust tip */}
+        <mesh position={[0, h * 0.28, 0]}>
+          <cylinderGeometry args={[0.08, 0.08, 0.05, 16]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.7} roughness={0.3} />
+        </mesh>
+      </group>
+      
+      {/* === CONTROL PANEL (Front) === */}
+      <group position={[w * 0.35, h * 0.1, d * 0.44]}>
+        {/* Panel housing */}
+        <mesh castShadow>
+          <boxGeometry args={[w * 0.25, h * 0.35, 0.1]} />
+          <meshStandardMaterial color={panelColor} metalness={0.5} roughness={0.5} />
+        </mesh>
+        
+        {/* Display screen */}
+        <mesh position={[0, h * 0.08, 0.052]}>
+          <boxGeometry args={[w * 0.15, h * 0.12, 0.01]} />
+          <meshStandardMaterial color="#0f172a" emissive="#22d3ee" emissiveIntensity={0.3} />
+        </mesh>
+        
+        {/* Status LEDs */}
+        <mesh position={[-w * 0.08, h * 0.15, 0.055]}>
+          <sphereGeometry args={[0.02, 8, 8]} />
+          <meshStandardMaterial color={greenLed} emissive={greenLed} emissiveIntensity={1} />
+        </mesh>
+        <mesh position={[-w * 0.04, h * 0.15, 0.055]}>
+          <sphereGeometry args={[0.02, 8, 8]} />
+          <meshStandardMaterial color={greenLed} emissive={greenLed} emissiveIntensity={0.8} />
+        </mesh>
+        <mesh position={[0, h * 0.15, 0.055]}>
+          <sphereGeometry args={[0.02, 8, 8]} />
+          <meshStandardMaterial color={yellowLed} emissive={yellowLed} emissiveIntensity={0.5} />
+        </mesh>
+        
+        {/* Control buttons */}
+        {[-0.06, -0.02, 0.02, 0.06].map((xPos, i) => (
+          <mesh key={`btn-${i}`} position={[xPos, -h * 0.08, 0.055]}>
+            <cylinderGeometry args={[0.015, 0.015, 0.015, 12]} />
+            <meshStandardMaterial 
+              color={i === 0 ? '#22c55e' : i === 3 ? '#dc2626' : '#4b5563'} 
+              metalness={0.4} 
+              roughness={0.6} 
+            />
+          </mesh>
+        ))}
+      </group>
+      
+      {/* === POWER OUTPUT CONNECTIONS (Right side) === */}
+      <group position={[w * 0.43, -h * 0.15, 0]}>
+        {/* Main output busbar box */}
+        <mesh castShadow>
+          <boxGeometry args={[0.15, h * 0.25, d * 0.4]} />
+          <meshStandardMaterial color={frameColor} metalness={0.6} roughness={0.4} />
+        </mesh>
+        
+        {/* Copper busbars (3 phases) */}
+        {[-d * 0.12, 0, d * 0.12].map((zPos, i) => (
+          <mesh key={`busbar-${i}`} position={[0.09, 0, zPos]}>
+            <boxGeometry args={[0.04, h * 0.18, 0.06]} />
+            <meshStandardMaterial color={copperColor} metalness={0.8} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* Output cable glands */}
+        {[-d * 0.12, 0, d * 0.12].map((zPos, i) => (
+          <mesh key={`gland-${i}`} position={[0.12, -h * 0.15, zPos]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.04, 0.04, 0.08, 12]} />
+            <meshStandardMaterial color="#1a1a1a" metalness={0.5} roughness={0.5} />
+          </mesh>
+        ))}
+      </group>
+      
+      {/* === FUEL CONNECTIONS (Rear) === */}
+      <group position={[0, -h * 0.2, -d * 0.44]}>
+        {/* Fuel inlet */}
+        <mesh position={[-w * 0.15, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.04, 0.04, 0.1, 12]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.6} roughness={0.4} />
+        </mesh>
+        
+        {/* Fuel return */}
+        <mesh position={[w * 0.15, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.03, 0.03, 0.1, 12]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.6} roughness={0.4} />
+        </mesh>
+      </group>
+      
+      {/* === VENTILATION LOUVRES (Sides) === */}
+      {[d * 0.43, -d * 0.43].map((zPos, side) => (
+        <group key={`vent-side-${side}`} position={[0, 0, zPos]}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <mesh 
+              key={`louver-${i}`}
+              position={[-w * 0.15 + i * (w * 0.08), h * 0.15, side === 0 ? 0.02 : -0.02]}
+              rotation={[0.3 * (side === 0 ? 1 : -1), 0, 0]}
+            >
+              <boxGeometry args={[w * 0.06, 0.015, 0.08]} />
+              <meshStandardMaterial color={bodyColor} metalness={0.5} roughness={0.5} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      
+      {/* === NAMEPLATE === */}
+      <mesh position={[w * 0.1, h * 0.3, d * 0.44]}>
+        <boxGeometry args={[w * 0.2, h * 0.08, 0.01]} />
+        <meshStandardMaterial color="#f5f5f5" metalness={0.2} roughness={0.8} />
+      </mesh>
+      
+      {/* === LIFTING EYES === */}
+      {[[-w * 0.35, h * 0.4, 0], [w * 0.35, h * 0.4, 0]].map((pos, i) => (
+        <mesh key={`lift-${i}`} position={pos as [number, number, number]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.06, 0.02, 8, 16]} />
+          <meshStandardMaterial color={frameColor} metalness={0.7} roughness={0.3} />
+        </mesh>
+      ))}
+      
+      {/* === POWER RATING LABEL (visual indicator) === */}
+      <mesh position={[-w * 0.3, h * 0.25, d * 0.44]}>
+        <boxGeometry args={[0.15, 0.06, 0.01]} />
+        <meshStandardMaterial color="#16a34a" emissive="#16a34a" emissiveIntensity={0.2} />
+      </mesh>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POWER LAYOUT 5MW (Complete layout: Generator + PDU + 2 Containers)
+// Pre-configured layout with correct safety distances
+// ═══════════════════════════════════════════════════════════════════════════
+const PowerLayout5MW = memo(function PowerLayout5MW({ 
+  position = [0, 0, 0],
+  showLabels = true,
+  showDistances = true
+}: { 
+  position?: [number, number, number];
+  showLabels?: boolean;
+  showDistances?: boolean;
+}) {
+  // Layout dimensions (in meters, converted from mm for components)
+  const generatorDims = { width: 6000, height: 3000, depth: 2500 };
+  const pduDims = { width: 2400, height: 2200, depth: 800 };
+  const containerDims = { width: 12192, height: 2896, depth: 2438 };
+  const coolingDims = { width: 12192, height: 1200, depth: 2438 };
+  
+  // Safety distances (meters)
+  const distGenToPDU = 3.0;      // Generator to PDU
+  const distPDUToContainer = 3.0; // PDU to containers
+  const distBetweenContainers = 4.0; // Between containers
+  
+  // Calculate positions
+  const genY = generatorDims.height / 2000;
+  const pduY = pduDims.height / 2000;
+  const containerY = containerDims.height / 2000;
+  const coolingY = containerDims.height / 1000 + coolingDims.height / 2000;
+  
+  // X positions (layout flows from left to right)
+  const genX = 0;
+  const pduX = genX + generatorDims.width / 2000 + distGenToPDU + pduDims.width / 2000;
+  const containerBaseX = pduX + pduDims.width / 2000 + distPDUToContainer + containerDims.width / 2000;
+  
+  // Z positions for containers (centered, with spacing)
+  const container1Z = -distBetweenContainers / 2 - containerDims.depth / 2000;
+  const container2Z = distBetweenContainers / 2 + containerDims.depth / 2000;
+  
+  return (
+    <group position={position}>
+      {/* === CONCRETE PAD (Ground) === */}
+      <mesh position={[containerBaseX / 2, -0.05, 0]} receiveShadow>
+        <boxGeometry args={[35, 0.3, 20]} />
+        <meshStandardMaterial color="#6b7280" metalness={0.1} roughness={0.9} />
+      </mesh>
+      
+      {/* === SAFETY ZONE MARKING (Yellow perimeter) === */}
+      <mesh position={[containerBaseX / 2, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[16, 16.3, 4]} />
+        <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.3} />
+      </mesh>
+      
+      {/* === GENERATOR 5 MW === */}
+      <Generator5MW 
+        dimensions={generatorDims}
+        position={[genX, genY, 0]}
+        powerMW={5}
+      />
+      
+      {/* === PDU (Power Distribution Unit) === */}
+      <LVDistributionSkid 
+        dimensions={pduDims}
+        position={[pduX, pduY, 0]}
+        feeders={2}
+      />
+      
+      {/* === CONTAINER #1 + COOLING === */}
+      <group position={[containerBaseX, 0, container1Z]}>
+        <ISOContainer 
+          dimensions={containerDims}
+          position={[0, containerY, 0]}
+        />
+        <BitmainCoolingSystem 
+          dimensions={coolingDims}
+          position={[0, coolingY, 0]}
+        />
+      </group>
+      
+      {/* === CONTAINER #2 + COOLING === */}
+      <group position={[containerBaseX, 0, container2Z]}>
+        <ISOContainer 
+          dimensions={containerDims}
+          position={[0, containerY, 0]}
+        />
+        <BitmainCoolingSystem 
+          dimensions={coolingDims}
+          position={[0, coolingY, 0]}
+        />
+      </group>
+      
+      {/* === CABLE TRAYS (Visual connection) === */}
+      {/* Generator to PDU */}
+      <mesh position={[(genX + pduX) / 2, 0.15, 0]} castShadow>
+        <boxGeometry args={[distGenToPDU + 1, 0.1, 0.3]} />
+        <meshStandardMaterial color="#374151" metalness={0.4} roughness={0.6} />
+      </mesh>
+      
+      {/* PDU to Container 1 */}
+      <mesh position={[(pduX + containerBaseX) / 2, 0.15, container1Z / 2]} castShadow>
+        <boxGeometry args={[distPDUToContainer + containerDims.width / 2000, 0.1, 0.3]} />
+        <meshStandardMaterial color="#374151" metalness={0.4} roughness={0.6} />
+      </mesh>
+      
+      {/* PDU to Container 2 */}
+      <mesh position={[(pduX + containerBaseX) / 2, 0.15, container2Z / 2]} castShadow>
+        <boxGeometry args={[distPDUToContainer + containerDims.width / 2000, 0.1, 0.3]} />
+        <meshStandardMaterial color="#374151" metalness={0.4} roughness={0.6} />
+      </mesh>
+      
+      {/* === DISTANCE MARKERS (Red dashed lines) === */}
+      {showDistances && (
+        <group>
+          {/* Generator to PDU distance */}
+          <mesh position={[(genX + generatorDims.width / 2000 + pduX - pduDims.width / 2000) / 2, 0.5, -2]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[distGenToPDU, 0.05]} />
+            <meshStandardMaterial color="#ef4444" />
+          </mesh>
+          
+          {/* PDU to Containers distance */}
+          <mesh position={[(pduX + pduDims.width / 2000 + containerBaseX - containerDims.width / 2000) / 2, 0.5, -2]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[distPDUToContainer, 0.05]} />
+            <meshStandardMaterial color="#ef4444" />
+          </mesh>
+          
+          {/* Between containers distance */}
+          <mesh position={[containerBaseX, 0.5, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+            <planeGeometry args={[distBetweenContainers, 0.05]} />
+            <meshStandardMaterial color="#ef4444" />
+          </mesh>
+        </group>
+      )}
+      
+      {/* === EARTHING POINTS === */}
+      {[
+        [genX - 3, 0.1, -1.5],
+        [pduX - 1.5, 0.1, -1],
+        [containerBaseX - 7, 0.1, container1Z - 1.5],
+        [containerBaseX - 7, 0.1, container2Z + 1.5],
+      ].map((pos, i) => (
+        <mesh key={`earth-${i}`} position={pos as [number, number, number]}>
+          <cylinderGeometry args={[0.08, 0.08, 0.2, 8]} />
+          <meshStandardMaterial color="#15803d" metalness={0.6} roughness={0.4} />
+        </mesh>
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // PREVIEW BOX (Routes to correct component based on type)
 // ═══════════════════════════════════════════════════════════════════════════
 const PreviewBox = memo(function PreviewBox({ 
@@ -1365,7 +1819,7 @@ const PreviewBox = memo(function PreviewBox({
   });
   
   // Memoize type detection
-  const { isContainer, isCooling, isTransformer, isPowerBlock, isPDU, isCanopy } = useMemo(() => {
+  const { isContainer, isCooling, isTransformer, isPowerBlock, isPDU, isCanopy, isCableTray, isJunctionBox } = useMemo(() => {
     const typeLC = objectType?.toLowerCase() || '';
     return {
       isContainer: typeLC.includes('container') || typeLC === 'container' || typeLC === 'containers',
@@ -1374,6 +1828,8 @@ const PreviewBox = memo(function PreviewBox({
       isPowerBlock: typeLC.includes('powerblock') || typeLC === 'powerblock' || typeLC === 'powerblocks' || typeLC.includes('power-block'),
       isPDU: typeLC.includes('pdu') || typeLC.includes('distribution') || typeLC.includes('skid') || typeLC.includes('switchboard') || typeLC.includes('lv-skid'),
       isCanopy: typeLC.includes('canopy') || typeLC.includes('solar-canopy') || typeLC.includes('solarcanopy') || typeLC.includes('solar'),
+      isCableTray: typeLC.includes('cable') || typeLC.includes('chemin') || typeLC.includes('tray') || typeLC.includes('ladder') || typeLC.includes('wire-mesh'),
+      isJunctionBox: typeLC.includes('junction') || typeLC.includes('boite') || typeLC.includes('box') || typeLC.includes('raccord'),
     };
   }, [objectType]);
   
@@ -1455,6 +1911,35 @@ const PreviewBox = memo(function PreviewBox({
           containersPerRow={4}
           extractorOpeningWidth={2.5}
           clearanceAboveCooling={4}
+        />
+      </group>
+    );
+  }
+  
+  if (isCableTray) {
+    return (
+      <group ref={groupRef}>
+        <LadderCableTray 
+          length={dimensions.width}
+          width={dimensions.depth}
+          height={dimensions.height}
+          position={[0, y, 0]}
+          withCables={true}
+          cableCount={6}
+        />
+      </group>
+    );
+  }
+  
+  if (isJunctionBox) {
+    return (
+      <group ref={groupRef}>
+        <JunctionBox 
+          width={dimensions.width}
+          height={dimensions.height}
+          depth={dimensions.depth}
+          position={[0, y, 0]}
+          cableEntries={4}
         />
       </group>
     );
@@ -1556,6 +2041,20 @@ export default function Object3DPreview({
       return 'canopy';
     }
     
+    // Cable Trays
+    if (typeLC.includes('cable') || typeLC.includes('tray') || typeLC.includes('chemin')) return 'cable-tray';
+    if (nameLC.includes('cable') || nameLC.includes('chemin') || nameLC.includes('tray') || 
+        nameLC.includes('ladder') || nameLC.includes('échelle') || nameLC.includes('goulotte')) {
+      return 'cable-tray';
+    }
+    
+    // Junction Boxes
+    if (typeLC.includes('junction') || typeLC.includes('box') || typeLC.includes('raccord')) return 'junction-box';
+    if (nameLC.includes('junction') || nameLC.includes('boîte') || nameLC.includes('raccord') ||
+        nameLC.includes('derivation') || nameLC.includes('coffret')) {
+      return 'junction-box';
+    }
+    
     return typeLC || 'generic';
   })();
 
@@ -1655,5 +2154,836 @@ export default function Object3DPreview({
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CABLE TRAY SYSTEM - Industrial cable management (Chemin de câbles)
+// Premium galvanized steel ladder tray with accessories
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Shared materials for cable management
+const cableMaterials = {
+  galvanizedSteel: new THREE.MeshStandardMaterial({ color: '#9ca3af', metalness: 0.75, roughness: 0.25 }),
+  hotDipGalv: new THREE.MeshStandardMaterial({ color: '#a1a1aa', metalness: 0.8, roughness: 0.2 }),
+  powderCoated: new THREE.MeshStandardMaterial({ color: '#374151', metalness: 0.6, roughness: 0.4 }),
+  wireMesh: new THREE.MeshStandardMaterial({ color: '#71717a', metalness: 0.7, roughness: 0.3, wireframe: false }),
+  cableBlack: new THREE.MeshStandardMaterial({ color: '#1f2937', metalness: 0.2, roughness: 0.8 }),
+  cableRed: new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.2, roughness: 0.8 }),
+  cableBlue: new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.2, roughness: 0.8 }),
+  cableGreen: new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.2, roughness: 0.8 }),
+  cableYellow: new THREE.MeshStandardMaterial({ color: '#eab308', metalness: 0.2, roughness: 0.8 }),
+  junctionBox: new THREE.MeshStandardMaterial({ color: '#52525b', metalness: 0.5, roughness: 0.5 }),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LADDER CABLE TRAY (Chemin de câbles type échelle)
+// Industrial standard - hot dip galvanized steel
+// ═══════════════════════════════════════════════════════════════════════════
+const LadderCableTray = memo(function LadderCableTray({ 
+  length = 3000,      // mm - standard 3m section
+  width = 300,        // mm - 300mm standard width
+  height = 100,       // mm - side rail height
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  withCables = true,
+  cableCount = 6,
+}: { 
+  length?: number;
+  width?: number;
+  height?: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  withCables?: boolean;
+  cableCount?: number;
+}) {
+  const l = length / 1000;  // Convert to meters
+  const w = width / 1000;
+  const h = height / 1000;
+  
+  // Rail thickness
+  const railThickness = 0.003; // 3mm steel
+  const rungSpacing = 0.25;   // 250mm between rungs
+  const rungCount = Math.floor(l / rungSpacing);
+  
+  const rungIndices = useMemo(() => Array.from({ length: rungCount }, (_, i) => i), [rungCount]);
+  
+  // Cable positions (distributed across width)
+  const cablePositions = useMemo(() => {
+    const positions: Array<{ xOffset: number; color: THREE.MeshStandardMaterial; radius: number }> = [];
+    const cableColors = [cableMaterials.cableBlack, cableMaterials.cableRed, cableMaterials.cableBlue, 
+                         cableMaterials.cableGreen, cableMaterials.cableYellow, cableMaterials.cableBlack];
+    const spacing = (w - 0.04) / (cableCount + 1);
+    
+    for (let i = 0; i < cableCount; i++) {
+      positions.push({
+        xOffset: -w/2 + 0.02 + spacing * (i + 1),
+        color: cableColors[i % cableColors.length],
+        radius: 0.012 + Math.random() * 0.008 // Varied cable sizes
+      });
+    }
+    return positions;
+  }, [w, cableCount]);
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* === SIDE RAILS (C-channel profile) === */}
+      {[-1, 1].map((side) => (
+        <group key={`rail-${side}`} position={[side * (w/2 - railThickness/2), 0, 0]}>
+          {/* Vertical web */}
+          <mesh castShadow>
+            <boxGeometry args={[railThickness, h, l]} />
+            <primitive object={cableMaterials.hotDipGalv} attach="material" />
+          </mesh>
+          {/* Top flange */}
+          <mesh position={[-side * 0.008, h/2 - railThickness/2, 0]} castShadow>
+            <boxGeometry args={[0.02, railThickness, l]} />
+            <primitive object={cableMaterials.hotDipGalv} attach="material" />
+          </mesh>
+          {/* Bottom flange */}
+          <mesh position={[-side * 0.008, -h/2 + railThickness/2, 0]} castShadow>
+            <boxGeometry args={[0.02, railThickness, l]} />
+            <primitive object={cableMaterials.hotDipGalv} attach="material" />
+          </mesh>
+        </group>
+      ))}
+      
+      {/* === CROSS RUNGS (Ladder rungs) === */}
+      {rungIndices.map((i) => (
+        <mesh 
+          key={`rung-${i}`}
+          position={[0, -h/2 + 0.015, -l/2 + rungSpacing/2 + i * rungSpacing]}
+          castShadow
+        >
+          <boxGeometry args={[w - 0.01, 0.006, 0.03]} />
+          <primitive object={cableMaterials.hotDipGalv} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* === SPLICE PLATES (End connectors) === */}
+      {[-l/2, l/2].map((zPos, i) => (
+        <group key={`splice-${i}`} position={[0, 0, zPos]}>
+          {[-1, 1].map((side) => (
+            <mesh 
+              key={`splice-plate-${side}`}
+              position={[side * (w/2 - railThickness), 0, 0]}
+              castShadow
+            >
+              <boxGeometry args={[0.025, h * 0.8, 0.04]} />
+              <primitive object={cableMaterials.galvanizedSteel} attach="material" />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      
+      {/* === CABLES (if enabled) === */}
+      {withCables && cablePositions.map((cable, i) => (
+        <mesh 
+          key={`cable-${i}`}
+          position={[cable.xOffset, -h/2 + cable.radius + 0.02, 0]}
+          rotation={[Math.PI/2, 0, 0]}
+          castShadow
+        >
+          <cylinderGeometry args={[cable.radius, cable.radius, l * 0.98, 12]} />
+          <primitive object={cable.color} attach="material" />
+        </mesh>
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WIRE MESH CABLE TRAY (Chemin de câbles fil)
+// For data/network cables - lighter duty
+// ═══════════════════════════════════════════════════════════════════════════
+const WireMeshTray = memo(function WireMeshTray({ 
+  length = 3000,
+  width = 200,
+  height = 60,
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  withCables = true,
+}: { 
+  length?: number;
+  width?: number;
+  height?: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  withCables?: boolean;
+}) {
+  const l = length / 1000;
+  const w = width / 1000;
+  const h = height / 1000;
+  
+  const wireThickness = 0.004;
+  const meshSpacingX = 0.05;
+  const meshSpacingZ = 0.1;
+  
+  const wireCountX = Math.floor(w / meshSpacingX);
+  const wireCountZ = Math.floor(l / meshSpacingZ);
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* === SIDE RAILS === */}
+      {[-1, 1].map((side) => (
+        <mesh 
+          key={`side-${side}`}
+          position={[side * w/2, 0, 0]}
+          castShadow
+        >
+          <boxGeometry args={[wireThickness * 2, h, l]} />
+          <primitive object={cableMaterials.wireMesh} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* === BOTTOM MESH (Longitudinal wires) === */}
+      {Array.from({ length: wireCountX }).map((_, i) => (
+        <mesh 
+          key={`long-wire-${i}`}
+          position={[-w/2 + meshSpacingX/2 + i * meshSpacingX, -h/2 + wireThickness, 0]}
+          castShadow
+        >
+          <boxGeometry args={[wireThickness, wireThickness, l]} />
+          <primitive object={cableMaterials.wireMesh} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* === BOTTOM MESH (Cross wires) === */}
+      {Array.from({ length: wireCountZ }).map((_, i) => (
+        <mesh 
+          key={`cross-wire-${i}`}
+          position={[0, -h/2 + wireThickness, -l/2 + meshSpacingZ/2 + i * meshSpacingZ]}
+          castShadow
+        >
+          <boxGeometry args={[w, wireThickness, wireThickness]} />
+          <primitive object={cableMaterials.wireMesh} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* === DATA CABLES (Blue Cat6/Cat6a) === */}
+      {withCables && (
+        <group position={[0, -h/2 + 0.02, 0]}>
+          {/* Cable bundle */}
+          <mesh rotation={[Math.PI/2, 0, 0]} castShadow>
+            <cylinderGeometry args={[w * 0.3, w * 0.3, l * 0.95, 16]} />
+            <meshStandardMaterial color="#1e40af" metalness={0.15} roughness={0.85} />
+          </mesh>
+          {/* Cable ties (visible) */}
+          {Array.from({ length: 6 }).map((_, i) => (
+            <mesh 
+              key={`tie-${i}`}
+              position={[0, 0.01, -l/2 + l/7 + i * (l/7)]}
+              rotation={[0, 0, Math.PI/2]}
+            >
+              <torusGeometry args={[w * 0.32, 0.003, 8, 16]} />
+              <meshStandardMaterial color="#1f2937" />
+            </mesh>
+          ))}
+        </group>
+      )}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CABLE TRAY ELBOW 90° (Coude 90°)
+// For direction changes in cable routing
+// ═══════════════════════════════════════════════════════════════════════════
+const CableTrayElbow90 = memo(function CableTrayElbow90({ 
+  width = 300,
+  height = 100,
+  bendRadius = 300,
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  horizontal = true,  // true = horizontal turn, false = vertical turn
+}: { 
+  width?: number;
+  height?: number;
+  bendRadius?: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  horizontal?: boolean;
+}) {
+  const w = width / 1000;
+  const h = height / 1000;
+  const r = bendRadius / 1000;
+  
+  // Create curved segments
+  const segments = 8;
+  const angleStep = (Math.PI / 2) / segments;
+  
+  const curvePoints = useMemo(() => {
+    const points: Array<{ x: number; z: number; angle: number }> = [];
+    for (let i = 0; i <= segments; i++) {
+      const angle = i * angleStep;
+      points.push({
+        x: r * Math.sin(angle),
+        z: r * (1 - Math.cos(angle)),
+        angle: angle
+      });
+    }
+    return points;
+  }, [r, segments, angleStep]);
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {horizontal ? (
+        // Horizontal elbow (turn left/right)
+        <>
+          {/* Curved side rails */}
+          {[-1, 1].map((side) => (
+            <group key={`curve-rail-${side}`}>
+              {curvePoints.slice(0, -1).map((point, i) => {
+                const nextPoint = curvePoints[i + 1];
+                const midX = (point.x + nextPoint.x) / 2;
+                const midZ = (point.z + nextPoint.z) / 2;
+                const segLength = Math.sqrt(
+                  Math.pow(nextPoint.x - point.x, 2) + 
+                  Math.pow(nextPoint.z - point.z, 2)
+                );
+                const segAngle = Math.atan2(nextPoint.x - point.x, nextPoint.z - point.z);
+                
+                return (
+                  <mesh 
+                    key={`seg-${i}`}
+                    position={[midX + side * (w/2) * Math.cos(point.angle + angleStep/2), 0, midZ + side * (w/2) * Math.sin(point.angle + angleStep/2)]}
+                    rotation={[0, segAngle, 0]}
+                    castShadow
+                  >
+                    <boxGeometry args={[0.003, h, segLength * 1.1]} />
+                    <primitive object={cableMaterials.hotDipGalv} attach="material" />
+                  </mesh>
+                );
+              })}
+            </group>
+          ))}
+          
+          {/* Curved bottom plate */}
+          <mesh position={[r/2, -h/2 + 0.002, r/2]} castShadow>
+            <boxGeometry args={[r * 0.9, 0.004, r * 0.9]} />
+            <primitive object={cableMaterials.galvanizedSteel} attach="material" />
+          </mesh>
+        </>
+      ) : (
+        // Vertical elbow (up/down)
+        <>
+          {curvePoints.slice(0, -1).map((point, i) => {
+            const nextPoint = curvePoints[i + 1];
+            return (
+              <mesh 
+                key={`vseg-${i}`}
+                position={[0, point.x, point.z]}
+                rotation={[point.angle + angleStep/2, 0, 0]}
+                castShadow
+              >
+                <boxGeometry args={[w, h, r / segments]} />
+                <primitive object={cableMaterials.galvanizedSteel} attach="material" />
+              </mesh>
+            );
+          })}
+        </>
+      )}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CABLE TRAY TEE (Raccord en T)
+// For branching cable routes
+// ═══════════════════════════════════════════════════════════════════════════
+const CableTrayTee = memo(function CableTrayTee({ 
+  width = 300,
+  height = 100,
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+}: { 
+  width?: number;
+  height?: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const w = width / 1000;
+  const h = height / 1000;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* === MAIN THROUGH SECTION === */}
+      {/* Side rails */}
+      {[-1, 1].map((side) => (
+        <mesh 
+          key={`main-rail-${side}`}
+          position={[side * w/2, 0, 0]}
+          castShadow
+        >
+          <boxGeometry args={[0.003, h, w * 1.5]} />
+          <primitive object={cableMaterials.hotDipGalv} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* Bottom plate (main) */}
+      <mesh position={[0, -h/2 + 0.002, 0]} castShadow>
+        <boxGeometry args={[w, 0.004, w * 1.5]} />
+        <primitive object={cableMaterials.galvanizedSteel} attach="material" />
+      </mesh>
+      
+      {/* === BRANCH SECTION === */}
+      {/* Branch rails */}
+      {[-1, 1].map((side) => (
+        <mesh 
+          key={`branch-rail-${side}`}
+          position={[w/2 + w * 0.4, 0, side * w/2]}
+          rotation={[0, Math.PI/2, 0]}
+          castShadow
+        >
+          <boxGeometry args={[0.003, h, w * 0.8]} />
+          <primitive object={cableMaterials.hotDipGalv} attach="material" />
+        </mesh>
+      ))}
+      
+      {/* Branch bottom plate */}
+      <mesh position={[w/2 + w * 0.4, -h/2 + 0.002, 0]} castShadow>
+        <boxGeometry args={[w * 0.8, 0.004, w]} />
+        <primitive object={cableMaterials.galvanizedSteel} attach="material" />
+      </mesh>
+      
+      {/* === CORNER REINFORCEMENTS === */}
+      {[[-w/2, w * 0.5], [w/2, w * 0.5], [-w/2, -w * 0.5], [w/2, -w * 0.5]].map((pos, i) => (
+        <mesh 
+          key={`gusset-${i}`}
+          position={[pos[0], -h/2 + 0.01, pos[1]]}
+          castShadow
+        >
+          <boxGeometry args={[0.04, 0.008, 0.04]} />
+          <primitive object={cableMaterials.hotDipGalv} attach="material" />
+        </mesh>
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CABLE TRAY REDUCER (Réducteur)
+// For transitioning between different tray widths
+// ═══════════════════════════════════════════════════════════════════════════
+const CableTrayReducer = memo(function CableTrayReducer({ 
+  widthLarge = 450,
+  widthSmall = 300,
+  length = 300,
+  height = 100,
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+}: { 
+  widthLarge?: number;
+  widthSmall?: number;
+  length?: number;
+  height?: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const wL = widthLarge / 1000;
+  const wS = widthSmall / 1000;
+  const l = length / 1000;
+  const h = height / 1000;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* === TAPERED SIDE RAILS === */}
+      {[-1, 1].map((side) => {
+        // Create angled rail
+        const startX = side * wL/2;
+        const endX = side * wS/2;
+        const midX = (startX + endX) / 2;
+        const angle = Math.atan2(startX - endX, l);
+        const railLength = Math.sqrt(Math.pow(startX - endX, 2) + Math.pow(l, 2));
+        
+        return (
+          <mesh 
+            key={`taper-rail-${side}`}
+            position={[midX, 0, 0]}
+            rotation={[0, -side * angle, 0]}
+            castShadow
+          >
+            <boxGeometry args={[0.003, h, railLength]} />
+            <primitive object={cableMaterials.hotDipGalv} attach="material" />
+          </mesh>
+        );
+      })}
+      
+      {/* === TAPERED BOTTOM === */}
+      <mesh position={[0, -h/2 + 0.002, 0]} castShadow>
+        <boxGeometry args={[(wL + wS) / 2, 0.004, l]} />
+        <primitive object={cableMaterials.galvanizedSteel} attach="material" />
+      </mesh>
+      
+      {/* === END PLATES === */}
+      <mesh position={[0, 0, -l/2]} castShadow>
+        <boxGeometry args={[wL, h, 0.004]} />
+        <primitive object={cableMaterials.galvanizedSteel} attach="material" />
+      </mesh>
+      <mesh position={[0, 0, l/2]} castShadow>
+        <boxGeometry args={[wS, h, 0.004]} />
+        <primitive object={cableMaterials.galvanizedSteel} attach="material" />
+      </mesh>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WALL BRACKET (Console murale)
+// For mounting cable trays to walls
+// ═══════════════════════════════════════════════════════════════════════════
+const WallBracket = memo(function WallBracket({ 
+  width = 300,        // Tray width it supports
+  depth = 200,        // How far from wall
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+}: { 
+  width?: number;
+  depth?: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const w = width / 1000;
+  const d = depth / 1000;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* === WALL PLATE === */}
+      <mesh position={[0, 0, 0]} castShadow>
+        <boxGeometry args={[w * 0.4, 0.15, 0.008]} />
+        <primitive object={cableMaterials.powderCoated} attach="material" />
+      </mesh>
+      
+      {/* === SUPPORT ARM (Triangular bracket) === */}
+      {[-1, 1].map((side) => (
+        <group key={`arm-${side}`} position={[side * w * 0.15, 0, 0]}>
+          {/* Horizontal arm */}
+          <mesh position={[0, 0, d/2]} castShadow>
+            <boxGeometry args={[0.04, 0.006, d]} />
+            <primitive object={cableMaterials.powderCoated} attach="material" />
+          </mesh>
+          {/* Diagonal brace */}
+          <mesh 
+            position={[0, -0.05, d * 0.35]} 
+            rotation={[Math.PI/4, 0, 0]}
+            castShadow
+          >
+            <boxGeometry args={[0.03, 0.005, d * 0.5]} />
+            <primitive object={cableMaterials.powderCoated} attach="material" />
+          </mesh>
+        </group>
+      ))}
+      
+      {/* === TOP SUPPORT RAIL === */}
+      <mesh position={[0, 0, d]} castShadow>
+        <boxGeometry args={[w * 0.35, 0.008, 0.04]} />
+        <primitive object={cableMaterials.powderCoated} attach="material" />
+      </mesh>
+      
+      {/* === MOUNTING HOLES (Visual) === */}
+      {[[-w * 0.12, 0.05], [w * 0.12, 0.05], [-w * 0.12, -0.05], [w * 0.12, -0.05]].map((pos, i) => (
+        <mesh key={`hole-${i}`} position={[pos[0], pos[1], 0.005]}>
+          <cylinderGeometry args={[0.006, 0.006, 0.01, 8]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.8} roughness={0.2} />
+        </mesh>
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CEILING TRAPEZE (Suspension plafond)
+// For hanging cable trays from ceiling/structure
+// ═══════════════════════════════════════════════════════════════════════════
+const CeilingTrapeze = memo(function CeilingTrapeze({ 
+  width = 300,        // Tray width it supports
+  dropHeight = 500,   // Distance from ceiling
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+}: { 
+  width?: number;
+  dropHeight?: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const w = width / 1000;
+  const drop = dropHeight / 1000;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* === THREADED RODS (2 per trapeze) === */}
+      {[-1, 1].map((side) => (
+        <group key={`rod-${side}`} position={[side * (w/2 + 0.02), drop/2, 0]}>
+          {/* Threaded rod */}
+          <mesh castShadow>
+            <cylinderGeometry args={[0.006, 0.006, drop, 8]} />
+            <meshStandardMaterial color="#71717a" metalness={0.8} roughness={0.2} />
+          </mesh>
+          {/* Top anchor plate */}
+          <mesh position={[0, drop/2, 0]} castShadow>
+            <boxGeometry args={[0.05, 0.008, 0.05]} />
+            <primitive object={cableMaterials.galvanizedSteel} attach="material" />
+          </mesh>
+          {/* Bottom nut */}
+          <mesh position={[0, -drop/2 + 0.01, 0]}>
+            <cylinderGeometry args={[0.012, 0.012, 0.015, 6]} />
+            <meshStandardMaterial color="#52525b" metalness={0.7} roughness={0.3} />
+          </mesh>
+        </group>
+      ))}
+      
+      {/* === CROSS MEMBER (Supports tray) === */}
+      <mesh position={[0, 0, 0]} castShadow>
+        <boxGeometry args={[w + 0.05, 0.04, 0.04]} />
+        <primitive object={cableMaterials.powderCoated} attach="material" />
+      </mesh>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// JUNCTION BOX (Boîte de jonction)
+// For cable connections and transitions
+// ═══════════════════════════════════════════════════════════════════════════
+const JunctionBox = memo(function JunctionBox({ 
+  width = 300,
+  height = 200,
+  depth = 150,
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  cableEntries = 4,
+}: { 
+  width?: number;
+  height?: number;
+  depth?: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  cableEntries?: number;
+}) {
+  const w = width / 1000;
+  const h = height / 1000;
+  const d = depth / 1000;
+  
+  const entrySpacing = w / (cableEntries + 1);
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* === MAIN BOX === */}
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[w, h, d]} />
+        <primitive object={cableMaterials.junctionBox} attach="material" />
+      </mesh>
+      
+      {/* === COVER PLATE === */}
+      <mesh position={[0, 0, d/2 + 0.002]} castShadow>
+        <boxGeometry args={[w * 0.95, h * 0.95, 0.004]} />
+        <meshStandardMaterial color="#6b7280" metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* === COVER SCREWS === */}
+      {[[-w * 0.4, h * 0.4], [w * 0.4, h * 0.4], [-w * 0.4, -h * 0.4], [w * 0.4, -h * 0.4]].map((pos, i) => (
+        <mesh key={`screw-${i}`} position={[pos[0], pos[1], d/2 + 0.006]}>
+          <cylinderGeometry args={[0.008, 0.008, 0.008, 12]} />
+          <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.2} />
+        </mesh>
+      ))}
+      
+      {/* === CABLE ENTRIES (Bottom) === */}
+      {Array.from({ length: cableEntries }).map((_, i) => (
+        <group key={`entry-${i}`} position={[-w/2 + entrySpacing * (i + 1), -h/2 - 0.02, 0]}>
+          {/* Cable gland */}
+          <mesh castShadow>
+            <cylinderGeometry args={[0.018, 0.018, 0.04, 12]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.5} />
+          </mesh>
+          {/* Locknut */}
+          <mesh position={[0, 0.025, 0]}>
+            <cylinderGeometry args={[0.022, 0.022, 0.01, 6]} />
+            <meshStandardMaterial color="#374151" metalness={0.7} roughness={0.3} />
+          </mesh>
+        </group>
+      ))}
+      
+      {/* === EARTH TERMINAL (Green/Yellow) === */}
+      <mesh position={[w * 0.35, h * 0.35, d/2 + 0.01]}>
+        <boxGeometry args={[0.025, 0.015, 0.008]} />
+        <meshStandardMaterial color="#22c55e" metalness={0.5} roughness={0.5} />
+      </mesh>
+      
+      {/* === IP RATING LABEL === */}
+      <mesh position={[0, -h * 0.3, d/2 + 0.004]}>
+        <boxGeometry args={[0.04, 0.015, 0.001]} />
+        <meshStandardMaterial color="#f5f5f5" />
+      </mesh>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPLETE CABLE ROUTING SYSTEM
+// Pre-configured professional cable layout for mining facility
+// ═══════════════════════════════════════════════════════════════════════════
+const CableRoutingSystem = memo(function CableRoutingSystem({ 
+  dimensions,
+  position = [0, 0, 0] as [number, number, number],
+  cableHeight = 3500,  // Height of cable trays above ground (mm)
+}: { 
+  dimensions: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  cableHeight?: number;
+}) {
+  const w = dimensions.width / 1000;
+  const d = dimensions.depth / 1000;
+  const cableY = cableHeight / 1000;
+  
+  // Main cable run length
+  const mainRunLength = w * 0.8;
+  const branchCount = 4;
+  const branchSpacing = mainRunLength / (branchCount + 1);
+  
+  return (
+    <group position={position}>
+      {/* === MAIN POWER CABLE RUN (Ladder tray 450mm) === */}
+      <LadderCableTray 
+        length={mainRunLength * 1000}
+        width={450}
+        height={100}
+        position={[0, cableY, 0]}
+        rotation={[0, Math.PI/2, 0]}
+        withCables={true}
+        cableCount={8}
+      />
+      
+      {/* === CEILING SUPPORTS FOR MAIN RUN === */}
+      {Array.from({ length: Math.ceil(mainRunLength / 2) }).map((_, i) => (
+        <CeilingTrapeze 
+          key={`main-support-${i}`}
+          width={450}
+          dropHeight={500}
+          position={[-mainRunLength/2 + 1 + i * 2, cableY + 0.25, 0]}
+        />
+      ))}
+      
+      {/* === BRANCH RUNS TO CONTAINERS (Ladder tray 300mm) === */}
+      {Array.from({ length: branchCount }).map((_, i) => {
+        const xPos = -mainRunLength/2 + branchSpacing * (i + 1);
+        const branchLength = d * 0.4;
+        
+        return (
+          <group key={`branch-${i}`}>
+            {/* Branch tray */}
+            <LadderCableTray 
+              length={branchLength * 1000}
+              width={300}
+              height={100}
+              position={[xPos, cableY - 0.15, branchLength/2 + 0.2]}
+              rotation={[0, 0, 0]}
+              withCables={true}
+              cableCount={4}
+            />
+            
+            {/* Tee connector */}
+            <CableTrayTee 
+              width={300}
+              height={100}
+              position={[xPos - 0.15, cableY, 0]}
+              rotation={[0, Math.PI/2, 0]}
+            />
+            
+            {/* Reducer (main to branch) */}
+            <CableTrayReducer 
+              widthLarge={450}
+              widthSmall={300}
+              length={300}
+              height={100}
+              position={[xPos, cableY - 0.08, 0.15]}
+              rotation={[0, 0, 0]}
+            />
+            
+            {/* Wall brackets for branch */}
+            <WallBracket 
+              width={300}
+              depth={200}
+              position={[xPos, cableY - 0.15, branchLength + 0.3]}
+              rotation={[0, Math.PI, 0]}
+            />
+            
+            {/* Junction box at end */}
+            <JunctionBox 
+              width={400}
+              height={300}
+              depth={200}
+              position={[xPos, cableY - 0.5, branchLength + 0.5]}
+              rotation={[0, Math.PI, 0]}
+              cableEntries={4}
+            />
+          </group>
+        );
+      })}
+      
+      {/* === DATA/NETWORK CABLE RUN (Wire mesh tray) === */}
+      <WireMeshTray 
+        length={mainRunLength * 1000 * 0.9}
+        width={200}
+        height={60}
+        position={[0, cableY + 0.12, -0.25]}
+        rotation={[0, Math.PI/2, 0]}
+        withCables={true}
+      />
+      
+      {/* === VERTICAL DROPS AT ENDS === */}
+      {[-1, 1].map((side) => (
+        <group key={`vertical-${side}`} position={[side * mainRunLength/2, 0, 0]}>
+          {/* Vertical cable tray section */}
+          <LadderCableTray 
+            length={cableY * 1000}
+            width={300}
+            height={100}
+            position={[side * 0.3, cableY/2, 0]}
+            rotation={[Math.PI/2, 0, 0]}
+            withCables={true}
+            cableCount={4}
+          />
+          
+          {/* 90° elbow */}
+          <CableTrayElbow90 
+            width={300}
+            height={100}
+            bendRadius={300}
+            position={[side * mainRunLength/2 - side * 0.15, cableY - 0.15, 0]}
+            rotation={[0, side > 0 ? 0 : Math.PI, 0]}
+            horizontal={false}
+          />
+        </group>
+      ))}
+      
+      {/* === FLOOR LEVEL JUNCTION BOXES === */}
+      {[-mainRunLength/2, mainRunLength/2].map((xPos, i) => (
+        <JunctionBox 
+          key={`floor-jbox-${i}`}
+          width={500}
+          height={400}
+          depth={250}
+          position={[xPos + (i === 0 ? 0.3 : -0.3), 0.25, 0]}
+          cableEntries={6}
+        />
+      ))}
+    </group>
+  );
+});
+
 // Export individual components for use in scene
-export { SolarCanopy, ISOContainer, BitmainCoolingSystem, OilTransformer, LVDistributionSkid };
+export { 
+  SolarCanopy, 
+  ISOContainer, 
+  BitmainCoolingSystem, 
+  OilTransformer, 
+  LVDistributionSkid,
+  // Cable Management System
+  LadderCableTray,
+  WireMeshTray,
+  CableTrayElbow90,
+  CableTrayTee,
+  CableTrayReducer,
+  WallBracket,
+  CeilingTrapeze,
+  JunctionBox,
+  CableRoutingSystem,
+};

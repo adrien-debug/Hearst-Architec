@@ -7,10 +7,7 @@ import {
   Move, 
   RotateCcw, 
   Maximize, 
-  Ruler,
   Grid3X3,
-  Eye,
-  EyeOff,
   Download,
   ZoomIn,
   ZoomOut,
@@ -19,7 +16,7 @@ import {
   Wand2
 } from 'lucide-react';
 
-export type Tool = 'select' | 'move' | 'rotate' | 'scale' | 'measure';
+export type Tool = 'select' | 'move' | 'rotate' | 'scale';
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 
 interface ToolbarProps {
@@ -27,8 +24,6 @@ interface ToolbarProps {
   onToolChange: (tool: Tool) => void;
   showGrid: boolean;
   onToggleGrid: () => void;
-  showDimensions: boolean;
-  onToggleDimensions: () => void;
   onOpenLibrary: () => void;
   onExport: () => void;
   onResetView: () => void;
@@ -93,8 +88,6 @@ export default function Toolbar({
   onToolChange,
   showGrid,
   onToggleGrid,
-  showDimensions,
-  onToggleDimensions,
   onOpenLibrary,
   onExport,
   onResetView,
@@ -134,11 +127,6 @@ export default function Toolbar({
 
         <Divider />
 
-        {/* Measure */}
-        <ToolButton icon={Ruler} label="Measure (M)" active={activeTool === 'measure'} onClick={() => onToolChange('measure')} />
-
-        <Divider />
-
         {/* Smart Alignment */}
         {onSmartAlignment && (
           <ToolButton 
@@ -163,7 +151,6 @@ export default function Toolbar({
 
         {/* Display */}
         <ToolButton icon={Grid3X3} label="Grid" active={showGrid} onClick={onToggleGrid} />
-        <ToolButton icon={showDimensions ? Eye : EyeOff} label="Dimensions" active={showDimensions} onClick={onToggleDimensions} />
 
         <Divider />
 

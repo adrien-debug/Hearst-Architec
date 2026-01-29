@@ -54,7 +54,10 @@ import {
   ArrowUp,
   ArrowDown,
   Move,
-  Copy
+  Copy,
+  BoxSelect,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -72,798 +75,9 @@ interface SavedProject {
 // 3D COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Measurement Line
-function MeasurementLine({ start, end }: { start: THREE.Vector3; end: THREE.Vector3 }) {
-  const distance = start.distanceTo(end);
-  const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-  
-  return (
-    <group>
-      <Line
-        points={[start, end]}
-        color="#ef4444"
-        lineWidth={2}
-        dashed
-        dashSize={0.1}
-        gapSize={0.05}
-      />
-      <Html position={midPoint} center>
-        <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-full whitespace-nowrap shadow-lg">
-          {(distance * 1000).toFixed(0)} mm ({distance.toFixed(2)} m)
-        </div>
-      </Html>
-    </group>
-  );
-}
 
-// Center Guides - Simple axes at origin
-function CenterGuides() {
-  return (
-    <group>
-      {/* Axe X (rouge) - ligne centrale de symétrie */}
-      <Line
-        points={[[-80, 0.08, 0], [80, 0.08, 0]]}
-        color="#dc2626"
-        lineWidth={3}
-      />
-      
-      {/* Axe Z (vert) - ligne centrale de symétrie */}
-      <Line
-        points={[[0, 0.08, -80], [0, 0.08, 80]]}
-        color="#16a34a"
-        lineWidth={3}
-      />
-      
-      {/* Croix centrale à l'origine */}
-      <mesh position={[0, 0.1, 0]} rotation={[-Math.PI/2, 0, 0]}>
-        <circleGeometry args={[1, 32]} />
-        <meshBasicMaterial color="#f59e0b" />
-      </mesh>
-    </group>
-  );
-}
 
-// Alignment Lines - Dynamic alignment guides based on objects
-function AlignmentLines({ objects }: { objects: Object3D[] }) {
-  // Détecter les lignes d'alignement (objets avec même X ou Z)
-  const containers = objects.filter(o => 
-    o.type.toLowerCase().includes('container') || 
-    o.name.toLowerCase().includes('hd5') ||
-    o.name.toLowerCase().includes('antspace')
-  );
-  
-  if (containers.length < 2) return null;
-  
-  // Trouver les rangées (groupes d'objets avec X similaire)
-  const xPositions = new Map<number, Object3D[]>();
-  const zPositions = new Map<number, Object3D[]>();
-  
-  containers.forEach(obj => {
-    // Arrondir à 0.5m pour grouper
-    const roundedX = Math.round(obj.position.x * 2) / 2;
-    const roundedZ = Math.round(obj.position.z * 2) / 2;
-    
-    if (!xPositions.has(roundedX)) xPositions.set(roundedX, []);
-    if (!zPositions.has(roundedZ)) zPositions.set(roundedZ, []);
-    
-    xPositions.get(roundedX)!.push(obj);
-    zPositions.get(roundedZ)!.push(obj);
-  });
-  
-  // Filtrer pour n'avoir que les vraies rangées (2+ objets)
-  const xRows = Array.from(xPositions.entries()).filter(([, objs]) => objs.length >= 2);
-  const zRows = Array.from(zPositions.entries()).filter(([, objs]) => objs.length >= 2);
-  
-  // Calculer l'étendue de la scène
-  const allX = containers.map(o => o.position.x);
-  const allZ = containers.map(o => o.position.z);
-  const minX = Math.min(...allX) - 10;
-  const maxX = Math.max(...allX) + 10;
-  const minZ = Math.min(...allZ) - 10;
-  const maxZ = Math.max(...allZ) + 10;
-  
-  return (
-    <group>
-      {/* Lignes d'alignement X (bleu clair) - pour chaque rangée verticale */}
-      {xRows.map(([x], idx) => (
-        <Line
-          key={`x-align-${idx}`}
-          points={[[x, 0.06, minZ], [x, 0.06, maxZ]]}
-          color="#3b82f6"
-          lineWidth={2}
-          dashed
-          dashSize={0.5}
-          gapSize={0.3}
-        />
-      ))}
-      
-      {/* Lignes d'alignement Z (cyan) - pour chaque rangée horizontale */}
-      {zRows.map(([z], idx) => (
-        <Line
-          key={`z-align-${idx}`}
-          points={[[minX, 0.06, z], [maxX, 0.06, z]]}
-          color="#06b6d4"
-          lineWidth={2}
-          dashed
-          dashSize={0.5}
-          gapSize={0.3}
-        />
-      ))}
-      
-      {/* Marqueurs aux intersections */}
-      {xRows.flatMap(([x], i) => 
-        zRows.map(([z], j) => (
-          <mesh key={`marker-${i}-${j}`} position={[x, 0.07, z]} rotation={[-Math.PI/2, 0, 0]}>
-            <ringGeometry args={[0.3, 0.5, 16]} />
-            <meshBasicMaterial color="#8b5cf6" transparent opacity={0.6} />
-          </mesh>
-        ))
-      )}
-    </group>
-  );
-}
 
-// Dimension Label with Hover Tooltip
-function DimensionLabel({ 
-  position, 
-  distance, 
-  axis, 
-  obj1Name, 
-  obj2Name,
-  ruleInfo
-}: { 
-  position: [number, number, number]; 
-  distance: number; 
-  axis: 'x' | 'z';
-  obj1Name: string;
-  obj2Name: string;
-  ruleInfo: { rule: string; description: string; status: 'ok' | 'warning' | 'error' };
-}) {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const [hoverTimer, setHoverTimer] = useState<NodeJS.Timeout | null>(null);
-  
-  const handleMouseEnter = () => {
-    const timer = setTimeout(() => setShowTooltip(true), 1500); // 1.5s delay
-    setHoverTimer(timer);
-  };
-  
-  const handleMouseLeave = () => {
-    if (hoverTimer) clearTimeout(hoverTimer);
-    setShowTooltip(false);
-  };
-  
-  const statusColors = {
-    ok: 'bg-green-500 border-green-400',
-    warning: 'bg-amber-500 border-amber-400',
-    error: 'bg-red-500 border-red-400'
-  };
-  
-  const statusIcons = {
-    ok: '✓',
-    warning: '⚠',
-    error: '✗'
-  };
-  
-  return (
-    <Html position={position} center>
-      <div 
-        className="relative cursor-pointer"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        <div className={`${statusColors[ruleInfo.status]} text-white text-xs px-2 py-1 rounded-full whitespace-nowrap font-bold shadow-lg border-2 transition-transform hover:scale-110`}>
-          {distance.toFixed(1)}m {statusIcons[ruleInfo.status]}
-        </div>
-        
-        {showTooltip && (
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 animate-fadeIn">
-            <div className="bg-slate-900 text-white text-xs rounded-lg shadow-2xl border border-slate-600 p-3 min-w-[220px]">
-              <div className="font-bold text-hearst-green mb-2 text-sm">
-                {axis === 'x' ? '↔ Espacement horizontal' : '↕ Espacement vertical'}
-              </div>
-              
-              <div className="space-y-1.5 text-slate-300">
-                <p><span className="text-white">Distance:</span> {distance.toFixed(2)}m ({(distance * 1000).toFixed(0)}mm)</p>
-                <p><span className="text-white">Entre:</span></p>
-                <p className="pl-2 text-blue-400">• {obj1Name}</p>
-                <p className="pl-2 text-blue-400">• {obj2Name}</p>
-              </div>
-              
-              <div className={`mt-2 pt-2 border-t border-slate-700 ${
-                ruleInfo.status === 'ok' ? 'text-green-400' : 
-                ruleInfo.status === 'warning' ? 'text-amber-400' : 'text-red-400'
-              }`}>
-                <p className="font-semibold">{statusIcons[ruleInfo.status]} {ruleInfo.rule}</p>
-                <p className="text-slate-400 text-[10px] mt-1">{ruleInfo.description}</p>
-              </div>
-              
-              {/* Arrow pointing down */}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-slate-900"></div>
-            </div>
-          </div>
-        )}
-      </div>
-    </Html>
-  );
-}
-
-// Floor Dimensions - Shows total footprint, spacing between objects
-function FloorDimensions({ objects }: { objects: Object3D[] }) {
-  if (objects.length === 0) return null;
-  
-  const lineY = 0.5; // Height above ground for visibility
-  
-  // Calculate bounding box of all objects
-  let minX = Infinity, maxX = -Infinity;
-  let minZ = Infinity, maxZ = -Infinity;
-  
-  objects.forEach(obj => {
-    const w = (obj.dimensions.width / 1000) * obj.scale.x;
-    const d = (obj.dimensions.depth / 1000) * obj.scale.z;
-    minX = Math.min(minX, obj.position.x - w/2);
-    maxX = Math.max(maxX, obj.position.x + w/2);
-    minZ = Math.min(minZ, obj.position.z - d/2);
-    maxZ = Math.max(maxZ, obj.position.z + d/2);
-  });
-  
-  const totalWidth = maxX - minX;
-  const totalDepth = maxZ - minZ;
-  const centerX = (minX + maxX) / 2;
-  const centerZ = (minZ + maxZ) / 2;
-  
-  // Get rule info based on distance and object types
-  const getRuleInfo = (distance: number, obj1: Object3D, obj2: Object3D): { rule: string; description: string; status: 'ok' | 'warning' | 'error' } => {
-    const type1 = obj1.type.toLowerCase();
-    const type2 = obj2.type.toLowerCase();
-    
-    // Aisle/maintenance access rules
-    if (distance >= 15) {
-      return {
-        rule: 'Allée principale (≥15m)',
-        description: 'Conforme aux normes de circulation des véhicules lourds et accès pompiers',
-        status: 'ok'
-      };
-    }
-    
-    // Container-to-container spacing
-    if ((type1.includes('container') && type2.includes('container')) || 
-        (type1.includes('cooling') && type2.includes('cooling')) ||
-        (type1.includes('antspace') && type2.includes('antspace'))) {
-      if (distance >= 3.9) { // 4m with tolerance
-        return {
-          rule: 'Espacement containers (≥4m)',
-          description: 'Conforme: permet accès maintenance et ventilation adéquate',
-          status: 'ok'
-        };
-      } else if (distance >= 2) {
-        return {
-          rule: 'Espacement réduit (2-4m)',
-          description: 'Attention: accès maintenance limité, vérifier ventilation',
-          status: 'warning'
-        };
-      } else {
-        return {
-          rule: 'Espacement insuffisant (<2m)',
-          description: 'Non conforme: risque thermique, accès impossible',
-          status: 'error'
-        };
-      }
-    }
-    
-    // Transformer spacing
-    if (type1.includes('transformer') || type2.includes('transformer')) {
-      if (distance >= 5) {
-        return {
-          rule: 'Distance sécurité transfo (≥5m)',
-          description: 'Conforme: zone de sécurité électrique respectée',
-          status: 'ok'
-        };
-      } else if (distance >= 3) {
-        return {
-          rule: 'Distance transfo limite (3-5m)',
-          description: 'Attention: vérifier normes électriques locales',
-          status: 'warning'
-        };
-      } else {
-        return {
-          rule: 'Distance transfo critique (<3m)',
-          description: 'Non conforme: risque électrique, augmenter distance',
-          status: 'error'
-        };
-      }
-    }
-    
-    // Default spacing
-    if (distance >= 3) {
-      return {
-        rule: 'Espacement standard (≥3m)',
-        description: 'Conforme aux recommandations générales',
-        status: 'ok'
-      };
-    } else if (distance >= 1) {
-      return {
-        rule: 'Espacement minimal (1-3m)',
-        description: 'Acceptable mais limité pour maintenance',
-        status: 'warning'
-      };
-    }
-    
-    return {
-      rule: 'Espacement très réduit (<1m)',
-      description: 'Vérifier si intentionnel (objets adjacents)',
-      status: 'warning'
-    };
-  };
-  
-  // Find all unique spacings between objects
-  const spacings: { 
-    start: THREE.Vector3; 
-    end: THREE.Vector3; 
-    distance: number; 
-    axis: 'x' | 'z';
-    obj1: Object3D;
-    obj2: Object3D;
-  }[] = [];
-  
-  // Check all pairs for spacing
-  for (let i = 0; i < objects.length; i++) {
-    for (let j = i + 1; j < objects.length; j++) {
-      const obj1 = objects[i];
-      const obj2 = objects[j];
-      
-      const w1 = (obj1.dimensions.width / 1000) * obj1.scale.x;
-      const w2 = (obj2.dimensions.width / 1000) * obj2.scale.x;
-      const d1 = (obj1.dimensions.depth / 1000) * obj1.scale.z;
-      const d2 = (obj2.dimensions.depth / 1000) * obj2.scale.z;
-      
-      // Check if aligned in Z (same row) - X spacing
-      const zOverlap = !(obj1.position.z + d1/2 < obj2.position.z - d2/2 || obj2.position.z + d2/2 < obj1.position.z - d1/2);
-      
-      if (zOverlap) {
-        const leftObj = obj1.position.x < obj2.position.x ? obj1 : obj2;
-        const rightObj = obj1.position.x < obj2.position.x ? obj2 : obj1;
-        const leftW = leftObj === obj1 ? w1 : w2;
-        const rightW = rightObj === obj1 ? w1 : w2;
-        
-        const edge1 = leftObj.position.x + leftW/2;
-        const edge2 = rightObj.position.x - rightW/2;
-        const gap = edge2 - edge1;
-        
-        if (gap > 0.2) {
-          const z = (obj1.position.z + obj2.position.z) / 2;
-          spacings.push({
-            start: new THREE.Vector3(edge1, lineY, z),
-            end: new THREE.Vector3(edge2, lineY, z),
-            distance: gap,
-            axis: 'x',
-            obj1: leftObj,
-            obj2: rightObj
-          });
-        }
-      }
-      
-      // Check if aligned in X (same column) - Z spacing
-      const xOverlap = !(obj1.position.x + w1/2 < obj2.position.x - w2/2 || obj2.position.x + w2/2 < obj1.position.x - w1/2);
-      
-      if (xOverlap) {
-        const frontObj = obj1.position.z < obj2.position.z ? obj1 : obj2;
-        const backObj = obj1.position.z < obj2.position.z ? obj2 : obj1;
-        const frontD = frontObj === obj1 ? d1 : d2;
-        const backD = backObj === obj1 ? d1 : d2;
-        
-        const edge1 = frontObj.position.z + frontD/2;
-        const edge2 = backObj.position.z - backD/2;
-        const gap = edge2 - edge1;
-        
-        if (gap > 0.2) {
-          const x = (obj1.position.x + obj2.position.x) / 2;
-          spacings.push({
-            start: new THREE.Vector3(x, lineY, edge1),
-            end: new THREE.Vector3(x, lineY, edge2),
-            distance: gap,
-            axis: 'z',
-            obj1: frontObj,
-            obj2: backObj
-          });
-        }
-      }
-    }
-  }
-  
-  // Remove duplicates - check midpoint and distance
-  const uniqueSpacings = spacings.filter((s, i) => {
-    const midX = (s.start.x + s.end.x) / 2;
-    const midZ = (s.start.z + s.end.z) / 2;
-    
-    for (let j = 0; j < i; j++) {
-      const other = spacings[j];
-      const otherMidX = (other.start.x + other.end.x) / 2;
-      const otherMidZ = (other.start.z + other.end.z) / 2;
-      
-      // Same midpoint (within 2m) and same distance (within 0.5m) = duplicate
-      if (Math.abs(midX - otherMidX) < 2 && 
-          Math.abs(midZ - otherMidZ) < 2 &&
-          Math.abs(s.distance - other.distance) < 0.5) {
-        return false;
-      }
-      
-      // Same line segment (endpoints match within tolerance)
-      const sameStart = Math.abs(s.start.x - other.start.x) < 0.5 && Math.abs(s.start.z - other.start.z) < 0.5;
-      const sameEnd = Math.abs(s.end.x - other.end.x) < 0.5 && Math.abs(s.end.z - other.end.z) < 0.5;
-      if (sameStart && sameEnd) return false;
-    }
-    return true;
-  });
-  
-  // Further filter: only show spacings for adjacent objects (not all pairs)
-  // Sort by distance and keep only reasonable ones
-  const filteredSpacings = uniqueSpacings
-    .filter(s => s.distance < 30) // Max 30m spacing shown
-    .sort((a, b) => a.distance - b.distance);
-  
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DISTANCES ENTRE OBJETS NON-ALIGNÉS (center to center)
-  // ═══════════════════════════════════════════════════════════════════════════
-  const centerDistances: {
-    obj1: Object3D;
-    obj2: Object3D;
-    distance: number;
-    midPoint: THREE.Vector3;
-  }[] = [];
-  
-  // Pour chaque objet, trouver son plus proche voisin
-  for (let i = 0; i < objects.length; i++) {
-    const obj1 = objects[i];
-    let closestDist = Infinity;
-    let closestObj: Object3D | null = null;
-    
-    for (let j = 0; j < objects.length; j++) {
-      if (i === j) continue;
-      const obj2 = objects[j];
-      
-      // Distance bord à bord (approximation)
-      const dx = Math.abs(obj1.position.x - obj2.position.x);
-      const dz = Math.abs(obj1.position.z - obj2.position.z);
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestObj = obj2;
-      }
-    }
-    
-    // Ajouter seulement si pas déjà dans filteredSpacings et distance < 25m
-    if (closestObj && closestDist < 25) {
-      const alreadyShown = filteredSpacings.some(s => 
-        (s.obj1.id === obj1.id && s.obj2.id === closestObj!.id) ||
-        (s.obj1.id === closestObj!.id && s.obj2.id === obj1.id)
-      );
-      
-      const alreadyAdded = centerDistances.some(cd =>
-        (cd.obj1.id === obj1.id && cd.obj2.id === closestObj!.id) ||
-        (cd.obj1.id === closestObj!.id && cd.obj2.id === obj1.id)
-      );
-      
-      if (!alreadyShown && !alreadyAdded) {
-        centerDistances.push({
-          obj1,
-          obj2: closestObj,
-          distance: closestDist,
-          midPoint: new THREE.Vector3(
-            (obj1.position.x + closestObj.position.x) / 2,
-            lineY + 1,
-            (obj1.position.z + closestObj.position.z) / 2
-          )
-        });
-      }
-    }
-  }
-  
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CONNEXIONS ÉLECTRIQUES avec règles de distance
-  // TRF → PDU: 5m optimal | PDU → Container: 10m optimal
-  // ═══════════════════════════════════════════════════════════════════════════
-  
-  // Règles de distance
-  const ELEC_RULES = {
-    TRF_TO_PDU: { optimal: 5, max: 8 },
-    PDU_TO_CONTAINER: { optimal: 10, max: 15 },
-    TRF_TO_CONTAINER: { optimal: 15, max: 20 } // Si pas de PDU
-  };
-  
-  // Identifier les équipements
-  const transformers = objects.filter(o => {
-    const t = o.type.toLowerCase();
-    const n = o.name.toLowerCase();
-    return (t.includes('transformer') || t.includes('transfo') || n.includes('transformer') || n.includes('transfo')) 
-           && !t.includes('rmu') && !n.includes('rmu');
-  });
-  
-  const pdus = objects.filter(o => {
-    const t = o.type.toLowerCase();
-    const n = o.name.toLowerCase();
-    return t.includes('pdu') || t.includes('distribution') || t.includes('skid') || t.includes('switchboard') ||
-           n.includes('pdu') || n.includes('distribution') || n.includes('skid');
-  });
-  
-  const containers = objects.filter(o => {
-    const t = o.type.toLowerCase();
-    const n = o.name.toLowerCase();
-    return t.includes('container') || t.includes('hd5') || t.includes('antspace') ||
-           n.includes('container') || n.includes('hd5') || n.includes('antspace');
-  });
-  
-  // Connexions électriques
-  interface ElecConnection {
-    from: Object3D;
-    to: Object3D;
-    distance: number;
-    type: 'trf-pdu' | 'pdu-container' | 'trf-container';
-    rule: { optimal: number; max: number };
-  }
-  
-  const electricalConnections: ElecConnection[] = [];
-  
-  // TRF → PDU (5m optimal)
-  for (const trf of transformers) {
-    // Trouver le PDU le plus proche
-    let closestPDU: Object3D | null = null;
-    let closestDist = Infinity;
-    
-    for (const pdu of pdus) {
-      const dx = trf.position.x - pdu.position.x;
-      const dz = trf.position.z - pdu.position.z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestPDU = pdu;
-      }
-    }
-    
-    if (closestPDU && closestDist < 20) {
-      electricalConnections.push({
-        from: trf,
-        to: closestPDU,
-        distance: closestDist,
-        type: 'trf-pdu',
-        rule: ELEC_RULES.TRF_TO_PDU
-      });
-    }
-  }
-  
-  // PDU → Container (10m optimal, 2 containers par PDU)
-  for (const pdu of pdus) {
-    const distances = containers.map(container => {
-      const dx = pdu.position.x - container.position.x;
-      const dz = pdu.position.z - container.position.z;
-      return { container, distance: Math.sqrt(dx * dx + dz * dz) };
-    });
-    
-    distances.sort((a, b) => a.distance - b.distance);
-    const closest2 = distances.slice(0, 2);
-    
-    for (const { container, distance } of closest2) {
-      electricalConnections.push({
-        from: pdu,
-        to: container,
-        distance,
-        type: 'pdu-container',
-        rule: ELEC_RULES.PDU_TO_CONTAINER
-      });
-    }
-  }
-  
-  // TRF → Container direct (si pas de PDU proche)
-  for (const trf of transformers) {
-    // Vérifier si ce TRF a un PDU connecté
-    const hasPDU = electricalConnections.some(c => c.from.id === trf.id && c.type === 'trf-pdu');
-    
-    if (!hasPDU) {
-      // Connexion directe aux 2 containers les plus proches
-      const distances = containers.map(container => {
-        const dx = trf.position.x - container.position.x;
-        const dz = trf.position.z - container.position.z;
-        return { container, distance: Math.sqrt(dx * dx + dz * dz) };
-      });
-      
-      distances.sort((a, b) => a.distance - b.distance);
-      const closest2 = distances.slice(0, 2);
-      
-      for (const { container, distance } of closest2) {
-        electricalConnections.push({
-          from: trf,
-          to: container,
-          distance,
-          type: 'trf-container',
-          rule: ELEC_RULES.TRF_TO_CONTAINER
-        });
-      }
-    }
-  }
-  
-  return (
-    <group>
-      {/* Total footprint outline on ground */}
-      <mesh position={[centerX, 0.02, centerZ]} rotation={[-Math.PI/2, 0, 0]}>
-        <planeGeometry args={[totalWidth + 0.2, totalDepth + 0.2]} />
-        <meshBasicMaterial color="#3b82f6" transparent opacity={0.08} />
-      </mesh>
-      
-      {/* Outline edges - blue dashed */}
-      <Line
-        points={[
-          [minX - 0.5, lineY, minZ - 0.5],
-          [maxX + 0.5, lineY, minZ - 0.5],
-          [maxX + 0.5, lineY, maxZ + 0.5],
-          [minX - 0.5, lineY, maxZ + 0.5],
-          [minX - 0.5, lineY, minZ - 0.5],
-        ]}
-        color="#3b82f6"
-        lineWidth={3}
-        dashed
-        dashSize={1}
-        gapSize={0.5}
-      />
-      
-      {/* Total width dimension (X axis) */}
-      <group position={[0, lineY, maxZ + 4]}>
-        <Line points={[[minX, 0, 0], [maxX, 0, 0]]} color="#3b82f6" lineWidth={3} />
-        <Line points={[[minX, 0, -0.5], [minX, 0, 0.5]]} color="#3b82f6" lineWidth={3} />
-        <Line points={[[maxX, 0, -0.5], [maxX, 0, 0.5]]} color="#3b82f6" lineWidth={3} />
-        <Html position={[centerX, 0.5, 0]} center>
-          <div className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full whitespace-nowrap font-bold shadow-lg">
-            ↔ {totalWidth.toFixed(1)}m
-          </div>
-        </Html>
-      </group>
-      
-      {/* Total depth dimension (Z axis) */}
-      <group position={[maxX + 4, lineY, 0]}>
-        <Line points={[[0, 0, minZ], [0, 0, maxZ]]} color="#3b82f6" lineWidth={3} />
-        <Line points={[[-0.5, 0, minZ], [0.5, 0, minZ]]} color="#3b82f6" lineWidth={3} />
-        <Line points={[[-0.5, 0, maxZ], [0.5, 0, maxZ]]} color="#3b82f6" lineWidth={3} />
-        <Html position={[0, 0.5, centerZ]} center>
-          <div className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full whitespace-nowrap font-bold shadow-lg">
-            ↕ {totalDepth.toFixed(1)}m
-          </div>
-        </Html>
-      </group>
-      
-      {/* All spacing lines with interactive labels */}
-      {filteredSpacings.map((s, i) => {
-        const ruleInfo = getRuleInfo(s.distance, s.obj1, s.obj2);
-        const lineColor = ruleInfo.status === 'ok' ? '#22c55e' : ruleInfo.status === 'warning' ? '#f59e0b' : '#ef4444';
-        const key = `${s.obj1.id}-${s.obj2.id}-${s.axis}-${s.distance.toFixed(1)}`;
-        
-        return (
-          <group key={key}>
-            <Line points={[s.start, s.end]} color={lineColor} lineWidth={3} />
-            {/* End markers */}
-            {s.axis === 'x' ? (
-              <>
-                <Line points={[[s.start.x, s.start.y, s.start.z - 0.3], [s.start.x, s.start.y, s.start.z + 0.3]]} color={lineColor} lineWidth={2} />
-                <Line points={[[s.end.x, s.end.y, s.end.z - 0.3], [s.end.x, s.end.y, s.end.z + 0.3]]} color={lineColor} lineWidth={2} />
-              </>
-            ) : (
-              <>
-                <Line points={[[s.start.x - 0.3, s.start.y, s.start.z], [s.start.x + 0.3, s.start.y, s.start.z]]} color={lineColor} lineWidth={2} />
-                <Line points={[[s.end.x - 0.3, s.end.y, s.end.z], [s.end.x + 0.3, s.end.y, s.end.z]]} color={lineColor} lineWidth={2} />
-              </>
-            )}
-            <DimensionLabel 
-              position={[(s.start.x + s.end.x) / 2, lineY + 0.5, (s.start.z + s.end.z) / 2]}
-              distance={s.distance}
-              axis={s.axis}
-              obj1Name={s.obj1.name}
-              obj2Name={s.obj2.name}
-              ruleInfo={ruleInfo}
-            />
-          </group>
-        );
-      })}
-      
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* CONNEXIONS ÉLECTRIQUES avec règles de distance */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {electricalConnections.map((ec, i) => {
-        // Couleur selon règle: vert si ≤ optimal, orange si ≤ max, rouge si > max
-        const isOptimal = ec.distance <= ec.rule.optimal;
-        const isAcceptable = ec.distance <= ec.rule.max;
-        const lineColor = isOptimal ? '#22c55e' : isAcceptable ? '#f59e0b' : '#ef4444';
-        const bgColor = isOptimal ? 'bg-green-500' : isAcceptable ? 'bg-amber-500' : 'bg-red-500';
-        
-        const midX = (ec.from.position.x + ec.to.position.x) / 2;
-        const midZ = (ec.from.position.z + ec.to.position.z) / 2;
-        
-        // Icône selon type de connexion
-        const icon = ec.type === 'trf-pdu' ? '🔌' : ec.type === 'pdu-container' ? '⚡' : '⚡';
-        const label = ec.type === 'trf-pdu' ? 'TRF→PDU' : ec.type === 'pdu-container' ? 'PDU→CNT' : 'TRF→CNT';
-        
-        return (
-          <group key={`elec-${i}`}>
-            {/* Ligne électrique */}
-            <Line 
-              points={[
-                [ec.from.position.x, lineY + 0.3, ec.from.position.z],
-                [ec.to.position.x, lineY + 0.3, ec.to.position.z]
-              ]} 
-              color={lineColor} 
-              lineWidth={4}
-            />
-            {/* Marqueur source */}
-            <mesh position={[ec.from.position.x, lineY + 0.3, ec.from.position.z]} rotation={[-Math.PI/2, 0, 0]}>
-              <circleGeometry args={[0.4, 16]} />
-              <meshBasicMaterial color={lineColor} />
-            </mesh>
-            {/* Marqueur destination */}
-            <mesh position={[ec.to.position.x, lineY + 0.3, ec.to.position.z]} rotation={[-Math.PI/2, 0, 0]}>
-              <circleGeometry args={[0.3, 16]} />
-              <meshBasicMaterial color={lineColor} />
-            </mesh>
-            {/* Label distance avec règle */}
-            <Html position={[midX, lineY + 1.5, midZ]} center>
-              <div className={`${bgColor} text-white text-[10px] px-2 py-1 rounded-full whitespace-nowrap font-bold shadow-lg`}>
-                {icon} {ec.distance.toFixed(1)}m {isOptimal ? '✓' : isAcceptable ? '⚠' : '✗'}
-                <span className="opacity-70 ml-1">({ec.rule.optimal}m)</span>
-              </div>
-            </Html>
-          </group>
-        );
-      })}
-      
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* LIGNES DE CENTRE DU LAYOUT (si décalé de l'origine) */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      
-      {/* Ligne de centre du layout (X) - violet pointillé */}
-      {Math.abs(centerX) > 0.5 && (
-        <>
-          <Line
-            points={[[centerX, 0.08, minZ - 3], [centerX, 0.08, maxZ + 3]]}
-            color="#8b5cf6"
-            lineWidth={2}
-            dashed
-            dashSize={1}
-            gapSize={0.5}
-          />
-          <Html position={[centerX, 0.5, minZ - 4]} center>
-            <div className="bg-violet-500/90 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
-              Centre X: {centerX.toFixed(1)}m
-            </div>
-          </Html>
-        </>
-      )}
-      
-      {/* Ligne de centre du layout (Z) - violet pointillé */}
-      {Math.abs(centerZ) > 0.5 && (
-        <>
-          <Line
-            points={[[minX - 3, 0.08, centerZ], [maxX + 3, 0.08, centerZ]]}
-            color="#8b5cf6"
-            lineWidth={2}
-            dashed
-            dashSize={1}
-            gapSize={0.5}
-          />
-          <Html position={[minX - 4, 0.5, centerZ]} center>
-            <div className="bg-violet-500/90 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
-              Centre Z: {centerZ.toFixed(1)}m
-            </div>
-          </Html>
-        </>
-      )}
-      
-      {/* Indicateur de décalage par rapport à l'origine */}
-      {(Math.abs(centerX) > 0.5 || Math.abs(centerZ) > 0.5) && (
-        <Html position={[centerX, 2, centerZ]} center>
-          <div className="bg-violet-600/90 text-white text-xs px-2 py-1 rounded-lg shadow-lg border border-violet-400">
-            <span className="font-medium">Décalage:</span> X={centerX.toFixed(1)}m, Z={centerZ.toFixed(1)}m
-          </div>
-        </Html>
-      )}
-    </group>
-  );
-}
 
 // Editable 3D Object
 // Hearst Logo Component - loads PNG texture
@@ -892,15 +106,13 @@ function EditableObject({
   isSelected, 
   onSelect, 
   transformMode,
-  onTransformEnd,
-  showDimensions
+  onTransformEnd
 }: { 
   object: Object3D; 
   isSelected: boolean;
   onSelect: (multiSelect: boolean) => void;
   transformMode: TransformMode;
   onTransformEnd: (position: THREE.Vector3, rotation: THREE.Euler, scale: THREE.Vector3) => void;
-  showDimensions: boolean;
 }) {
   const meshRef = useRef<any>(null);
   const transformRef = useRef<any>(null);
@@ -950,11 +162,11 @@ function EditableObject({
   else if (isRMU) displayColor = '#1f2937';
   else if (isCanopy) displayColor = '#1e3a5f';
 
-  // Container realistic rendering
+  // Container realistic rendering - SAME STYLE as cooling
   const renderContainer = () => {
     const [w, h, d] = scale; // width, height, depth in meters
-    const frameThickness = 0.15;
-    const corrugationCount = 12;
+    const frameThickness = 0.12;
+    const cornerPostSize = 0.12;
     
     return (
       <group
@@ -967,90 +179,162 @@ function EditableObject({
       >
         {/* Main body - white metallic */}
         <mesh castShadow receiveShadow>
-          <boxGeometry args={[w, h, d]} />
+          <boxGeometry args={[w - 0.02, h - 0.02, d - 0.02]} />
           <meshStandardMaterial color="#ffffff" metalness={0.8} roughness={0.2} />
         </mesh>
         
-        {/* Frame edges - darker steel */}
-        {/* Bottom frame - inside container */}
-        <mesh position={[0, -h/2 + frameThickness/2, 0]} castShadow>
-          <boxGeometry args={[w - 0.02, frameThickness, d - 0.02]} />
-          <meshStandardMaterial color="#3d3d3d" metalness={0.1} roughness={0.8} />
+        {/* === BLACK METALLIC FRAME === */}
+        
+        {/* Bottom frame - front/back */}
+        <mesh position={[0, -h/2 + frameThickness/2, -d/2 + 0.05]} castShadow>
+          <boxGeometry args={[w, frameThickness, 0.1]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
         </mesh>
-        {/* Top frame - inside container */}
-        <mesh position={[0, h/2 - frameThickness/2, 0]} castShadow>
-          <boxGeometry args={[w - 0.02, frameThickness, d - 0.02]} />
-          <meshStandardMaterial color="#3d3d3d" metalness={0.1} roughness={0.8} />
+        <mesh position={[0, -h/2 + frameThickness/2, d/2 - 0.05]} castShadow>
+          <boxGeometry args={[w, frameThickness, 0.1]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
         </mesh>
         
-        {/* Corner posts - inside, matte black */}
-        {[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([xDir, zDir], i) => (
-          <mesh key={`post-${i}`} position={[xDir * (w/2 - 0.15), 0, zDir * (d/2 - 0.15)]} castShadow>
-            <boxGeometry args={[0.18, h - 0.1, 0.18]} />
-            <meshStandardMaterial color="#3d3d3d" metalness={0.1} roughness={0.8} />
+        {/* Bottom frame - sides */}
+        <mesh position={[-w/2 + 0.05, -h/2 + frameThickness/2, 0]} castShadow>
+          <boxGeometry args={[0.1, frameThickness, d]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[w/2 - 0.05, -h/2 + frameThickness/2, 0]} castShadow>
+          <boxGeometry args={[0.1, frameThickness, d]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        
+        {/* Top frame - front/back */}
+        <mesh position={[0, h/2 - frameThickness/2, -d/2 + 0.04]} castShadow>
+          <boxGeometry args={[w, frameThickness * 0.8, 0.08]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, h/2 - frameThickness/2, d/2 - 0.04]} castShadow>
+          <boxGeometry args={[w, frameThickness * 0.8, 0.08]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        
+        {/* Top frame - sides */}
+        <mesh position={[-w/2 + 0.04, h/2 - frameThickness/2, 0]} castShadow>
+          <boxGeometry args={[0.08, frameThickness * 0.8, d]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[w/2 - 0.04, h/2 - frameThickness/2, 0]} castShadow>
+          <boxGeometry args={[0.08, frameThickness * 0.8, d]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        
+        {/* Corner posts (4 vertical) */}
+        {[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([xSign, zSign], i) => (
+          <mesh 
+            key={`post-${i}`} 
+            position={[xSign * (w/2 - cornerPostSize/2), 0, zSign * (d/2 - cornerPostSize/2)]} 
+            castShadow
+          >
+            <boxGeometry args={[cornerPostSize, h + 0.02, cornerPostSize]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
           </mesh>
         ))}
         
-        {/* Corrugations on sides (Z faces) - white metallic */}
-        {Array.from({ length: corrugationCount }).map((_, i) => {
-          const xPos = -w/2 + (w / corrugationCount) * (i + 0.5);
-          return (
-            <group key={`corr-${i}`}>
-              {/* Front side corrugation */}
-              <mesh position={[xPos, 0, d/2 + 0.02]} castShadow>
-                <boxGeometry args={[w / corrugationCount * 0.3, h * 0.85, 0.05]} />
-                <meshStandardMaterial color="#f5f5f5" metalness={0.7} roughness={0.3} />
-              </mesh>
-              {/* Back side corrugation */}
-              <mesh position={[xPos, 0, -d/2 - 0.02]} castShadow>
-                <boxGeometry args={[w / corrugationCount * 0.3, h * 0.85, 0.05]} />
-                <meshStandardMaterial color="#f5f5f5" metalness={0.7} roughness={0.3} />
-              </mesh>
-            </group>
-          );
-        })}
+        {/* ISO Corner castings (8 corners) */}
+        {[
+          [-w/2, -h/2, -d/2], [w/2, -h/2, -d/2], [-w/2, -h/2, d/2], [w/2, -h/2, d/2],
+          [-w/2, h/2, -d/2], [w/2, h/2, -d/2], [-w/2, h/2, d/2], [w/2, h/2, d/2],
+        ].map((pos, i) => (
+          <mesh key={`casting-${i}`} position={pos as [number, number, number]} castShadow>
+            <boxGeometry args={[0.18, 0.1, 0.18]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* === CORRUGATED SIDES (Front - Z negative) === */}
+        {Array.from({ length: Math.floor(w / 0.12) }).map((_, i) => (
+          <mesh 
+            key={`corr-front-${i}`}
+            position={[-w/2 + 0.06 + i * 0.12, 0, -d/2 - 0.015]}
+            castShadow
+          >
+            <boxGeometry args={[0.06, h * 0.85, 0.03]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* === CORRUGATED SIDES (Back - Z positive) === */}
+        {Array.from({ length: Math.floor(w / 0.12) }).map((_, i) => (
+          <mesh 
+            key={`corr-back-${i}`}
+            position={[-w/2 + 0.06 + i * 0.12, 0, d/2 + 0.015]}
+            castShadow
+          >
+            <boxGeometry args={[0.06, h * 0.85, 0.03]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* === CORRUGATED SIDES (Left) === */}
+        {Array.from({ length: Math.floor(d / 0.12) }).map((_, i) => (
+          <mesh 
+            key={`corr-left-${i}`}
+            position={[-w/2 - 0.015, 0, -d/2 + 0.06 + i * 0.12]}
+            castShadow
+          >
+            <boxGeometry args={[0.03, h * 0.85, 0.06]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* === CORRUGATED SIDES (Right) === */}
+        {Array.from({ length: Math.floor(d / 0.12) }).map((_, i) => (
+          <mesh 
+            key={`corr-right-${i}`}
+            position={[w/2 + 0.015, 0, -d/2 + 0.06 + i * 0.12]}
+            castShadow
+          >
+            <boxGeometry args={[0.03, h * 0.85, 0.06]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
         
         {/* HEARST LOGO - Using imported PNG texture on both sides */}
-        <HearstLogo position={[0, 0, d/2 + 0.06]} height={h * 0.6} />
-        <HearstLogo position={[0, 0, -d/2 - 0.06]} height={h * 0.6} rotation={[0, Math.PI, 0]} />
+        <HearstLogo position={[0, 0, d/2 + 0.06]} height={h * 0.5} />
+        <HearstLogo position={[0, 0, -d/2 - 0.06]} height={h * 0.5} rotation={[0, Math.PI, 0]} />
         
         {/* Container doors (back face X-) - double doors */}
-        <group position={[-w/2 - 0.03, 0, 0]}>
+        <group position={[-w/2 - 0.04, 0, 0]}>
           {/* Door frame */}
           <mesh position={[0, 0, 0]} castShadow>
-            <boxGeometry args={[0.08, h * 0.92, d * 0.85]} />
-            <meshStandardMaterial color="#1a1a1a" metalness={0.2} roughness={0.7} />
+            <boxGeometry args={[0.08, h * 0.9, d * 0.85]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
           </mesh>
           
           {/* Left door panel */}
           <mesh position={[-0.02, 0, -d * 0.22]} castShadow>
-            <boxGeometry args={[0.06, h * 0.88, d * 0.38]} />
-            <meshStandardMaterial color="#e8e8e8" metalness={0.6} roughness={0.3} />
+            <boxGeometry args={[0.06, h * 0.85, d * 0.38]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
           </mesh>
           
           {/* Right door panel */}
           <mesh position={[-0.02, 0, d * 0.22]} castShadow>
-            <boxGeometry args={[0.06, h * 0.88, d * 0.38]} />
-            <meshStandardMaterial color="#e8e8e8" metalness={0.6} roughness={0.3} />
+            <boxGeometry args={[0.06, h * 0.85, d * 0.38]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
           </mesh>
           
-          {/* Door handles/lock bars - left door */}
+          {/* Door handles/lock bars */}
           <mesh position={[-0.06, 0, -d * 0.05]} castShadow>
-            <boxGeometry args={[0.04, h * 0.7, 0.08]} />
-            <meshStandardMaterial color="#2d2d2d" metalness={0.4} roughness={0.5} />
+            <boxGeometry args={[0.04, h * 0.7, 0.06]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
           </mesh>
-          
-          {/* Door handles/lock bars - right door */}
           <mesh position={[-0.06, 0, d * 0.05]} castShadow>
-            <boxGeometry args={[0.04, h * 0.7, 0.08]} />
-            <meshStandardMaterial color="#2d2d2d" metalness={0.4} roughness={0.5} />
+            <boxGeometry args={[0.04, h * 0.7, 0.06]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
           </mesh>
           
           {/* Horizontal lock bars */}
           {[-0.3, 0, 0.3].map((yOffset, i) => (
             <mesh key={`lock-${i}`} position={[-0.08, yOffset * h, 0]} castShadow>
               <boxGeometry args={[0.03, 0.06, d * 0.75]} />
-              <meshStandardMaterial color="#4a4a4a" metalness={0.5} roughness={0.4} />
+              <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
             </mesh>
           ))}
         </group>
@@ -1058,18 +342,23 @@ function EditableObject({
     );
   };
   
-  // Cooling realistic rendering - white metallic  
+  // Cooling realistic rendering - SAME architecture as container (black metallic frames)
   const renderCooling = () => {
     const [w, h, d] = scale;
-    const frameColor = '#3d3d3d'; // Dark gray frame (same as container)
-    const bodyColor = '#ffffff'; // Pure white (same as container)
-    const fanColor = '#1f2937'; // Dark fan housing
-    const grillColor = '#6b7280'; // Gray grill
+    const frameThickness = 0.12; // Same as container
+    const cornerPostSize = 0.12; // Same as container
     
-    // Number of fans based on width
-    const fanCount = Math.max(4, Math.floor(w / 2));
-    const fanSpacing = w / fanCount;
-    const fanRadius = Math.min(fanSpacing * 0.35, d * 0.3);
+    // Number of fans based on width - 2 rows
+    const fansPerRow = Math.max(4, Math.floor(w / 2));
+    const fanRows = 2;
+    const fanSpacingX = (w - 1) / fansPerRow;
+    const fanSpacingZ = (d - 0.5) / (fanRows + 1);
+    const fanRadius = Math.min(0.28, (d * 0.35) / fanRows);
+    
+    // Panel count for thermal exchanger
+    const numPanels = Math.floor(w / 0.9);
+    const panelWidth = (w - cornerPostSize * 2) / numPanels;
+    const panelHeight = h * 0.7;
     
     return (
       <group
@@ -1080,83 +369,207 @@ function EditableObject({
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
       >
-        {/* Main body frame */}
+        {/* === MAIN BODY (White metallic - same as container) === */}
         <mesh castShadow receiveShadow>
-          <boxGeometry args={[w, h, d]} />
-          <meshStandardMaterial color={bodyColor} metalness={0.8} roughness={0.2} />
+          <boxGeometry args={[w - 0.02, h - 0.02, d - 0.02]} />
+          <meshStandardMaterial color="#ffffff" metalness={0.8} roughness={0.2} />
         </mesh>
         
-        {/* Top frame border */}
-        <mesh position={[0, h/2, 0]} castShadow>
-          <boxGeometry args={[w + 0.05, 0.08, d + 0.05]} />
-          <meshStandardMaterial color={frameColor} metalness={0.4} roughness={0.5} />
+        {/* === BLACK METALLIC FRAME - Same architecture as container === */}
+        
+        {/* Bottom frame - front/back */}
+        <mesh position={[0, -h/2 + frameThickness/2, -d/2 + 0.05]} castShadow>
+          <boxGeometry args={[w, frameThickness, 0.1]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, -h/2 + frameThickness/2, d/2 - 0.05]} castShadow>
+          <boxGeometry args={[w, frameThickness, 0.1]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
         </mesh>
         
-        {/* Circular fans on top - Bitmain style */}
-        {Array.from({ length: fanCount }).map((_, i) => {
-          const xPos = -w/2 + fanSpacing * (i + 0.5);
+        {/* Bottom frame - sides */}
+        <mesh position={[-w/2 + 0.05, -h/2 + frameThickness/2, 0]} castShadow>
+          <boxGeometry args={[0.1, frameThickness, d]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[w/2 - 0.05, -h/2 + frameThickness/2, 0]} castShadow>
+          <boxGeometry args={[0.1, frameThickness, d]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        
+        {/* Top frame - front/back */}
+        <mesh position={[0, h/2 - frameThickness/2, -d/2 + 0.04]} castShadow>
+          <boxGeometry args={[w, frameThickness * 0.8, 0.08]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, h/2 - frameThickness/2, d/2 - 0.04]} castShadow>
+          <boxGeometry args={[w, frameThickness * 0.8, 0.08]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        
+        {/* Top frame - sides */}
+        <mesh position={[-w/2 + 0.04, h/2 - frameThickness/2, 0]} castShadow>
+          <boxGeometry args={[0.08, frameThickness * 0.8, d]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[w/2 - 0.04, h/2 - frameThickness/2, 0]} castShadow>
+          <boxGeometry args={[0.08, frameThickness * 0.8, d]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        
+        {/* Corner posts (4 vertical) - same as container */}
+        {[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([xSign, zSign], i) => (
+          <mesh 
+            key={`post-${i}`} 
+            position={[xSign * (w/2 - cornerPostSize/2), 0, zSign * (d/2 - cornerPostSize/2)]} 
+            castShadow
+          >
+            <boxGeometry args={[cornerPostSize, h + 0.02, cornerPostSize]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* ISO Corner castings (8 corners) - same as container */}
+        {[
+          [-w/2, -h/2, -d/2], [w/2, -h/2, -d/2], [-w/2, -h/2, d/2], [w/2, -h/2, d/2],
+          [-w/2, h/2, -d/2], [w/2, h/2, -d/2], [-w/2, h/2, d/2], [w/2, h/2, d/2],
+        ].map((pos, i) => (
+          <mesh key={`casting-${i}`} position={pos as [number, number, number]} castShadow>
+            <boxGeometry args={[0.18, 0.1, 0.18]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* === CORRUGATED SIDES (Same style as container - Front) === */}
+        {Array.from({ length: Math.floor(w / 0.12) }).map((_, i) => (
+          <mesh 
+            key={`corr-front-${i}`}
+            position={[-w/2 + 0.06 + i * 0.12, 0, -d/2 - 0.015]}
+            castShadow
+          >
+            <boxGeometry args={[0.06, h * 0.85, 0.03]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* === CORRUGATED SIDES (Same style as container - Back) === */}
+        {Array.from({ length: Math.floor(w / 0.12) }).map((_, i) => (
+          <mesh 
+            key={`corr-back-${i}`}
+            position={[-w/2 + 0.06 + i * 0.12, 0, d/2 + 0.015]}
+            castShadow
+          >
+            <boxGeometry args={[0.06, h * 0.85, 0.03]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* === CORRUGATED SIDES (Left) === */}
+        {Array.from({ length: Math.floor(d / 0.12) }).map((_, i) => (
+          <mesh 
+            key={`corr-left-${i}`}
+            position={[-w/2 - 0.015, 0, -d/2 + 0.06 + i * 0.12]}
+            castShadow
+          >
+            <boxGeometry args={[0.03, h * 0.85, 0.06]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* === CORRUGATED SIDES (Right) === */}
+        {Array.from({ length: Math.floor(d / 0.12) }).map((_, i) => (
+          <mesh 
+            key={`corr-right-${i}`}
+            position={[w/2 + 0.015, 0, -d/2 + 0.06 + i * 0.12]}
+            castShadow
+          >
+            <boxGeometry args={[0.03, h * 0.85, 0.06]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        
+        {/* === FAN PLATFORM (Top - dark frame) === */}
+        <mesh position={[0, h/2 + 0.02, 0]} castShadow>
+          <boxGeometry args={[w - cornerPostSize * 2, 0.04, d - cornerPostSize * 2]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+        </mesh>
+        
+        {/* === LONG RECTANGULAR GRILL FANS (2 rows full width) === */}
+        {Array.from({ length: fanRows }).map((_, rowIdx) => {
+          const grillWidth = w - cornerPostSize * 2 - 0.2;
+          const grillDepth = (d - 0.6) / fanRows - 0.1;
+          const zPos = -d/2 + 0.3 + (grillDepth + 0.1) * rowIdx + grillDepth/2;
+          
           return (
-            <group key={`fan-unit-${i}`} position={[xPos, h/2 + 0.1, 0]}>
-              {/* Fan housing (cylinder) */}
+            <group key={`grill-row-${rowIdx}`} position={[0, h/2 + 0.06, zPos]}>
+              {/* Grill frame (dark) */}
               <mesh castShadow>
-                <cylinderGeometry args={[fanRadius, fanRadius, 0.15, 24]} />
-                <meshStandardMaterial color={fanColor} metalness={0.5} roughness={0.4} />
+                <boxGeometry args={[grillWidth, 0.08, grillDepth]} />
+                <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
               </mesh>
-              {/* Fan grill */}
-              <mesh position={[0, 0.08, 0]}>
-                <cylinderGeometry args={[fanRadius * 0.95, fanRadius * 0.95, 0.02, 24]} />
-                <meshStandardMaterial color={grillColor} metalness={0.6} roughness={0.3} />
+              
+              {/* Fan motors with VISIBLE BLADES */}
+              {Array.from({ length: Math.floor(grillWidth / 1.5) }).map((_, i) => {
+                const motorX = -grillWidth/2 + 0.75 + i * 1.5;
+                const bladeRadius = 0.4;
+                return (
+                  <group key={`motor-${i}`} position={[motorX, 0.05, 0]}>
+                    {/* Circular grill opening */}
+                    <mesh rotation={[Math.PI/2, 0, 0]}>
+                      <ringGeometry args={[bladeRadius - 0.03, bladeRadius + 0.03, 32]} />
+                      <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+                    </mesh>
+                    
+                    {/* === VISIBLE FAN BLADES (6 blades) === */}
+                    {[0, 60, 120, 180, 240, 300].map((angle, j) => (
+                      <mesh 
+                        key={`blade-${j}`} 
+                        position={[0, 0.02, 0]}
+                        rotation={[0.12, (angle * Math.PI) / 180, 0]}
+                      >
+                        <boxGeometry args={[bladeRadius * 0.85, 0.02, 0.1]} />
+                        <meshStandardMaterial color="#e5e7eb" metalness={0.6} roughness={0.3} />
+                      </mesh>
+                    ))}
+                    
+                    {/* Center hub */}
+                    <mesh position={[0, 0.03, 0]}>
+                      <cylinderGeometry args={[0.08, 0.08, 0.05, 16]} />
+                      <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+                    </mesh>
+                    
+                    {/* Protective wire grill */}
+                    <mesh position={[0, 0.06, 0]}>
+                      <cylinderGeometry args={[bladeRadius - 0.02, bladeRadius - 0.02, 0.01, 24]} />
+                      <meshStandardMaterial color="#6b7280" metalness={0.4} roughness={0.5} wireframe />
+                    </mesh>
+                  </group>
+                );
+              })}
+              
+              {/* Frame edges */}
+              <mesh position={[-grillWidth/2, 0.02, 0]} castShadow>
+                <boxGeometry args={[0.06, 0.12, grillDepth + 0.04]} />
+                <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
               </mesh>
-              {/* Fan center hub */}
-              <mesh position={[0, 0.1, 0]}>
-                <cylinderGeometry args={[fanRadius * 0.2, fanRadius * 0.2, 0.05, 12]} />
-                <meshStandardMaterial color="#111827" metalness={0.7} roughness={0.2} />
+              <mesh position={[grillWidth/2, 0.02, 0]} castShadow>
+                <boxGeometry args={[0.06, 0.12, grillDepth + 0.04]} />
+                <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
               </mesh>
-              {/* Fan blades (simplified) */}
-              {[0, 60, 120, 180, 240, 300].map((angle, j) => (
-                <mesh key={`blade-${j}`} position={[0, 0.09, 0]} rotation={[0, (angle * Math.PI) / 180, 0]}>
-                  <boxGeometry args={[fanRadius * 1.6, 0.02, fanRadius * 0.15]} />
-                  <meshStandardMaterial color="#374151" metalness={0.4} roughness={0.5} />
-                </mesh>
-              ))}
             </group>
           );
         })}
         
-        {/* Side louvers - air intake (front) */}
-        {Array.from({ length: 8 }).map((_, i) => (
-          <mesh key={`louver-front-${i}`} position={[0, -h/3 + (h * 0.6 / 8) * i, d/2 + 0.02]} castShadow>
-            <boxGeometry args={[w * 0.9, 0.03, 0.04]} />
-            <meshStandardMaterial color={grillColor} metalness={0.5} roughness={0.4} />
-          </mesh>
-        ))}
-        
-        {/* Side louvers - air intake (back) */}
-        {Array.from({ length: 8 }).map((_, i) => (
-          <mesh key={`louver-back-${i}`} position={[0, -h/3 + (h * 0.6 / 8) * i, -d/2 - 0.02]} castShadow>
-            <boxGeometry args={[w * 0.9, 0.03, 0.04]} />
-            <meshStandardMaterial color={grillColor} metalness={0.5} roughness={0.4} />
-          </mesh>
-        ))}
-        
-        {/* Corner posts */}
-        {[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([xSign, zSign], i) => (
-          <mesh key={`post-${i}`} position={[xSign * (w/2 - 0.05), 0, zSign * (d/2 - 0.05)]} castShadow>
-            <boxGeometry args={[0.1, h, 0.1]} />
-            <meshStandardMaterial color={frameColor} metalness={0.4} roughness={0.5} />
-          </mesh>
-        ))}
-        
-        {/* Bottom mounting rails */}
-        <mesh position={[0, -h/2 + 0.05, 0]} castShadow>
-          <boxGeometry args={[w, 0.1, d]} />
-          <meshStandardMaterial color={frameColor} metalness={0.4} roughness={0.5} />
+        {/* === ANTSPACE LOGO - Offset to avoid z-fighting === */}
+        <mesh position={[w * 0.15, h * 0.15, -d/2 - 0.08]}>
+          <boxGeometry args={[1.0, 0.08, 0.01]} />
+          <meshStandardMaterial color="#48bb78" emissive="#48bb78" emissiveIntensity={0.2} />
         </mesh>
         
-        {/* Bitmain logo area (front panel) */}
-        <mesh position={[-w/2 + 0.8, 0, d/2 + 0.01]}>
-          <planeGeometry args={[1.2, 0.3]} />
-          <meshStandardMaterial color="#f97316" metalness={0.3} roughness={0.5} />
+        {/* === BITMAIN LOGO - Offset to avoid z-fighting === */}
+        <mesh position={[w/2 - 0.8, -h * 0.25, -d/2 - 0.08]}>
+          <boxGeometry args={[0.6, 0.06, 0.01]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
         </mesh>
       </group>
     );
@@ -1524,7 +937,7 @@ function EditableObject({
     );
   };
 
-  // Solar Canopy rendering
+  // Solar Canopy rendering - MONO-SLOPE Industrial steel structure
   const renderCanopy = () => {
     const [w, h, d] = scale;
     const steelColor = '#374151';
@@ -1532,14 +945,33 @@ function EditableObject({
     const solarCellColor = '#0f172a';
     const solarBlue = '#1e3a5f';
     
+    // Structure dimensions
+    const postSection = 0.3;    // HEB 300 column section
+    const beamHeight = 0.4;     // IPE beam height
+    const beamWidth = 0.2;      // IPE beam width
+    const purlinHeight = 0.15;  // Purlin (C-channel) height
+    const purlinWidth = 0.08;   // Purlin width
+    
+    // MONO-SLOPE ROOF: 10° inclination for Qatar (optimal for cleaning + solar)
+    const roofAngle = Math.PI / 18; // 10 degrees
+    const slopeRise = d * Math.tan(roofAngle); // Height difference across depth (~4.2m for 24m depth)
+    
+    // Thermal clearance calculation:
+    // Cooling TOP = 6.192m (slab 0.4 + container 2.896 + cooling 2.896)
+    // Required clearance above cooling = 4m for hot air extraction
+    // Post LOW side minimum = 6.192 + 4 = 10.2m → use 10m from ground
+    const postHeightLow = 10;  // 10m at low side (ensures 4m clearance above cooling)
+    const postHeightHigh = postHeightLow + slopeRise; // ~14.2m at high side (Z = -d/2)
+    
+    // Grid layout: 5 posts in X, 4 posts in Z
+    const nPostsX = 5;
+    const nPostsZ = 4;
+    const postSpacingX = w / (nPostsX - 1);
+    const postSpacingZ = d / (nPostsZ - 1);
+    
     // Panel dimensions
     const panelWidth = 2.1;
     const panelDepth = 1.05;
-    const panelAngle = Math.PI / 7; // ~25° for Qatar latitude
-    
-    // Post spacing
-    const postSpacingX = w / 4;
-    const postSpacingZ = d / 3;
     
     // Calculate extractor opening positions (above each cooling unit)
     const extractorOpenings: Array<{ x: number; z: number }> = [];
@@ -1557,7 +989,7 @@ function EditableObject({
     
     // Check if position is over extractor
     const isOverExtractor = (x: number, z: number) => {
-      const openingWidth = 2.5;
+      const openingWidth = 3;
       for (const opening of extractorOpenings) {
         if (Math.abs(x - opening.x) < openingWidth && Math.abs(z - opening.z) < openingWidth) {
           return true;
@@ -1566,28 +998,33 @@ function EditableObject({
       return false;
     };
     
-    // Generate panel positions
-    const panelCols = Math.floor(w / panelWidth);
-    const panelRows = Math.floor(d / panelDepth);
-    const panels: Array<{ x: number; z: number }> = [];
+    // Calculate post height at given Z position (mono-slope)
+    const getPostHeight = (zPos: number) => {
+      // Linear interpolation: high at -d/2, low at +d/2
+      const t = (zPos + d/2) / d; // 0 at -d/2, 1 at +d/2
+      return postHeightHigh - t * slopeRise;
+    };
     
-    for (let col = 0; col < panelCols; col++) {
-      for (let row = 0; row < panelRows; row++) {
-        const xPos = -w/2 + panelWidth/2 + col * panelWidth;
-        const zPos = -d/2 + panelDepth/2 + row * panelDepth;
-        if (!isOverExtractor(xPos, zPos)) {
-          panels.push({ x: xPos, z: zPos });
-        }
+    // Calculate roof Y at given Z position
+    const getRoofY = (zPos: number) => {
+      const postH = getPostHeight(zPos);
+      return postH - postHeightLow; // Relative to the low side baseline
+    };
+    
+    // Generate post data with heights
+    const postData: Array<{ x: number; z: number; height: number }> = [];
+    for (let xi = 0; xi < nPostsX; xi++) {
+      for (let zi = 0; zi < nPostsZ; zi++) {
+        const x = -w/2 + xi * postSpacingX;
+        const z = -d/2 + zi * postSpacingZ;
+        postData.push({ x, z, height: getPostHeight(z) });
       }
     }
     
-    // Post positions
-    const posts: Array<[number, number]> = [];
-    for (let xi = 0; xi <= 4; xi++) {
-      for (let zi = 0; zi <= 3; zi++) {
-        posts.push([-w/2 + xi * postSpacingX, -d/2 + zi * postSpacingZ]);
-      }
-    }
+    // Z positions for rows of posts/beams
+    const rowZPositions = Array.from({ length: nPostsZ }, (_, i) => -d/2 + i * postSpacingZ);
+    // X positions for columns
+    const colXPositions = Array.from({ length: nPostsX }, (_, i) => -w/2 + i * postSpacingX);
     
     return (
       <group
@@ -1598,83 +1035,201 @@ function EditableObject({
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
       >
-        {/* Support Posts */}
-        {posts.map(([xPos, zPos], i) => (
-          <group key={`post-${i}`} position={[xPos, -h/2 - 2, zPos]}>
+        {/* ═══ STEEL COLUMNS (Variable height for mono-slope) ═══ */}
+        {postData.map((post, i) => (
+          <group key={`post-${i}`} position={[post.x, -postHeightLow + post.height/2, post.z]}>
+            {/* Main column */}
             <mesh castShadow>
-              <boxGeometry args={[0.25, h + 4, 0.25]} />
+              <boxGeometry args={[postSection, post.height, postSection]} />
+              <meshStandardMaterial color={steelColor} metalness={0.8} roughness={0.2} />
+            </mesh>
+            {/* Base plate (at ground level) */}
+            <mesh position={[0, -post.height/2 + 0.05, 0]} castShadow>
+              <boxGeometry args={[postSection * 2, 0.1, postSection * 2]} />
               <meshStandardMaterial color={steelColor} metalness={0.7} roughness={0.3} />
             </mesh>
-            <mesh position={[0, -(h + 4)/2, 0]} castShadow>
-              <boxGeometry args={[0.5, 0.1, 0.5]} />
-              <meshStandardMaterial color={steelColor} metalness={0.6} roughness={0.4} />
+            {/* Column cap plate */}
+            <mesh position={[0, post.height/2, 0]} castShadow>
+              <boxGeometry args={[postSection * 1.5, 0.08, postSection * 1.5]} />
+              <meshStandardMaterial color={steelColor} metalness={0.7} roughness={0.3} />
             </mesh>
           </group>
         ))}
         
-        {/* Main Longitudinal Beams (X direction) */}
-        {[-d/3, 0, d/3].map((zPos, i) => (
-          <mesh key={`beam-x-${i}`} position={[0, 0, zPos]} castShadow>
-            <boxGeometry args={[w, 0.2, 0.15]} />
-            <meshStandardMaterial color={steelColor} metalness={0.65} roughness={0.35} />
-          </mesh>
-        ))}
+        {/* ═══ MAIN BEAMS - Longitudinal (X direction, following slope) ═══ */}
+        {rowZPositions.map((zPos, i) => {
+          const roofY = getRoofY(zPos);
+          return (
+            <mesh key={`main-beam-${i}`} position={[0, roofY, zPos]} castShadow>
+              <boxGeometry args={[w + 0.5, beamHeight, beamWidth]} />
+              <meshStandardMaterial color={steelColor} metalness={0.75} roughness={0.25} />
+            </mesh>
+          );
+        })}
         
-        {/* Cross Beams (Z direction) */}
-        {[-w/2, -w/4, 0, w/4, w/2].map((xPos, i) => (
-          <mesh key={`beam-z-${i}`} position={[xPos, 0, 0]} castShadow>
-            <boxGeometry args={[0.15, 0.2, d]} />
-            <meshStandardMaterial color={steelColor} metalness={0.65} roughness={0.35} />
-          </mesh>
-        ))}
+        {/* ═══ RAFTERS - Inclined beams (Z direction, connecting main beams) ═══ */}
+        {colXPositions.map((xPos, i) => {
+          // Rafter follows the slope (descends toward +Z)
+          const rafterLength = Math.sqrt(d * d + slopeRise * slopeRise);
+          const midY = slopeRise / 2;
+          return (
+            <mesh 
+              key={`rafter-${i}`} 
+              position={[xPos, midY, 0]} 
+              rotation={[roofAngle, 0, 0]}
+              castShadow
+            >
+              <boxGeometry args={[beamWidth, beamHeight, rafterLength]} />
+              <meshStandardMaterial color={steelColor} metalness={0.75} roughness={0.25} />
+            </mesh>
+          );
+        })}
         
-        {/* Solar Panels (tilted, with gaps for extractors) */}
-        <group position={[0, 0.25, 0]} rotation={[panelAngle, 0, 0]}>
-          {panels.map(({ x, z }, i) => (
-            <group key={`panel-${i}`} position={[x, 0, z]}>
-              {/* Panel frame */}
-              <mesh castShadow>
-                <boxGeometry args={[panelWidth * 0.98, 0.04, panelDepth * 0.98]} />
-                <meshStandardMaterial color={aluminumFrame} metalness={0.75} roughness={0.25} />
-              </mesh>
-              {/* Solar cells */}
-              <mesh position={[0, 0.025, 0]}>
-                <boxGeometry args={[panelWidth * 0.92, 0.02, panelDepth * 0.92]} />
-                <meshStandardMaterial color={solarCellColor} metalness={0.4} roughness={0.2} />
-              </mesh>
-              {/* Glass cover */}
-              <mesh position={[0, 0.04, 0]}>
-                <boxGeometry args={[panelWidth * 0.95, 0.005, panelDepth * 0.95]} />
-                <meshStandardMaterial color={solarBlue} metalness={0.1} roughness={0.1} transparent opacity={0.4} />
-              </mesh>
-            </group>
-          ))}
+        {/* ═══ PURLINS - Following slope (support for panels) ═══ */}
+        {Array.from({ length: Math.floor(d / 1.5) }, (_, i) => {
+          const zPos = -d/2 + 0.75 + i * 1.5;
+          const yPos = getRoofY(zPos) + 0.3;
+          return (
+            <mesh key={`purlin-${i}`} position={[0, yPos, zPos]} castShadow>
+              <boxGeometry args={[w, purlinHeight, purlinWidth]} />
+              <meshStandardMaterial color={aluminumFrame} metalness={0.6} roughness={0.4} />
+            </mesh>
+          );
+        })}
+        
+        {/* ═══ HORIZONTAL BRACING (at roof level) ═══ */}
+        {/* Diagonal bracing in the roof plane */}
+        <mesh 
+          position={[-w/4, slopeRise/2, 0]} 
+          rotation={[0, Math.PI/6, -roofAngle]}
+          castShadow
+        >
+          <boxGeometry args={[0.06, 0.06, d * 0.6]} />
+          <meshStandardMaterial color={steelColor} metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh 
+          position={[w/4, slopeRise/2, 0]} 
+          rotation={[0, -Math.PI/6, -roofAngle]}
+          castShadow
+        >
+          <boxGeometry args={[0.06, 0.06, d * 0.6]} />
+          <meshStandardMaterial color={steelColor} metalness={0.7} roughness={0.3} />
+        </mesh>
+        
+        {/* ═══ VERTICAL BRACING (X-bracing on end walls) ═══ */}
+        {/* Left end */}
+        <mesh position={[-w/2, -postHeightLow/2 + 1, 0]} rotation={[0, 0, Math.PI/5]} castShadow>
+          <boxGeometry args={[0.06, postHeightLow * 0.7, 0.06]} />
+          <meshStandardMaterial color={steelColor} metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[-w/2, -postHeightLow/2 + 1, 0]} rotation={[0, 0, -Math.PI/5]} castShadow>
+          <boxGeometry args={[0.06, postHeightLow * 0.7, 0.06]} />
+          <meshStandardMaterial color={steelColor} metalness={0.7} roughness={0.3} />
+        </mesh>
+        {/* Right end */}
+        <mesh position={[w/2, -postHeightLow/2 + 1, 0]} rotation={[0, 0, Math.PI/5]} castShadow>
+          <boxGeometry args={[0.06, postHeightLow * 0.7, 0.06]} />
+          <meshStandardMaterial color={steelColor} metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[w/2, -postHeightLow/2 + 1, 0]} rotation={[0, 0, -Math.PI/5]} castShadow>
+          <boxGeometry args={[0.06, postHeightLow * 0.7, 0.06]} />
+          <meshStandardMaterial color={steelColor} metalness={0.7} roughness={0.3} />
+        </mesh>
+        
+        {/* ═══ SOLAR PANELS (on inclined roof structure) ═══ */}
+        <group position={[0, slopeRise/2 + 0.4, 0]} rotation={[roofAngle, 0, 0]}>
+          {/* Generate panels avoiding extractors */}
+          {(() => {
+            const panelCols = Math.floor(w / panelWidth);
+            const panelRows = Math.floor(d / panelDepth);
+            const panelElements: JSX.Element[] = [];
+            
+            for (let col = 0; col < panelCols; col++) {
+              for (let row = 0; row < panelRows; row++) {
+                const xPos = -w/2 + panelWidth/2 + col * panelWidth;
+                const zPos = -d/2 + panelDepth/2 + row * panelDepth;
+                
+                if (!isOverExtractor(xPos, zPos)) {
+                  panelElements.push(
+                    <group key={`panel-${col}-${row}`} position={[xPos, 0, zPos]}>
+                      {/* Panel frame */}
+                      <mesh castShadow>
+                        <boxGeometry args={[panelWidth * 0.98, 0.04, panelDepth * 0.98]} />
+                        <meshStandardMaterial color={aluminumFrame} metalness={0.75} roughness={0.25} />
+                      </mesh>
+                      {/* Solar cells */}
+                      <mesh position={[0, 0.025, 0]}>
+                        <boxGeometry args={[panelWidth * 0.92, 0.02, panelDepth * 0.92]} />
+                        <meshStandardMaterial color={solarCellColor} metalness={0.4} roughness={0.2} />
+                      </mesh>
+                      {/* Glass cover */}
+                      <mesh position={[0, 0.04, 0]}>
+                        <boxGeometry args={[panelWidth * 0.95, 0.005, panelDepth * 0.95]} />
+                        <meshStandardMaterial color={solarBlue} metalness={0.1} roughness={0.1} transparent opacity={0.3} />
+                      </mesh>
+                    </group>
+                  );
+                }
+              }
+            }
+            return panelElements;
+          })()}
         </group>
         
-        {/* Extractor Opening Frames (visible openings above cooling units) */}
-        {extractorOpenings.map((opening, i) => (
-          <group key={`opening-${i}`} position={[opening.x, 0.2, opening.z]}>
-            {/* Opening frame */}
-            <mesh>
-              <boxGeometry args={[2.7, 0.1, 2.7]} />
-              <meshStandardMaterial color={steelColor} metalness={0.6} roughness={0.4} />
-            </mesh>
-            {/* Mesh grating */}
-            <mesh position={[0, 0.08, 0]}>
-              <boxGeometry args={[2.3, 0.02, 2.3]} />
-              <meshStandardMaterial color="#4b5563" metalness={0.5} roughness={0.5} wireframe />
-            </mesh>
-            {/* Airflow indicator (red cone) */}
-            <mesh position={[0, 0.4, 0]} rotation={[-Math.PI/2, 0, 0]}>
-              <coneGeometry args={[0.3, 0.6, 8]} />
-              <meshStandardMaterial color="#ef4444" transparent opacity={0.6} emissive="#ef4444" emissiveIntensity={0.3} />
-            </mesh>
-          </group>
-        ))}
+        {/* ═══ EXTRACTOR OPENINGS (grilles above cooling units) ═══ */}
+        {extractorOpenings.map((opening, i) => {
+          const yPos = getRoofY(opening.z) + 0.5;
+          return (
+            <group key={`opening-${i}`} position={[opening.x, yPos, opening.z]}>
+              {/* Opening frame */}
+              <mesh>
+                <boxGeometry args={[3.2, 0.15, 3.2]} />
+                <meshStandardMaterial color={steelColor} metalness={0.6} roughness={0.4} />
+              </mesh>
+              {/* Mesh grating */}
+              <mesh position={[0, 0.1, 0]}>
+                <boxGeometry args={[2.8, 0.03, 2.8]} />
+                <meshStandardMaterial color="#4b5563" metalness={0.5} roughness={0.5} wireframe />
+              </mesh>
+              {/* Airflow indicator */}
+              <mesh position={[0, 0.4, 0]} rotation={[-Math.PI/2, 0, 0]}>
+                <coneGeometry args={[0.4, 0.7, 8]} />
+                <meshStandardMaterial color="#ef4444" transparent opacity={0.5} emissive="#ef4444" emissiveIntensity={0.3} />
+              </mesh>
+            </group>
+          );
+        })}
         
-        {/* Inverter Boxes (at corners) */}
-        {[[-w/2 + 1, -d/2 + 1], [w/2 - 1, -d/2 + 1], [-w/2 + 1, d/2 - 1], [w/2 - 1, d/2 - 1]].map(([xPos, zPos], i) => (
-          <group key={`inverter-${i}`} position={[xPos, -h/4, zPos]}>
+        {/* ═══ LIGHTNING RODS (at corners) ═══ */}
+        {[
+          [-w/2 + 0.5, -d/2 + 0.5],
+          [w/2 - 0.5, -d/2 + 0.5],
+          [-w/2 + 0.5, d/2 - 0.5],
+          [w/2 - 0.5, d/2 - 0.5]
+        ].map(([xPos, zPos], i) => {
+          const yPos = getRoofY(zPos) + 1.5;
+          return (
+            <mesh key={`lightning-${i}`} position={[xPos, yPos, zPos]} castShadow>
+              <cylinderGeometry args={[0.02, 0.03, 2, 8]} />
+              <meshStandardMaterial color="#d97706" metalness={0.8} roughness={0.2} />
+            </mesh>
+          );
+        })}
+        
+        {/* ═══ CABLE TRAYS (along main beams) ═══ */}
+        <mesh position={[0, -0.3, -d/2 + 0.5]} castShadow>
+          <boxGeometry args={[w * 0.9, 0.15, 0.3]} />
+          <meshStandardMaterial color={steelColor} metalness={0.5} roughness={0.5} />
+        </mesh>
+        
+        {/* ═══ INVERTER BOXES (at corners) ═══ */}
+        {[
+          [-w/2 + 1, -d/2 + 1],
+          [w/2 - 1, -d/2 + 1],
+          [-w/2 + 1, d/2 - 1],
+          [w/2 - 1, d/2 - 1]
+        ].map(([xPos, zPos], i) => (
+          <group key={`inverter-${i}`} position={[xPos, -postHeightLow/2, zPos]}>
             <mesh castShadow>
               <boxGeometry args={[0.8, 1.2, 0.4]} />
               <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.5} />
@@ -1684,14 +1239,6 @@ function EditableObject({
               <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} />
             </mesh>
           </group>
-        ))}
-        
-        {/* Lightning Rods */}
-        {[[-w/2 + 0.5, -d/2 + 0.5], [w/2 - 0.5, -d/2 + 0.5], [-w/2 + 0.5, d/2 - 0.5], [w/2 - 0.5, d/2 - 0.5]].map(([xPos, zPos], i) => (
-          <mesh key={`lightning-${i}`} position={[xPos, h/2 + 0.5, zPos]} castShadow>
-            <cylinderGeometry args={[0.015, 0.025, 1.5, 8]} />
-            <meshStandardMaterial color="#d97706" metalness={0.8} roughness={0.2} />
-          </mesh>
         ))}
       </group>
     );
@@ -1797,35 +1344,26 @@ function Scene({
   onSelect,
   transformMode,
   tool,
-  measurePoints,
-  onMeasureClick,
   onTransformEnd,
   showGrid,
-  showDimensions,
   viewDirection,
-  orbitRef
+  orbitRef,
+  cameraLocked = false
 }: {
   objects: Object3D[];
   selectedIds: string[];
   onSelect: (id: string, multiSelect: boolean) => void;
   transformMode: TransformMode;
   tool: Tool;
-  measurePoints: THREE.Vector3[];
-  onMeasureClick: (point: THREE.Vector3) => void;
   onTransformEnd: (id: string, position: THREE.Vector3, rotation: THREE.Euler, scale: THREE.Vector3) => void;
   showGrid: boolean;
-  showDimensions: boolean;
   viewDirection: 'front' | 'back' | 'left' | 'right' | 'top' | 'perspective' | null;
   orbitRef: React.RefObject<any>;
+  cameraLocked?: boolean;
 }) {
-  const handleFloorClick = (e: any) => {
-    if (tool === 'measure') {
-      e.stopPropagation();
-      onMeasureClick(e.point.clone());
-    } else {
-      // Deselect by passing empty string - handled in parent
-      onSelect('', false);
-    }
+  const handleFloorClick = () => {
+    // Deselect by passing empty string - handled in parent
+    onSelect('', false);
   };
 
   return (
@@ -1834,6 +1372,7 @@ function Scene({
       <OrbitControls 
         ref={orbitRef}
         makeDefault
+        enabled={!cameraLocked}
         enableDamping 
         dampingFactor={0.05}
         minDistance={5}
@@ -1902,23 +1441,9 @@ function Scene({
           onSelect={(multiSelect: boolean) => onSelect(obj.id, multiSelect)}
           transformMode={transformMode}
           onTransformEnd={(pos, rot, scale) => onTransformEnd(obj.id, pos, rot, scale)}
-          showDimensions={showDimensions}
         />
       ))}
 
-      {/* Center Guides, Alignment Lines and Floor dimensions */}
-      {showDimensions && (
-        <>
-          <CenterGuides />
-          <AlignmentLines objects={objects} />
-          {objects.length > 0 && <FloorDimensions objects={objects} />}
-        </>
-      )}
-
-      {/* Measurement line */}
-      {measurePoints.length === 2 && (
-        <MeasurementLine start={measurePoints[0]} end={measurePoints[1]} />
-      )}
     </>
   );
 }
@@ -1929,11 +1454,16 @@ function Scene({
 
 export default function DesignerPage() {
   // Scene state
-  // Dimensions in mm: 12192 x 2896 x 2438 (40ft ISO)
+  // Dimensions in mm: 12192 x 2896 x 2438 (40ft ISO Container)
   const unitDims = { width: 12192, height: 2896, depth: 2438 };
   const unitWidthM = unitDims.width / 1000; // 12.192m (length)
   const unitDepthM = unitDims.depth / 1000; // 2.438m (depth)
   const unitHeightM = unitDims.height / 1000; // 2.896m
+  
+  // EC2-DT Cooling System - Real dimensions (1.2m height, same footprint as container)
+  const coolingDims = { width: 12192, height: 1200, depth: 2438 };
+  const coolingHeightM = coolingDims.height / 1000; // 1.2m (real EC2-DT height)
+  
   const slabHeight = 0.4; // 40cm concrete slab
   const gapBetweenRows = 4; // 4m gap between containers in same row
   const faceToFaceGap = 15; // 15m between front faces
@@ -1968,16 +1498,16 @@ export default function DesignerPage() {
       locked: false,
       visible: true
     });
-    // Cooling on roof
+    // Cooling on roof - positioned at container top + cooling half height
     initialObjects.push({
       id: `cooling-${i + 1}`,
       name: `EC2-DT #${i + 1}`,
       type: 'cooling',
-      position: { x: row1X, y: slabHeight + unitHeightM + unitHeightM / 2, z: zPos },
+      position: { x: row1X, y: slabHeight + unitHeightM + coolingHeightM / 2, z: zPos },
       rotation: { x: 0, y: 0, z: 0 },
       scale: { x: 1, y: 1, z: 1 },
       color: '#1e3a5f',
-      dimensions: unitDims,
+      dimensions: coolingDims,
       locked: false,
       visible: true
     });
@@ -1999,20 +1529,33 @@ export default function DesignerPage() {
       locked: false,
       visible: true
     });
-    // Cooling on roof
+    // Cooling on roof - positioned at container top + cooling half height
     initialObjects.push({
       id: `cooling-${i + 5}`,
       name: `EC2-DT #${i + 5}`,
       type: 'cooling',
-      position: { x: row2X, y: slabHeight + unitHeightM + unitHeightM / 2, z: zPos },
+      position: { x: row2X, y: slabHeight + unitHeightM + coolingHeightM / 2, z: zPos },
       rotation: { x: 0, y: Math.PI, z: 0 },
       scale: { x: 1, y: 1, z: 1 },
       color: '#1e3a5f',
-      dimensions: unitDims,
+      dimensions: coolingDims,
       locked: false,
       visible: true
     });
   }
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECURITY DISTANCES (ZonDESK compliance)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TRF ↔ PDU : 3m (bord à bord)
+  // PDU ↔ Container : 3m (bord à bord)
+  const SECURITY_DIST_TRF_PDU = 3.0;      // 3m between transformer and PDU
+  const SECURITY_DIST_PDU_CONTAINER = 3.0; // 3m between PDU and container edge
+  
+  // PDU dimensions (defined early for position calculations)
+  const pduDims = { width: 2400, height: 2200, depth: 800 }; // 2.4m x 2.2m x 0.8m
+  const pduHeightM = pduDims.height / 1000;
+  const pduDepthAfterRotation = pduDims.depth / 1000;  // 0.8m (rotated 90°)
   
   // 4 Transformers 4MW - positioned at corners
   const transformerDims = { width: 2500, height: 3000, depth: 2000 }; // 2.5m x 3m x 2m
@@ -2020,19 +1563,30 @@ export default function DesignerPage() {
   const transformerWidthM = transformerDims.width / 1000;
   const transformerDepthM = transformerDims.depth / 1000;
   
+  // Container inner edges (for distance calculations)
+  const containerInnerEdgeLeft = row1X + (unitWidthM / 2);   // -7.5m
+  const containerInnerEdgeRight = row2X - (unitWidthM / 2);  // +7.5m
+  
   // Transformer positions: 2 pairs in the middle of the passage
   // Pair 1: between containers 1-2 (top of layout)
   // Pair 2: between containers 3-4 (bottom of layout)
-  const pairGap = 3; // 3m gap between transformers in a pair
   const containerStep = unitDepthM + gapBetweenRows; // Distance between container centers
   const zTop = centerOffsetZ + containerStep / 2; // Between container 1 and 2
   const zBottom = centerOffsetZ + totalZSpan - containerStep / 2; // Between container 3 and 4
   
+  // Calculate transformer X positions based on security distances:
+  // Layout: Container | 3m | PDU (0.8m) | 3m | TRF (2.5m) | center | TRF | 3m | PDU | 3m | Container
+  // TRF center from container edge = 3m + 0.8m + 3m + 1.25m = 8.05m
+  // Container edge at ±7.5m, so TRF at ±(7.5 - 8.05) = ±(-0.55m) → center side
+  // For symmetric layout: TRF X = ±0.55m from center
+  const trfXFromCenter = containerInnerEdgeLeft + SECURITY_DIST_PDU_CONTAINER + pduDepthAfterRotation + SECURITY_DIST_TRF_PDU + (transformerWidthM / 2);
+  // This gives us the actual TRF X position (≈0.55m from center for each pair)
+  
   const transformerPositions = [
-    { x: -pairGap / 2, z: zTop, rot: 0 }, // Top pair - left
-    { x: pairGap / 2, z: zTop, rot: 0 }, // Top pair - right
-    { x: -pairGap / 2, z: zBottom, rot: 0 }, // Bottom pair - left
-    { x: pairGap / 2, z: zBottom, rot: 0 }, // Bottom pair - right
+    { x: -trfXFromCenter, z: zTop, rot: 0 }, // Top pair - left
+    { x: trfXFromCenter, z: zTop, rot: 0 }, // Top pair - right
+    { x: -trfXFromCenter, z: zBottom, rot: 0 }, // Bottom pair - left
+    { x: trfXFromCenter, z: zBottom, rot: 0 }, // Bottom pair - right
   ];
   
   transformerPositions.forEach((pos, i) => {
@@ -2051,20 +1605,69 @@ export default function DesignerPage() {
   });
   
   // ═══════════════════════════════════════════════════════════════════════════
+  // PDU - LV Distribution Skids (1 PDU per 2 containers)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 4 PDUs total: 2 per row, each serving 2 containers
+  // Positioned at exactly 3m from container edge (ZonDESK security compliance)
+  // pduDims already defined above for position calculations
+  
+  // PDU X positions based on security distances:
+  // Container inner edge = row1X + unitWidthM/2 = -7.5m (left) / +7.5m (right)
+  // PDU center = container edge + 3m + PDU_depth/2 (when rotated 90°)
+  // PDU depth after rotation = 0.8m, so half = 0.4m
+  const pduRow1X = containerInnerEdgeLeft + SECURITY_DIST_PDU_CONTAINER + (pduDepthAfterRotation / 2);
+  // pduRow1X = -7.5 + 3.0 + 0.4 = -4.1m
+  const pduRow2X = containerInnerEdgeRight - SECURITY_DIST_PDU_CONTAINER - (pduDepthAfterRotation / 2);
+  // pduRow2X = +7.5 - 3.0 - 0.4 = +4.1m
+  
+  // PDU Z positions: centered between pairs of containers
+  // Containers at Z: -9.657, -3.219, +3.219, +9.657
+  const containerSpacingZ = unitDepthM + gapBetweenRows; // 6.438m
+  const pduZTop = centerOffsetZ + containerSpacingZ / 2;    // Between container 1-2 ≈ -6.4m
+  const pduZBottom = centerOffsetZ + totalZSpan - containerSpacingZ / 2; // Between container 3-4 ≈ +6.4m
+  
+  const pduPositions = [
+    { x: pduRow1X, z: pduZTop, rot: Math.PI / 2, name: 'PDU Row1-A (C1-C2)' },
+    { x: pduRow1X, z: pduZBottom, rot: Math.PI / 2, name: 'PDU Row1-B (C3-C4)' },
+    { x: pduRow2X, z: pduZTop, rot: -Math.PI / 2, name: 'PDU Row2-A (C5-C6)' },
+    { x: pduRow2X, z: pduZBottom, rot: -Math.PI / 2, name: 'PDU Row2-B (C7-C8)' },
+  ];
+  
+  pduPositions.forEach((pos, i) => {
+    initialObjects.push({
+      id: `pdu-${i + 1}`,
+      name: pos.name,
+      type: 'pdu',
+      position: { x: pos.x, y: slabHeight + pduHeightM / 2, z: pos.z },
+      rotation: { x: 0, y: pos.rot, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#374151',
+      dimensions: pduDims,
+      locked: false,
+      visible: true
+    });
+  });
+  
+  // ═══════════════════════════════════════════════════════════════════════════
   // SOLAR CANOPY - Covers entire installation with thermal extraction zones
   // ═══════════════════════════════════════════════════════════════════════════
   // Dimensions calculation:
-  // Width (X): from row1X - containerWidth/2 - margin to row2X + containerWidth/2 + margin
-  //          = -13.596 - 6.096 - 2 to 13.596 + 6.096 + 2 = -21.7 to 21.7 ≈ 44m
-  // Depth (Z): from centerOffsetZ - containerDepth/2 - margin to centerOffsetZ + totalZSpan + containerDepth/2 + margin
-  //          ≈ 28m
-  // Height: Structure height = 2m (positioned at top of cooling systems + 4m clearance)
-  const canopyWidth = 44000;   // 44m width to cover both rows + margins
-  const canopyDepth = 28000;   // 28m depth to cover 4 containers + margins
+  // Width (X): row1X=-13.596, row2X=+13.596, container width=12.192m
+  //          = from -19.7 to +19.7 = 39.4m + 2m margin = 42m
+  // Depth (Z): containers from -10.9 to +10.9 = 21.8m + 2m margin = 24m
+  // 
+  // THERMAL EXTRACTION CLEARANCE:
+  // Cooling TOP = 4.496m (slab 0.4 + container 2.896 + cooling 1.2)
+  // Required clearance = 4m minimum for hot air extraction
+  // Canopy LOW side = 10.4m (4.496 + 5.9m clearance) ✓ Excellent
+  // Canopy HIGH side = ~14.6m (10° mono-slope roof)
+  const canopyWidth = 42000;   // 42m width to cover both rows + margins
+  const canopyDepth = 24000;   // 24m depth to cover 4 containers + margins
   const canopyStructureHeight = 2000; // 2m structure height
-  const coolingTopY = slabHeight + unitHeightM + unitHeightM; // Top of cooling system
-  const canopyClearance = 4; // 4m clearance above cooling extractors
-  const canopyY = coolingTopY + canopyClearance + (canopyStructureHeight / 2000);
+  // Position canopy so that 10m posts reach down to ground (slabHeight)
+  // Post LOW height = 10m, positioned so base is at slabHeight
+  // canopyY = slabHeight + postHeightLow = 0.4 + 10 = 10.4m
+  const canopyY = slabHeight + 10; // 10.4m - posts go down to slab level
   
   initialObjects.push({
     id: 'solar-canopy-1',
@@ -2083,6 +1686,7 @@ export default function DesignerPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   // Box selection state
+  const [boxSelectMode, setBoxSelectMode] = useState(false); // Mode toggle
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
   const [boxStart, setBoxStart] = useState<{ x: number; y: number } | null>(null);
   const [boxCurrent, setBoxCurrent] = useState<{ x: number; y: number } | null>(null);
@@ -2157,9 +1761,7 @@ export default function DesignerPage() {
   
   // View state
   const [showGrid, setShowGrid] = useState(true);
-  const [showDimensions, setShowDimensions] = useState(true);
   const [viewDirection, setViewDirection] = useState<'front' | 'back' | 'left' | 'right' | 'top' | 'perspective' | null>(null);
-  const [measurePoints, setMeasurePoints] = useState<THREE.Vector3[]>([]);
   
   // UI state
   const [showLibrary, setShowLibrary] = useState(false);
@@ -2350,9 +1952,23 @@ export default function DesignerPage() {
 
   const orbitRef = useRef<any>(null);
 
+  // Project version - increment to force reload of initial objects with PDUs
+  const PROJECT_VERSION = 'v2-pdu-zondesk';
+  
   // Load DB layouts, restore last project, and AI status
   useEffect(() => {
     const init = async () => {
+      // Force reload if version changed (to load new PDUs)
+      const savedVersion = localStorage.getItem('hearst-designer-project-version');
+      if (savedVersion !== PROJECT_VERSION) {
+        console.log(`🔄 Project version changed: ${savedVersion} → ${PROJECT_VERSION}`);
+        console.log('📦 Loading fresh initial objects with 4 PDUs');
+        localStorage.setItem('hearst-designer-project-version', PROJECT_VERSION);
+        localStorage.removeItem('hearst-designer-last-project');
+        setDbLoading(false);
+        return; // Keep initial objects with PDUs
+      }
+      
       // Load DB layouts first
       setDbLoading(true);
       try {
@@ -2604,18 +2220,6 @@ export default function DesignerPage() {
     if (tool === 'move') setTransformMode('translate');
     else if (tool === 'rotate') setTransformMode('rotate');
     else if (tool === 'scale') setTransformMode('scale');
-    
-    if (tool === 'measure') {
-      setMeasurePoints([]);
-    }
-  }, []);
-
-  // Measure click handler
-  const handleMeasureClick = useCallback((point: THREE.Vector3) => {
-    setMeasurePoints(prev => {
-      if (prev.length >= 2) return [point];
-      return [...prev, point];
-    });
   }, []);
 
   // Transform handler
@@ -3157,39 +2761,145 @@ export default function DesignerPage() {
             </button>
           </div>
           
-          {/* Measure info */}
-          {activeTool === 'measure' && (
-            <div className="bg-red-100 text-red-700 px-4 py-1.5 rounded-full text-sm font-medium">
-              {measurePoints.length === 0 
-                ? 'Click first point' 
-                : measurePoints.length === 1 
-                  ? 'Click second point'
-                  : `Distance: ${(measurePoints[0].distanceTo(measurePoints[1]) * 1000).toFixed(0)} mm`
-              }
-            </div>
-          )}
         </div>
       </div>
 
       {/* 3D Viewport Container */}
-      <div className="flex-1 relative">
+      <div 
+        className="flex-1 relative"
+        ref={canvasContainerRef}
+        onMouseDown={(e) => {
+          // Only start box selection with left click when boxSelectMode is active
+          if (e.button === 0 && boxSelectMode) {
+            const rect = canvasContainerRef.current?.getBoundingClientRect();
+            if (rect) {
+              setBoxStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+              setIsBoxSelecting(true);
+            }
+          }
+        }}
+        onMouseMove={(e) => {
+          if (isBoxSelecting && boxStart) {
+            const rect = canvasContainerRef.current?.getBoundingClientRect();
+            if (rect) {
+              setBoxCurrent({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+            }
+          }
+        }}
+        onMouseUp={() => {
+          if (isBoxSelecting && boxStart && boxCurrent && boxSelectMode) {
+            const rect = canvasContainerRef.current?.getBoundingClientRect();
+            if (rect) {
+              const minX = Math.min(boxStart.x, boxCurrent.x);
+              const maxX = Math.max(boxStart.x, boxCurrent.x);
+              const minY = Math.min(boxStart.y, boxCurrent.y);
+              const maxY = Math.max(boxStart.y, boxCurrent.y);
+              
+              // Only select if box is at least 20px
+              if (maxX - minX > 20 && maxY - minY > 20) {
+                const selectedInBox: string[] = [];
+                
+                // Calculate scene bounds for mapping
+                const allX = objects.map(o => o.position.x);
+                const allZ = objects.map(o => o.position.z);
+                const sceneMinX = Math.min(...allX) - 20;
+                const sceneMaxX = Math.max(...allX) + 20;
+                const sceneMinZ = Math.min(...allZ) - 20;
+                const sceneMaxZ = Math.max(...allZ) + 20;
+                const sceneWidth = sceneMaxX - sceneMinX;
+                const sceneDepth = sceneMaxZ - sceneMinZ;
+                
+                objects.forEach(obj => {
+                  // Map 3D position to screen position (top-down view approximation)
+                  // Center of screen = center of scene
+                  const normalizedX = (obj.position.x - sceneMinX) / sceneWidth;
+                  const normalizedZ = (obj.position.z - sceneMinZ) / sceneDepth;
+                  
+                  const screenX = normalizedX * rect.width;
+                  const screenY = normalizedZ * rect.height;
+                  
+                  // Check if in selection box
+                  if (screenX >= minX && screenX <= maxX && screenY >= minY && screenY <= maxY) {
+                    selectedInBox.push(obj.id);
+                  }
+                });
+                
+                if (selectedInBox.length > 0) {
+                  setSelectedIds(selectedInBox);
+                  console.log('Selected:', selectedInBox.length, 'objects');
+                } else {
+                  console.log('No objects in selection box');
+                }
+              }
+            }
+          }
+          setIsBoxSelecting(false);
+          setBoxStart(null);
+          setBoxCurrent(null);
+        }}
+        onMouseLeave={() => {
+          setIsBoxSelecting(false);
+          setBoxStart(null);
+          setBoxCurrent(null);
+        }}
+      >
+        {/* Box Selection Overlay */}
+        {isBoxSelecting && boxStart && boxCurrent && (
+          <div
+            className="absolute border-2 border-blue-500 bg-blue-500/20 pointer-events-none z-50"
+            style={{
+              left: Math.min(boxStart.x, boxCurrent.x),
+              top: Math.min(boxStart.y, boxCurrent.y),
+              width: Math.abs(boxCurrent.x - boxStart.x),
+              height: Math.abs(boxCurrent.y - boxStart.y),
+            }}
+          />
+        )}
+        
         {/* 3D Canvas */}
         <Canvas shadows className="absolute inset-0">
           <Scene
-          objects={objects}
-          selectedIds={selectedIds}
-          onSelect={handleSelect}
-          transformMode={transformMode}
-          tool={activeTool}
-          measurePoints={measurePoints}
-          onMeasureClick={handleMeasureClick}
-          onTransformEnd={handleTransformEnd}
-          showGrid={showGrid}
-          showDimensions={showDimensions}
-          viewDirection={viewDirection}
-          orbitRef={orbitRef}
-        />
+            objects={objects}
+            selectedIds={selectedIds}
+            onSelect={handleSelect}
+            transformMode={transformMode}
+            tool={activeTool}
+            onTransformEnd={handleTransformEnd}
+            showGrid={showGrid}
+            viewDirection={viewDirection}
+            orbitRef={orbitRef}
+            cameraLocked={boxSelectMode}
+          />
         </Canvas>
+
+        {/* Box Select Mode Button */}
+        <button
+          onClick={() => {
+            const newMode = !boxSelectMode;
+            setBoxSelectMode(newMode);
+            // Force top view when enabling box select mode
+            if (newMode) {
+              setViewDirection('top');
+            }
+          }}
+          className={`absolute top-4 left-4 z-30 flex items-center gap-2 px-4 py-2 rounded-xl font-medium shadow-lg transition-all ${
+            boxSelectMode 
+              ? 'bg-blue-500 text-white ring-2 ring-blue-300' 
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <BoxSelect className="w-4 h-4" />
+          <span>Sélection Rectangle</span>
+          {boxSelectMode && <Lock className="w-3 h-3 ml-1" />}
+        </button>
+        
+        {/* Box Select Instructions */}
+        {boxSelectMode && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2">
+            <Lock className="w-4 h-4" />
+            Caméra verrouillée - Dessinez un rectangle pour sélectionner
+          </div>
+        )}
 
         {/* Toolbar */}
         <Toolbar
@@ -3197,8 +2907,6 @@ export default function DesignerPage() {
           onToolChange={handleToolChange}
           showGrid={showGrid}
           onToggleGrid={() => setShowGrid(!showGrid)}
-          showDimensions={showDimensions}
-          onToggleDimensions={() => setShowDimensions(!showDimensions)}
           onOpenLibrary={() => setShowLibrary(true)}
           onExport={handleExport}
           onResetView={() => setViewDirection('perspective')}
@@ -3293,30 +3001,6 @@ export default function DesignerPage() {
           </div>
         )}
 
-        {/* Emprise Totale - Bottom Right */}
-        {objects.length > 0 && showDimensions && (() => {
-          let minX = Infinity, maxX = -Infinity;
-          let minZ = Infinity, maxZ = -Infinity;
-          objects.forEach(obj => {
-            const w = (obj.dimensions.width / 1000) * obj.scale.x;
-            const d = (obj.dimensions.depth / 1000) * obj.scale.z;
-            minX = Math.min(minX, obj.position.x - w/2);
-            maxX = Math.max(maxX, obj.position.x + w/2);
-            minZ = Math.min(minZ, obj.position.z - d/2);
-            maxZ = Math.max(maxZ, obj.position.z + d/2);
-          });
-          const totalWidth = maxX - minX;
-          const totalDepth = maxZ - minZ;
-          const area = totalWidth * totalDepth;
-          
-          return (
-            <div className="absolute right-4 bottom-4 bg-white/95 backdrop-blur-sm rounded-lg px-3 py-2 z-20 shadow-lg border border-slate-200 text-xs">
-              <span className="text-slate-500">Emprise:</span>
-              <span className="font-semibold text-slate-700 ml-1">{totalWidth.toFixed(1)}×{totalDepth.toFixed(1)}m</span>
-              <span className="font-bold text-slate-900 ml-2">{area.toFixed(0)}m²</span>
-            </div>
-          );
-        })()}
       </div>
 
       {/* Library Drawer */}
