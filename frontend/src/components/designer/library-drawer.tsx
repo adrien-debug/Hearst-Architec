@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Package, Wind, Zap, Server, Network, Box, Layers, Search, Plus, RefreshCw, Sun } from 'lucide-react';
+import { X, Package, Wind, Zap, Server, Network, Box, Layers, Search, Plus, RefreshCw, Sun, Shield } from 'lucide-react';
 import { objectsApi, InfraObject } from '@/lib/api';
 import ObjectCard from './object-card';
 
@@ -12,13 +12,14 @@ interface LibraryDrawerProps {
   onEditObject?: (object: InfraObject) => void;
 }
 
-type ObjectCategory = 'containers' | 'cooling' | 'transformers' | 'pdu' | 'racks' | 'networking' | 'modules' | 'solar';
+type ObjectCategory = 'containers' | 'cooling' | 'transformers' | 'pdu' | 'racks' | 'networking' | 'modules' | 'solar' | 'security';
 
 const categories: { id: ObjectCategory; label: string; icon: React.ReactNode; color: string }[] = [
   { id: 'containers', label: 'Containers', icon: <Package className="w-5 h-5" />, color: 'bg-slate-100 text-slate-700' },
   { id: 'cooling', label: 'Cooling', icon: <Wind className="w-5 h-5" />, color: 'bg-blue-100 text-blue-700' },
   { id: 'transformers', label: 'Transformers', icon: <Zap className="w-5 h-5" />, color: 'bg-amber-100 text-amber-700' },
   { id: 'pdu', label: 'PDU', icon: <Box className="w-5 h-5" />, color: 'bg-purple-100 text-purple-700' },
+  { id: 'security', label: 'Sécurité', icon: <Shield className="w-5 h-5" />, color: 'bg-red-100 text-red-700' },
   { id: 'solar', label: 'Solaire', icon: <Sun className="w-5 h-5" />, color: 'bg-yellow-100 text-yellow-700' },
   { id: 'racks', label: 'Racks', icon: <Server className="w-5 h-5" />, color: 'bg-green-100 text-green-700' },
   { id: 'networking', label: 'Networking', icon: <Network className="w-5 h-5" />, color: 'bg-cyan-100 text-cyan-700' },

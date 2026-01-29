@@ -2,9 +2,11 @@
 
 import { memo, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Line, Text, Html } from '@react-three/drei';
+import { Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
-import type { CableRoute, CableSegment, CablePoint, CableFitting } from './cable-routing-tool';
+import type { CableRoute, CableSegment, CablePoint } from './cable-routing-tool';
+import type { WorldSnapPoint, ConnectionType } from './cable-snap-points';
+import type { CableZone } from './cable-zone-manager';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED MATERIALS
@@ -390,7 +392,7 @@ const DrawingPreview = memo(function DrawingPreview({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SNAP POINTS VISUALIZATION
+// SNAP POINTS VISUALIZATION (Legacy - simple)
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SnapPointsVisualization = memo(function SnapPointsVisualization({
@@ -426,6 +428,295 @@ const SnapPointsVisualization = memo(function SnapPointsVisualization({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// INTELLIGENT SNAP POINTS VISUALIZATION (Par type de connexion)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Couleurs par type de connexion
+const CONNECTION_TYPE_COLORS: Record<ConnectionType, string> = {
+  'power-ht': '#dc2626',     // Rouge - Haute tension
+  'power-bt': '#f97316',     // Orange - Basse tension
+  'power-input': '#eab308',  // Jaune - Entrée puissance
+  'power-output': '#84cc16', // Lime - Sortie puissance
+  'earth': '#22c55e',        // Vert - Terre
+  'data': '#3b82f6',         // Bleu - Data
+  'control': '#8b5cf6',      // Violet - Contrôle
+  'cooling-in': '#06b6d4',   // Cyan - Refroidissement entrée
+  'cooling-out': '#0891b2',  // Cyan foncé - Refroidissement sortie
+};
+
+const IntelligentSnapPoint3D = memo(function IntelligentSnapPoint3D({
+  snapPoint,
+  isActive,
+  isHovered,
+  showLabels,
+  onClick,
+}: {
+  snapPoint: WorldSnapPoint;
+  isActive: boolean;
+  isHovered: boolean;
+  showLabels: boolean;
+  onClick?: () => void;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const arrowRef = useRef<THREE.Group>(null);
+  
+  // Animation pour les points actifs/hover
+  useFrame((_, delta) => {
+    if (meshRef.current && (isActive || isHovered)) {
+      meshRef.current.rotation.y += delta * 3;
+    }
+  });
+  
+  const color = CONNECTION_TYPE_COLORS[snapPoint.connectionType] || '#6b7280';
+  const size = isActive ? 0.18 : isHovered ? 0.14 : 0.10;
+  const isFull = snapPoint.currentCables >= snapPoint.maxCables;
+  
+  // Forme selon type
+  const getShape = () => {
+    switch (snapPoint.connectionType) {
+      case 'power-ht':
+      case 'power-bt':
+        return <boxGeometry args={[size, size, size]} />;
+      case 'earth':
+        return <coneGeometry args={[size * 0.7, size, 4]} />;
+      case 'data':
+        return <dodecahedronGeometry args={[size * 0.8]} />;
+      default:
+        return <octahedronGeometry args={[size * 0.9]} />;
+    }
+  };
+  
+  return (
+    <group position={snapPoint.position.toArray()}>
+      {/* Point principal */}
+      <mesh 
+        ref={meshRef}
+        onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+        castShadow
+      >
+        {getShape()}
+        <meshStandardMaterial 
+          color={isFull ? '#6b7280' : color}
+          metalness={0.4}
+          roughness={0.5}
+          emissive={isActive ? color : undefined}
+          emissiveIntensity={isActive ? 0.6 : 0}
+          transparent={isFull}
+          opacity={isFull ? 0.4 : 1}
+        />
+      </mesh>
+      
+      {/* Flèche de direction (si priorité 1) */}
+      {snapPoint.priority === 1 && (
+        <group ref={arrowRef}>
+          <mesh 
+            position={snapPoint.direction.clone().multiplyScalar(size + 0.08).toArray()}
+            rotation={[
+              Math.atan2(
+                Math.sqrt(snapPoint.direction.x ** 2 + snapPoint.direction.z ** 2),
+                snapPoint.direction.y
+              ),
+              Math.atan2(snapPoint.direction.x, snapPoint.direction.z),
+              0
+            ]}
+          >
+            <coneGeometry args={[0.04, 0.1, 8]} />
+            <meshStandardMaterial color={color} />
+          </mesh>
+        </group>
+      )}
+      
+      {/* Anneau de capacité */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+        <ringGeometry args={[size * 1.1, size * 1.4, 16]} />
+        <meshStandardMaterial 
+          color={color}
+          transparent
+          opacity={isActive ? 0.8 : 0.3}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      
+      {/* Label avec info de capacité */}
+      {showLabels && (isActive || isHovered) && (
+        <Html
+          position={[0, size + 0.15, 0]}
+          center
+          distanceFactor={8}
+        >
+          <div className="bg-slate-900/95 text-white text-[10px] px-2 py-1 rounded-lg shadow-lg whitespace-nowrap border border-slate-700">
+            <div className="font-semibold">{snapPoint.label}</div>
+            <div className="flex items-center gap-2 mt-0.5 text-[9px] text-slate-400">
+              <span 
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              <span>{snapPoint.connectionType}</span>
+              <span>•</span>
+              <span>{snapPoint.currentCables}/{snapPoint.maxCables}</span>
+            </div>
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+});
+
+const IntelligentSnapPointsVisualization = memo(function IntelligentSnapPointsVisualization({
+  snapPoints,
+  activeSnapPointId,
+  hoveredSnapPointId,
+  showLabels = true,
+  filterTypes,
+  onSnapPointClick,
+}: {
+  snapPoints: WorldSnapPoint[];
+  activeSnapPointId: string | null;
+  hoveredSnapPointId: string | null;
+  showLabels?: boolean;
+  filterTypes?: ConnectionType[];
+  onSnapPointClick?: (snapPoint: WorldSnapPoint) => void;
+}) {
+  const filteredPoints = useMemo(() => {
+    if (!filterTypes || filterTypes.length === 0) return snapPoints;
+    return snapPoints.filter(sp => filterTypes.includes(sp.connectionType));
+  }, [snapPoints, filterTypes]);
+
+  return (
+    <group>
+      {filteredPoints.map(sp => (
+        <IntelligentSnapPoint3D
+          key={sp.id}
+          snapPoint={sp}
+          isActive={sp.id === activeSnapPointId}
+          isHovered={sp.id === hoveredSnapPointId}
+          showLabels={showLabels}
+          onClick={() => onSnapPointClick?.(sp)}
+        />
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FORBIDDEN ZONES VISUALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+const ForbiddenZoneVisualization = memo(function ForbiddenZoneVisualization({
+  zone,
+  showLabel = false,
+}: {
+  zone: CableZone;
+  showLabel?: boolean;
+}) {
+  if (zone.type !== 'forbidden') return null;
+  
+  const center = new THREE.Vector3();
+  zone.bounds.getCenter(center);
+  const size = new THREE.Vector3();
+  zone.bounds.getSize(size);
+  
+  return (
+    <group position={center.toArray()}>
+      {/* Zone semi-transparente rouge */}
+      <mesh>
+        <boxGeometry args={[size.x, size.y, size.z]} />
+        <meshStandardMaterial 
+          color="#ef4444"
+          transparent
+          opacity={0.15}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      
+      {/* Bordure */}
+      <lineSegments>
+        <edgesGeometry args={[new THREE.BoxGeometry(size.x, size.y, size.z)]} />
+        <lineBasicMaterial color="#ef4444" transparent opacity={0.5} />
+      </lineSegments>
+      
+      {/* Label */}
+      {showLabel && zone.reason && (
+        <Html position={[0, size.y / 2 + 0.2, 0]} center distanceFactor={12}>
+          <div className="bg-red-500/90 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap">
+            ⚠️ {zone.reason}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+});
+
+const ForbiddenZonesVisualization = memo(function ForbiddenZonesVisualization({
+  zones,
+  showLabels = false,
+}: {
+  zones: CableZone[];
+  showLabels?: boolean;
+}) {
+  const forbiddenZones = zones.filter(z => z.type === 'forbidden');
+  
+  return (
+    <group>
+      {forbiddenZones.map(zone => (
+        <ForbiddenZoneVisualization 
+          key={zone.id} 
+          zone={zone} 
+          showLabel={showLabels}
+        />
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HEIGHT INDICATOR (Preview de la hauteur de câble)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const HeightIndicator = memo(function HeightIndicator({
+  position,
+  height,
+  color = '#3b82f6',
+}: {
+  position: THREE.Vector3;
+  height: number;
+  color?: string;
+}) {
+  return (
+    <group position={[position.x, 0, position.z]}>
+      {/* Ligne verticale pointillée */}
+      <Line
+        points={[[0, 0.01, 0], [0, height, 0]]}
+        color={color}
+        lineWidth={1}
+        dashed
+        dashSize={0.1}
+        gapSize={0.05}
+      />
+      
+      {/* Marqueur au sol */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <ringGeometry args={[0.15, 0.2, 16]} />
+        <meshBasicMaterial color={color} transparent opacity={0.6} side={THREE.DoubleSide} />
+      </mesh>
+      
+      {/* Marqueur en hauteur */}
+      <mesh position={[0, height, 0]}>
+        <sphereGeometry args={[0.08, 12, 12]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
+      </mesh>
+      
+      {/* Label hauteur */}
+      <Html position={[0.15, height / 2, 0]} center distanceFactor={10}>
+        <div className="bg-slate-800/90 text-white text-[10px] px-1.5 py-0.5 rounded">
+          {height.toFixed(2)}m
+        </div>
+      </Html>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN CABLE SCENE COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -444,6 +735,18 @@ interface CableSceneProps {
   isDrawing: boolean;
   defaultWidth: number;
   defaultHeight: number;
+  // Nouvelles props pour snap points intelligents
+  intelligentSnapPoints?: WorldSnapPoint[];
+  activeIntelligentSnapPointId?: string | null;
+  hoveredSnapPointId?: string | null;
+  onIntelligentSnapPointClick?: (snapPoint: WorldSnapPoint) => void;
+  filterConnectionTypes?: ConnectionType[];
+  // Zones
+  cableZones?: CableZone[];
+  showForbiddenZones?: boolean;
+  // Indicateur de hauteur
+  showHeightIndicator?: boolean;
+  currentHeight?: number;
 }
 
 const CableScene = memo(function CableScene({
@@ -461,6 +764,16 @@ const CableScene = memo(function CableScene({
   isDrawing,
   defaultWidth,
   defaultHeight,
+  // Nouvelles props
+  intelligentSnapPoints = [],
+  activeIntelligentSnapPointId = null,
+  hoveredSnapPointId = null,
+  onIntelligentSnapPointClick,
+  filterConnectionTypes,
+  cableZones = [],
+  showForbiddenZones = false,
+  showHeightIndicator = false,
+  currentHeight = 3.5,
 }: CableSceneProps) {
   // Build point lookup map
   const pointMap = useMemo(() => {
@@ -521,11 +834,39 @@ const CableScene = memo(function CableScene({
         />
       )}
       
-      {/* Snap points */}
-      {isDrawing && snapPoints.length > 0 && (
+      {/* Legacy snap points (compatibilité) */}
+      {isDrawing && snapPoints.length > 0 && intelligentSnapPoints.length === 0 && (
         <SnapPointsVisualization
           snapPoints={snapPoints}
           activeSnapPoint={activeSnapPoint}
+        />
+      )}
+      
+      {/* Intelligent snap points (nouveau système) */}
+      {isDrawing && intelligentSnapPoints.length > 0 && (
+        <IntelligentSnapPointsVisualization
+          snapPoints={intelligentSnapPoints}
+          activeSnapPointId={activeIntelligentSnapPointId}
+          hoveredSnapPointId={hoveredSnapPointId}
+          showLabels={showLabels}
+          filterTypes={filterConnectionTypes}
+          onSnapPointClick={onIntelligentSnapPointClick}
+        />
+      )}
+      
+      {/* Forbidden zones */}
+      {showForbiddenZones && cableZones.length > 0 && (
+        <ForbiddenZonesVisualization
+          zones={cableZones}
+          showLabels={showLabels}
+        />
+      )}
+      
+      {/* Height indicator on preview point */}
+      {isDrawing && showHeightIndicator && previewPoint && (
+        <HeightIndicator
+          position={previewPoint}
+          height={currentHeight}
         />
       )}
     </group>
@@ -536,5 +877,17 @@ const CableScene = memo(function CableScene({
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export { CableScene, CableTraySegment3D, CablePoint3D, DrawingPreview, SnapPointsVisualization };
+export { 
+  CableScene, 
+  CableTraySegment3D, 
+  CablePoint3D, 
+  DrawingPreview, 
+  SnapPointsVisualization,
+  IntelligentSnapPointsVisualization,
+  IntelligentSnapPoint3D,
+  ForbiddenZonesVisualization,
+  HeightIndicator,
+  CONNECTION_TYPE_COLORS,
+};
+export type { CableSceneProps };
 export default CableScene;

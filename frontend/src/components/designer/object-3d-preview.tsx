@@ -1819,7 +1819,7 @@ const PreviewBox = memo(function PreviewBox({
   });
   
   // Memoize type detection
-  const { isContainer, isCooling, isTransformer, isPowerBlock, isPDU, isCanopy, isCableTray, isJunctionBox } = useMemo(() => {
+  const { isContainer, isCooling, isTransformer, isPowerBlock, isPDU, isCanopy, isCableTray, isJunctionBox, isRMU, isSecurityZone, isSecurityFence, isExtinguisher, isDangerSign, isEmergencyStop } = useMemo(() => {
     const typeLC = objectType?.toLowerCase() || '';
     return {
       isContainer: typeLC.includes('container') || typeLC === 'container' || typeLC === 'containers',
@@ -1830,6 +1830,13 @@ const PreviewBox = memo(function PreviewBox({
       isCanopy: typeLC.includes('canopy') || typeLC.includes('solar-canopy') || typeLC.includes('solarcanopy') || typeLC.includes('solar'),
       isCableTray: typeLC.includes('cable') || typeLC.includes('chemin') || typeLC.includes('tray') || typeLC.includes('ladder') || typeLC.includes('wire-mesh'),
       isJunctionBox: typeLC.includes('junction') || typeLC.includes('boite') || typeLC.includes('box') || typeLC.includes('raccord'),
+      // Security & Safety Equipment
+      isRMU: typeLC.includes('rmu') || typeLC.includes('ring-main') || typeLC.includes('cellule-ht') || typeLC.includes('switchgear'),
+      isSecurityZone: typeLC.includes('zone-ht') || typeLC.includes('zone-bt') || typeLC.includes('security-zone') || typeLC.includes('zone-securite'),
+      isSecurityFence: typeLC.includes('grillage') || typeLC.includes('fence') || typeLC.includes('cloture') || typeLC.includes('barriere'),
+      isExtinguisher: typeLC.includes('extincteur') || typeLC.includes('extinguisher') || typeLC.includes('fire'),
+      isDangerSign: typeLC.includes('danger') || typeLC.includes('panneau') || typeLC.includes('warning') || typeLC.includes('sign'),
+      isEmergencyStop: typeLC.includes('arret-urgence') || typeLC.includes('emergency') || typeLC.includes('stop') || typeLC.includes('coup-poing'),
     };
   }, [objectType]);
   
@@ -1944,6 +1951,90 @@ const PreviewBox = memo(function PreviewBox({
       </group>
     );
   }
+  
+  // === SECURITY & SAFETY EQUIPMENT ===
+  
+  if (isRMU) {
+    return (
+      <group ref={groupRef}>
+        <RMU3D 
+          dimensions={dimensions}
+          position={[0, 0, 0]}
+          functions={Math.max(2, Math.min(6, Math.floor(dimensions.width / 400)))}
+        />
+      </group>
+    );
+  }
+  
+  if (isSecurityZone) {
+    const zoneType = objectType?.toLowerCase().includes('ht') ? 'HT' 
+                   : objectType?.toLowerCase().includes('bt') ? 'BT' 
+                   : objectType?.toLowerCase().includes('ops') ? 'OPS' 
+                   : 'SAFE';
+    return (
+      <group ref={groupRef}>
+        <SecurityZone3D 
+          width={dimensions.width}
+          depth={dimensions.depth}
+          zoneType={zoneType}
+          position={[0, 0, 0]}
+          shape="rectangle"
+          showBorder={true}
+          showLabel={true}
+        />
+      </group>
+    );
+  }
+  
+  if (isSecurityFence) {
+    return (
+      <group ref={groupRef}>
+        <SecurityFence3D 
+          length={dimensions.width}
+          height={dimensions.height || 2000}
+          position={[0, 0, 0]}
+          withGate={true}
+          gatePosition={0.5}
+          gateWidth={1200}
+        />
+      </group>
+    );
+  }
+  
+  if (isExtinguisher) {
+    return (
+      <group ref={groupRef}>
+        <FireExtinguisher3D 
+          position={[0, 0, 0]}
+          type="CO2"
+          wallMounted={true}
+        />
+      </group>
+    );
+  }
+  
+  if (isDangerSign) {
+    return (
+      <group ref={groupRef}>
+        <DangerSign3D 
+          position={[0, y, 0]}
+          type="electrical"
+          size={dimensions.width || 400}
+        />
+      </group>
+    );
+  }
+  
+  if (isEmergencyStop) {
+    return (
+      <group ref={groupRef}>
+        <EmergencyStop3D 
+          position={[0, y, 0]}
+          pressed={false}
+        />
+      </group>
+    );
+  }
 
   // Generic box for other types (racks, networking)
   const scale: [number, number, number] = [
@@ -2053,6 +2144,48 @@ export default function Object3DPreview({
     if (nameLC.includes('junction') || nameLC.includes('boîte') || nameLC.includes('raccord') ||
         nameLC.includes('derivation') || nameLC.includes('coffret')) {
       return 'junction-box';
+    }
+    
+    // === SECURITY & SAFETY EQUIPMENT ===
+    
+    // RMU (Ring Main Unit - Cellule HT)
+    if (typeLC.includes('rmu') || typeLC.includes('ring-main') || typeLC.includes('cellule')) return 'rmu';
+    if (nameLC.includes('rmu') || nameLC.includes('cellule ht') || nameLC.includes('ring main') ||
+        nameLC.includes('switchgear') || nameLC.includes('sm6') || nameLC.includes('rm6')) {
+      return 'rmu';
+    }
+    
+    // Security Zones
+    if (typeLC.includes('zone-ht') || typeLC.includes('zone-bt') || typeLC.includes('security-zone')) return 'security-zone';
+    if (nameLC.includes('zone ht') || nameLC.includes('zone bt') || nameLC.includes('zone securite') ||
+        nameLC.includes('périmètre') || nameLC.includes('marquage')) {
+      return 'security-zone';
+    }
+    
+    // Security Fence
+    if (typeLC.includes('grillage') || typeLC.includes('fence') || typeLC.includes('cloture')) return 'security-fence';
+    if (nameLC.includes('grillage') || nameLC.includes('clôture') || nameLC.includes('barrière') ||
+        nameLC.includes('fence') || nameLC.includes('portillon')) {
+      return 'security-fence';
+    }
+    
+    // Fire Extinguisher
+    if (typeLC.includes('extincteur') || typeLC.includes('extinguisher') || typeLC.includes('fire')) return 'extinguisher';
+    if (nameLC.includes('extincteur') || nameLC.includes('co2') || nameLC.includes('fire')) {
+      return 'extinguisher';
+    }
+    
+    // Danger Signs
+    if (typeLC.includes('danger') || typeLC.includes('panneau') || typeLC.includes('warning')) return 'danger-sign';
+    if (nameLC.includes('danger') || nameLC.includes('panneau') || nameLC.includes('avertissement') ||
+        nameLC.includes('haute tension') || nameLC.includes('électrique')) {
+      return 'danger-sign';
+    }
+    
+    // Emergency Stop
+    if (typeLC.includes('arret-urgence') || typeLC.includes('emergency') || typeLC.includes('stop')) return 'emergency-stop';
+    if (nameLC.includes('arrêt urgence') || nameLC.includes('coup de poing') || nameLC.includes('emergency stop')) {
+      return 'emergency-stop';
     }
     
     return typeLC || 'generic';
@@ -2969,6 +3102,781 @@ const CableRoutingSystem = memo(function CableRoutingSystem({
   );
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ELECTRICAL SAFETY ZONE (Zone de sécurité électrique)
+// Floor marking for HT (red), BT (orange), Operations (yellow)
+// Norme NF C 15-100 / IEC 61936
+// ═══════════════════════════════════════════════════════════════════════════
+
+const securityMaterials = {
+  zoneHT: new THREE.MeshStandardMaterial({ color: '#dc2626', transparent: true, opacity: 0.4, side: THREE.DoubleSide }),
+  zoneBT: new THREE.MeshStandardMaterial({ color: '#f97316', transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
+  zoneOps: new THREE.MeshStandardMaterial({ color: '#eab308', transparent: true, opacity: 0.3, side: THREE.DoubleSide }),
+  zoneSafe: new THREE.MeshStandardMaterial({ color: '#22c55e', transparent: true, opacity: 0.25, side: THREE.DoubleSide }),
+  fenceSteel: new THREE.MeshStandardMaterial({ color: '#71717a', metalness: 0.7, roughness: 0.3 }),
+  fenceMesh: new THREE.MeshStandardMaterial({ color: '#52525b', metalness: 0.6, roughness: 0.4, wireframe: true }),
+  dangerYellow: new THREE.MeshStandardMaterial({ color: '#fbbf24', metalness: 0.3, roughness: 0.7 }),
+  dangerBlack: new THREE.MeshStandardMaterial({ color: '#1f2937', metalness: 0.3, roughness: 0.7 }),
+  emergencyRed: new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.4, roughness: 0.6 }),
+  extincteurRed: new THREE.MeshStandardMaterial({ color: '#b91c1c', metalness: 0.5, roughness: 0.5 }),
+  badgeReader: new THREE.MeshStandardMaterial({ color: '#1e3a5f', metalness: 0.5, roughness: 0.5 }),
+  ledGreen: new THREE.MeshStandardMaterial({ color: '#22c55e', emissive: '#22c55e', emissiveIntensity: 1 }),
+  ledRed: new THREE.MeshStandardMaterial({ color: '#dc2626', emissive: '#dc2626', emissiveIntensity: 0.8 }),
+  evacGreen: new THREE.MeshStandardMaterial({ color: '#16a34a', emissive: '#16a34a', emissiveIntensity: 0.5, transparent: true, opacity: 0.8 }),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECURITY ZONE 3D - Floor marking for electrical safety zones
+// ═══════════════════════════════════════════════════════════════════════════
+const SecurityZone3D = memo(function SecurityZone3D({ 
+  width = 6000,           // mm
+  depth = 6000,           // mm
+  zoneType = 'HT',        // 'HT' | 'BT' | 'OPS' | 'SAFE'
+  position = [0, 0, 0] as [number, number, number],
+  shape = 'rectangle',    // 'rectangle' | 'circle'
+  showBorder = true,
+  showLabel = true,
+}: { 
+  width?: number;
+  depth?: number;
+  zoneType?: 'HT' | 'BT' | 'OPS' | 'SAFE';
+  position?: [number, number, number];
+  shape?: 'rectangle' | 'circle';
+  showBorder?: boolean;
+  showLabel?: boolean;
+}) {
+  const w = width / 1000;
+  const d = depth / 1000;
+  const radius = Math.max(w, d) / 2;
+  
+  const zoneMaterial = useMemo(() => {
+    switch (zoneType) {
+      case 'HT': return securityMaterials.zoneHT;
+      case 'BT': return securityMaterials.zoneBT;
+      case 'OPS': return securityMaterials.zoneOps;
+      case 'SAFE': return securityMaterials.zoneSafe;
+      default: return securityMaterials.zoneHT;
+    }
+  }, [zoneType]);
+  
+  const borderColor = useMemo(() => {
+    switch (zoneType) {
+      case 'HT': return '#dc2626';
+      case 'BT': return '#f97316';
+      case 'OPS': return '#eab308';
+      case 'SAFE': return '#22c55e';
+      default: return '#dc2626';
+    }
+  }, [zoneType]);
+  
+  const zoneLabel = useMemo(() => {
+    switch (zoneType) {
+      case 'HT': return 'ZONE HT - DANGER';
+      case 'BT': return 'ZONE BT';
+      case 'OPS': return 'ZONE OPÉRATIONNELLE';
+      case 'SAFE': return 'ZONE SÉCURISÉE';
+      default: return 'ZONE';
+    }
+  }, [zoneType]);
+  
+  // Hazard stripe pattern for border (alternating yellow/black)
+  const stripeCount = shape === 'circle' ? 32 : Math.floor((2 * w + 2 * d) / 0.4);
+  
+  return (
+    <group position={position}>
+      {/* Zone fill */}
+      {shape === 'circle' ? (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+          <circleGeometry args={[radius, 32]} />
+          <primitive object={zoneMaterial} attach="material" />
+        </mesh>
+      ) : (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+          <planeGeometry args={[w, d]} />
+          <primitive object={zoneMaterial} attach="material" />
+        </mesh>
+      )}
+      
+      {/* Hazard border stripes (yellow/black) */}
+      {showBorder && shape === 'rectangle' && (
+        <group position={[0, 0.008, 0]}>
+          {/* Front border */}
+          {Array.from({ length: Math.floor(w / 0.4) }).map((_, i) => (
+            <mesh 
+              key={`front-${i}`}
+              position={[-w/2 + 0.2 + i * 0.4, 0, -d/2]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <planeGeometry args={[0.2, 0.15]} />
+              <primitive object={i % 2 === 0 ? securityMaterials.dangerYellow : securityMaterials.dangerBlack} attach="material" />
+            </mesh>
+          ))}
+          {/* Back border */}
+          {Array.from({ length: Math.floor(w / 0.4) }).map((_, i) => (
+            <mesh 
+              key={`back-${i}`}
+              position={[-w/2 + 0.2 + i * 0.4, 0, d/2]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <planeGeometry args={[0.2, 0.15]} />
+              <primitive object={i % 2 === 0 ? securityMaterials.dangerYellow : securityMaterials.dangerBlack} attach="material" />
+            </mesh>
+          ))}
+          {/* Left border */}
+          {Array.from({ length: Math.floor(d / 0.4) }).map((_, i) => (
+            <mesh 
+              key={`left-${i}`}
+              position={[-w/2, 0, -d/2 + 0.2 + i * 0.4]}
+              rotation={[-Math.PI / 2, 0, Math.PI / 2]}
+            >
+              <planeGeometry args={[0.2, 0.15]} />
+              <primitive object={i % 2 === 0 ? securityMaterials.dangerYellow : securityMaterials.dangerBlack} attach="material" />
+            </mesh>
+          ))}
+          {/* Right border */}
+          {Array.from({ length: Math.floor(d / 0.4) }).map((_, i) => (
+            <mesh 
+              key={`right-${i}`}
+              position={[w/2, 0, -d/2 + 0.2 + i * 0.4]}
+              rotation={[-Math.PI / 2, 0, Math.PI / 2]}
+            >
+              <planeGeometry args={[0.2, 0.15]} />
+              <primitive object={i % 2 === 0 ? securityMaterials.dangerYellow : securityMaterials.dangerBlack} attach="material" />
+            </mesh>
+          ))}
+        </group>
+      )}
+      
+      {/* Circle border */}
+      {showBorder && shape === 'circle' && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]}>
+          <ringGeometry args={[radius - 0.1, radius, 32]} />
+          <meshStandardMaterial color={borderColor} />
+        </mesh>
+      )}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECURITY FENCE 3D - Steel fence with mesh panels
+// Industrial safety barrier for HT zones (Norme NF C 13-200)
+// ═══════════════════════════════════════════════════════════════════════════
+const SecurityFence3D = memo(function SecurityFence3D({ 
+  length = 6000,          // mm - total fence length
+  height = 2000,          // mm - fence height (min 2m for HT)
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  withGate = false,       // Include access gate
+  gatePosition = 0.5,     // 0-1 relative position along fence
+  gateWidth = 1200,       // mm
+}: { 
+  length?: number;
+  height?: number;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  withGate?: boolean;
+  gatePosition?: number;
+  gateWidth?: number;
+}) {
+  const l = length / 1000;
+  const h = height / 1000;
+  const gw = gateWidth / 1000;
+  
+  // Post spacing (max 3m for stability)
+  const postSpacing = Math.min(3, l / Math.ceil(l / 3));
+  const postCount = Math.ceil(l / postSpacing) + 1;
+  
+  // Gate position in meters
+  const gateX = -l/2 + l * gatePosition;
+  
+  const postIndices = useMemo(() => Array.from({ length: postCount }, (_, i) => i), [postCount]);
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* === FENCE POSTS (Steel tubes) === */}
+      {postIndices.map((i) => {
+        const xPos = -l/2 + i * postSpacing;
+        // Skip posts where gate is
+        if (withGate && Math.abs(xPos - gateX) < gw/2 + 0.1) return null;
+        
+        return (
+          <group key={`post-${i}`} position={[xPos, 0, 0]}>
+            {/* Main post (60x60mm steel tube) */}
+            <mesh position={[0, h/2, 0]} castShadow>
+              <boxGeometry args={[0.06, h, 0.06]} />
+              <primitive object={securityMaterials.fenceSteel} attach="material" />
+            </mesh>
+            {/* Post cap */}
+            <mesh position={[0, h + 0.02, 0]} castShadow>
+              <boxGeometry args={[0.08, 0.04, 0.08]} />
+              <primitive object={securityMaterials.fenceSteel} attach="material" />
+            </mesh>
+            {/* Base plate */}
+            <mesh position={[0, 0.02, 0]} castShadow>
+              <boxGeometry args={[0.15, 0.04, 0.15]} />
+              <primitive object={securityMaterials.fenceSteel} attach="material" />
+            </mesh>
+            {/* Anchor bolts */}
+            {[[-0.04, -0.04], [0.04, -0.04], [-0.04, 0.04], [0.04, 0.04]].map(([dx, dz], bi) => (
+              <mesh key={`bolt-${bi}`} position={[dx, 0.005, dz]}>
+                <cylinderGeometry args={[0.008, 0.008, 0.03, 8]} />
+                <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.2} />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
+      
+      {/* === HORIZONTAL RAILS === */}
+      {/* Top rail */}
+      <mesh position={[0, h - 0.03, 0]} castShadow>
+        <boxGeometry args={[l, 0.04, 0.04]} />
+        <primitive object={securityMaterials.fenceSteel} attach="material" />
+      </mesh>
+      {/* Middle rail */}
+      <mesh position={[0, h * 0.5, 0]} castShadow>
+        <boxGeometry args={[l, 0.03, 0.03]} />
+        <primitive object={securityMaterials.fenceSteel} attach="material" />
+      </mesh>
+      {/* Bottom rail */}
+      <mesh position={[0, 0.15, 0]} castShadow>
+        <boxGeometry args={[l, 0.03, 0.03]} />
+        <primitive object={securityMaterials.fenceSteel} attach="material" />
+      </mesh>
+      
+      {/* === MESH PANELS (Wire mesh 50x50mm) === */}
+      {postIndices.slice(0, -1).map((i) => {
+        const xPos = -l/2 + i * postSpacing + postSpacing/2;
+        const panelWidth = postSpacing - 0.08;
+        
+        // Skip panel where gate is
+        if (withGate && Math.abs(xPos - gateX) < gw/2 + postSpacing/2) return null;
+        
+        return (
+          <mesh 
+            key={`panel-${i}`}
+            position={[xPos, h/2, 0]}
+          >
+            <planeGeometry args={[panelWidth, h - 0.2]} />
+            <meshStandardMaterial 
+              color="#6b7280" 
+              metalness={0.6} 
+              roughness={0.4} 
+              wireframe 
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        );
+      })}
+      
+      {/* === ACCESS GATE (if enabled) === */}
+      {withGate && (
+        <group position={[gateX, 0, 0]}>
+          {/* Gate posts (heavier duty) */}
+          {[-gw/2 - 0.04, gw/2 + 0.04].map((xOff, i) => (
+            <group key={`gate-post-${i}`} position={[xOff, 0, 0]}>
+              <mesh position={[0, h/2, 0]} castShadow>
+                <boxGeometry args={[0.08, h, 0.08]} />
+                <primitive object={securityMaterials.fenceSteel} attach="material" />
+              </mesh>
+              <mesh position={[0, h + 0.03, 0]} castShadow>
+                <boxGeometry args={[0.12, 0.06, 0.12]} />
+                <primitive object={securityMaterials.fenceSteel} attach="material" />
+              </mesh>
+            </group>
+          ))}
+          
+          {/* Gate frame */}
+          <group position={[0, 0, 0.03]}>
+            {/* Gate panel frame */}
+            <mesh position={[0, h/2, 0]} castShadow>
+              <boxGeometry args={[gw, h - 0.15, 0.04]} />
+              <primitive object={securityMaterials.fenceSteel} attach="material" />
+            </mesh>
+            {/* Gate mesh */}
+            <mesh position={[0, h/2, 0.025]}>
+              <planeGeometry args={[gw - 0.1, h - 0.25]} />
+              <meshStandardMaterial color="#6b7280" metalness={0.5} roughness={0.5} wireframe side={THREE.DoubleSide} />
+            </mesh>
+            
+            {/* Gate handle */}
+            <mesh position={[gw/2 - 0.08, h * 0.45, 0.05]} castShadow>
+              <boxGeometry args={[0.04, 0.15, 0.03]} />
+              <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+            </mesh>
+            
+            {/* Lock */}
+            <mesh position={[gw/2 - 0.08, h * 0.5, 0.07]} castShadow>
+              <boxGeometry args={[0.06, 0.08, 0.04]} />
+              <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
+            </mesh>
+          </group>
+          
+          {/* === DANGER SIGN on gate === */}
+          <DangerSign3D 
+            position={[0, h - 0.4, 0.08]}
+            type="electrical"
+            size={300}
+          />
+          
+          {/* === BADGE READER === */}
+          <BadgeReader3D 
+            position={[-gw/2 - 0.2, h * 0.5, 0.15]}
+          />
+          
+          {/* === EMERGENCY STOP on gate post === */}
+          <EmergencyStop3D 
+            position={[gw/2 + 0.1, h * 0.6, 0.1]}
+          />
+        </group>
+      )}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DANGER SIGN 3D - Electrical hazard warning signs
+// Triangle jaune/noir normalisé (ISO 7010 - W012)
+// ═══════════════════════════════════════════════════════════════════════════
+const DangerSign3D = memo(function DangerSign3D({ 
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  type = 'electrical',    // 'electrical' | 'high-voltage' | 'general' | 'no-entry'
+  size = 400,             // mm
+}: { 
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  type?: 'electrical' | 'high-voltage' | 'general' | 'no-entry';
+  size?: number;
+}) {
+  const s = size / 1000;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Sign backing plate */}
+      <mesh castShadow>
+        <boxGeometry args={[s, s, 0.008]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.2} roughness={0.8} />
+      </mesh>
+      
+      {/* Black border (triangle approximation with box) */}
+      <mesh position={[0, 0, 0.005]}>
+        <boxGeometry args={[s * 0.9, s * 0.9, 0.002]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.2} roughness={0.8} />
+      </mesh>
+      
+      {/* Lightning bolt symbol (simplified) */}
+      {type === 'electrical' && (
+        <group position={[0, 0, 0.006]}>
+          {/* Main bolt */}
+          <mesh position={[0, s * 0.1, 0]} rotation={[0, 0, 0.3]}>
+            <boxGeometry args={[s * 0.08, s * 0.4, 0.003]} />
+            <meshStandardMaterial color="#1f2937" />
+          </mesh>
+          <mesh position={[s * 0.05, -s * 0.15, 0]} rotation={[0, 0, -0.3]}>
+            <boxGeometry args={[s * 0.08, s * 0.25, 0.003]} />
+            <meshStandardMaterial color="#1f2937" />
+          </mesh>
+          {/* Arrow head */}
+          <mesh position={[0, -s * 0.3, 0]}>
+            <coneGeometry args={[s * 0.08, s * 0.12, 3]} />
+            <meshStandardMaterial color="#1f2937" />
+          </mesh>
+        </group>
+      )}
+      
+      {/* High voltage text plate (optional) */}
+      {type === 'high-voltage' && (
+        <mesh position={[0, -s * 0.55, 0.004]}>
+          <boxGeometry args={[s * 1.2, s * 0.25, 0.006]} />
+          <meshStandardMaterial color="#ffffff" metalness={0.1} roughness={0.9} />
+        </mesh>
+      )}
+      
+      {/* No entry (red circle with bar) */}
+      {type === 'no-entry' && (
+        <group position={[0, 0, 0.006]}>
+          <mesh rotation={[0, 0, 0]}>
+            <torusGeometry args={[s * 0.35, s * 0.06, 8, 24]} />
+            <meshStandardMaterial color="#dc2626" />
+          </mesh>
+          <mesh rotation={[0, 0, Math.PI / 4]}>
+            <boxGeometry args={[s * 0.6, s * 0.1, 0.003]} />
+            <meshStandardMaterial color="#dc2626" />
+          </mesh>
+        </group>
+      )}
+      
+      {/* Mounting holes */}
+      {[[-s * 0.35, s * 0.35], [s * 0.35, s * 0.35], [-s * 0.35, -s * 0.35], [s * 0.35, -s * 0.35]].map(([x, y], i) => (
+        <mesh key={`hole-${i}`} position={[x, y, 0.005]}>
+          <cylinderGeometry args={[0.008, 0.008, 0.01, 8]} />
+          <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.2} />
+        </mesh>
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EMERGENCY STOP 3D - Coup de poing d'arrêt d'urgence
+// Rouge champignon avec collerette jaune (Norme IEC 60947-5-5)
+// ═══════════════════════════════════════════════════════════════════════════
+const EmergencyStop3D = memo(function EmergencyStop3D({ 
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  pressed = false,
+}: { 
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  pressed?: boolean;
+}) {
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Yellow backing plate (collerette) */}
+      <mesh castShadow>
+        <boxGeometry args={[0.12, 0.12, 0.015]} />
+        <primitive object={securityMaterials.dangerYellow} attach="material" />
+      </mesh>
+      
+      {/* Gray housing */}
+      <mesh position={[0, 0, 0.02]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 0.03, 16]} />
+        <meshStandardMaterial color="#4b5563" metalness={0.5} roughness={0.5} />
+      </mesh>
+      
+      {/* Red mushroom button */}
+      <mesh position={[0, 0, pressed ? 0.03 : 0.045]} castShadow>
+        <cylinderGeometry args={[0.035, 0.03, pressed ? 0.02 : 0.03, 16]} />
+        <primitive object={securityMaterials.emergencyRed} attach="material" />
+      </mesh>
+      
+      {/* Button top (dome) */}
+      <mesh position={[0, 0, pressed ? 0.04 : 0.06]}>
+        <sphereGeometry args={[0.03, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <primitive object={securityMaterials.emergencyRed} attach="material" />
+      </mesh>
+      
+      {/* STOP text (simplified as white ring) */}
+      <mesh position={[0, 0, pressed ? 0.042 : 0.062]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.02, 0.003, 8, 16]} />
+        <meshStandardMaterial color="#ffffff" />
+      </mesh>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BADGE READER 3D - Access control reader
+// Lecteur de badge RFID avec LED status
+// ═══════════════════════════════════════════════════════════════════════════
+const BadgeReader3D = memo(function BadgeReader3D({ 
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  status = 'idle',        // 'idle' | 'granted' | 'denied'
+}: { 
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  status?: 'idle' | 'granted' | 'denied';
+}) {
+  const ledMaterial = useMemo(() => {
+    switch (status) {
+      case 'granted': return securityMaterials.ledGreen;
+      case 'denied': return securityMaterials.ledRed;
+      default: return new THREE.MeshStandardMaterial({ color: '#374151', metalness: 0.5, roughness: 0.5 });
+    }
+  }, [status]);
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Main housing */}
+      <mesh castShadow>
+        <boxGeometry args={[0.08, 0.12, 0.025]} />
+        <primitive object={securityMaterials.badgeReader} attach="material" />
+      </mesh>
+      
+      {/* Front panel (lighter) */}
+      <mesh position={[0, 0, 0.014]}>
+        <boxGeometry args={[0.07, 0.11, 0.003]} />
+        <meshStandardMaterial color="#374151" metalness={0.4} roughness={0.6} />
+      </mesh>
+      
+      {/* Card scan area */}
+      <mesh position={[0, -0.01, 0.016]}>
+        <boxGeometry args={[0.055, 0.06, 0.002]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.3} roughness={0.7} />
+      </mesh>
+      
+      {/* Status LED */}
+      <mesh position={[0, 0.04, 0.016]}>
+        <sphereGeometry args={[0.008, 12, 12]} />
+        <primitive object={ledMaterial} attach="material" />
+      </mesh>
+      
+      {/* LED housing ring */}
+      <mesh position={[0, 0.04, 0.014]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.01, 0.002, 8, 16]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* Keypad (4 buttons) */}
+      {[[-0.015, 0.02], [0.015, 0.02], [-0.015, 0], [0.015, 0]].map(([x, y], i) => (
+        <mesh key={`btn-${i}`} position={[x, y - 0.04, 0.016]}>
+          <boxGeometry args={[0.018, 0.015, 0.003]} />
+          <meshStandardMaterial color="#52525b" metalness={0.4} roughness={0.6} />
+        </mesh>
+      ))}
+      
+      {/* Mounting screws */}
+      {[[0.03, 0.05], [-0.03, 0.05], [0.03, -0.05], [-0.03, -0.05]].map(([x, y], i) => (
+        <mesh key={`screw-${i}`} position={[x, y, 0.016]}>
+          <cylinderGeometry args={[0.004, 0.004, 0.004, 8]} />
+          <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.2} />
+        </mesh>
+      ))}
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FIRE EXTINGUISHER 3D - Extincteur CO2
+// Rouge avec manomètre et flexible (Norme NF EN 3)
+// ═══════════════════════════════════════════════════════════════════════════
+const FireExtinguisher3D = memo(function FireExtinguisher3D({ 
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  type = 'CO2',           // 'CO2' | 'powder' | 'water'
+  wallMounted = true,
+}: { 
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  type?: 'CO2' | 'powder' | 'water';
+  wallMounted?: boolean;
+}) {
+  const h = 0.6;  // 600mm height
+  const r = 0.08; // 80mm radius
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Wall bracket (if mounted) */}
+      {wallMounted && (
+        <group position={[0, h * 0.4, -0.08]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.15, 0.25, 0.03]} />
+            <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
+          </mesh>
+          {/* Hook */}
+          <mesh position={[0, 0.08, 0.04]} castShadow>
+            <boxGeometry args={[0.12, 0.04, 0.06]} />
+            <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
+          </mesh>
+        </group>
+      )}
+      
+      {/* Main cylinder */}
+      <mesh position={[0, h/2, 0]} castShadow>
+        <cylinderGeometry args={[r, r, h, 16]} />
+        <primitive object={securityMaterials.extincteurRed} attach="material" />
+      </mesh>
+      
+      {/* Bottom dome */}
+      <mesh position={[0, 0, 0]}>
+        <sphereGeometry args={[r, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+        <primitive object={securityMaterials.extincteurRed} attach="material" />
+      </mesh>
+      
+      {/* Top valve assembly */}
+      <mesh position={[0, h + 0.03, 0]} castShadow>
+        <cylinderGeometry args={[0.04, 0.05, 0.08, 12]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+      </mesh>
+      
+      {/* Pressure gauge */}
+      <mesh position={[0.05, h + 0.02, 0]} rotation={[0, 0, Math.PI / 4]} castShadow>
+        <cylinderGeometry args={[0.02, 0.02, 0.015, 12]} />
+        <meshStandardMaterial color="#f5f5f5" metalness={0.3} roughness={0.7} />
+      </mesh>
+      
+      {/* Handle/trigger */}
+      <mesh position={[0, h + 0.08, 0.03]} castShadow>
+        <boxGeometry args={[0.06, 0.04, 0.02]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* Lever */}
+      <mesh position={[0, h + 0.11, 0.02]} rotation={[0.3, 0, 0]} castShadow>
+        <boxGeometry args={[0.08, 0.015, 0.05]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* Hose connector */}
+      <mesh position={[0.04, h + 0.04, -0.02]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.012, 0.012, 0.04, 8]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.5} />
+      </mesh>
+      
+      {/* Label band (white with type text) */}
+      <mesh position={[0, h * 0.6, r + 0.002]}>
+        <boxGeometry args={[r * 1.5, 0.12, 0.002]} />
+        <meshStandardMaterial color="#ffffff" />
+      </mesh>
+      
+      {/* Type indicator */}
+      {type === 'CO2' && (
+        <mesh position={[0, h * 0.35, r + 0.003]}>
+          <boxGeometry args={[0.05, 0.03, 0.001]} />
+          <meshStandardMaterial color="#1f2937" />
+        </mesh>
+      )}
+      
+      {/* Safety pin */}
+      <mesh position={[-0.03, h + 0.1, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.015, 0.003, 6, 12]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.5} roughness={0.5} />
+      </mesh>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVACUATION ARROW 3D - Floor marking for evacuation routes
+// Green arrow with phosphorescent effect
+// ═══════════════════════════════════════════════════════════════════════════
+const EvacuationArrow3D = memo(function EvacuationArrow3D({ 
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  size = 600,             // mm
+}: { 
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  size?: number;
+}) {
+  const s = size / 1000;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Arrow body */}
+      <mesh position={[0, 0.005, -s * 0.15]} rotation={[-Math.PI / 2, 0, 0]}>
+        <boxGeometry args={[s * 0.25, s * 0.5, 0.01]} />
+        <primitive object={securityMaterials.evacGreen} attach="material" />
+      </mesh>
+      
+      {/* Arrow head */}
+      <mesh position={[0, 0.005, s * 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[s * 0.3, s * 0.35, 3]} />
+        <primitive object={securityMaterials.evacGreen} attach="material" />
+      </mesh>
+    </group>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RMU 3D - Ring Main Unit (Cellule HT compacte)
+// Schneider RM6 style - compact MV switchgear
+// ═══════════════════════════════════════════════════════════════════════════
+const RMU3D = memo(function RMU3D({ 
+  dimensions = { width: 1200, height: 1800, depth: 900 },
+  position = [0, 0, 0] as [number, number, number],
+  rotation = [0, 0, 0] as [number, number, number],
+  functions = 3,          // Number of functions (2-6)
+}: { 
+  dimensions?: { width: number; height: number; depth: number };
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  functions?: number;
+}) {
+  const w = dimensions.width / 1000;
+  const h = dimensions.height / 1000;
+  const d = dimensions.depth / 1000;
+  
+  const funcWidth = w / functions;
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Main cabinet */}
+      <mesh position={[0, h/2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w, h, d]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+      </mesh>
+      
+      {/* Front panels (per function) */}
+      {Array.from({ length: functions }).map((_, i) => {
+        const xPos = -w/2 + funcWidth/2 + i * funcWidth;
+        return (
+          <group key={`func-${i}`} position={[xPos, h/2, d/2 + 0.005]}>
+            {/* Panel */}
+            <mesh castShadow>
+              <boxGeometry args={[funcWidth * 0.9, h * 0.85, 0.01]} />
+              <meshStandardMaterial color="#374151" metalness={0.5} roughness={0.5} />
+            </mesh>
+            
+            {/* Function indicator window */}
+            <mesh position={[0, h * 0.25, 0.006]}>
+              <boxGeometry args={[funcWidth * 0.5, 0.08, 0.005]} />
+              <meshStandardMaterial color="#0f172a" />
+            </mesh>
+            
+            {/* Status LED */}
+            <mesh position={[funcWidth * 0.3, h * 0.35, 0.008]}>
+              <sphereGeometry args={[0.01, 8, 8]} />
+              <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} />
+            </mesh>
+            
+            {/* Operating handle */}
+            <mesh position={[0, 0, 0.015]} castShadow>
+              <cylinderGeometry args={[0.03, 0.03, 0.04, 8]} />
+              <meshStandardMaterial color="#dc2626" metalness={0.4} roughness={0.6} />
+            </mesh>
+            
+            {/* Handle lever */}
+            <mesh position={[0, 0, 0.04]} rotation={[0, 0, 0]} castShadow>
+              <boxGeometry args={[0.08, 0.02, 0.015]} />
+              <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+            </mesh>
+          </group>
+        );
+      })}
+      
+      {/* Cable entry (bottom) */}
+      {Array.from({ length: functions }).map((_, i) => {
+        const xPos = -w/2 + funcWidth/2 + i * funcWidth;
+        return (
+          <mesh key={`cable-${i}`} position={[xPos, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.04, 0.04, 0.15, 12]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.5} />
+          </mesh>
+        );
+      })}
+      
+      {/* Top vent */}
+      <mesh position={[0, h + 0.02, 0]} castShadow>
+        <boxGeometry args={[w * 0.8, 0.04, d * 0.6]} />
+        <meshStandardMaterial color="#4b5563" metalness={0.5} roughness={0.5} />
+      </mesh>
+      
+      {/* Nameplate */}
+      <mesh position={[0, h * 0.85, d/2 + 0.008]}>
+        <boxGeometry args={[w * 0.5, 0.06, 0.003]} />
+        <meshStandardMaterial color="#f5f5f5" />
+      </mesh>
+      
+      {/* HV warning sign */}
+      <DangerSign3D 
+        position={[-w/3, h * 0.6, d/2 + 0.015]}
+        type="high-voltage"
+        size={200}
+      />
+      
+      {/* Earth terminal */}
+      <mesh position={[w/2 - 0.08, 0.15, d/2 + 0.01]}>
+        <cylinderGeometry args={[0.015, 0.015, 0.02, 8]} />
+        <meshStandardMaterial color="#22c55e" metalness={0.6} roughness={0.4} />
+      </mesh>
+    </group>
+  );
+});
+
 // Export individual components for use in scene
 export { 
   SolarCanopy, 
@@ -2986,4 +3894,13 @@ export {
   CeilingTrapeze,
   JunctionBox,
   CableRoutingSystem,
+  // Security & Safety Equipment
+  SecurityZone3D,
+  SecurityFence3D,
+  DangerSign3D,
+  EmergencyStop3D,
+  BadgeReader3D,
+  FireExtinguisher3D,
+  EvacuationArrow3D,
+  RMU3D,
 };

@@ -698,6 +698,61 @@ Le Genie génère automatiquement un BOM complet avec :
 - 📊 Estimation installation (15% du matériel)
 - 💵 Total projet en temps réel
 
+### 🔌 Système de Câblage Intelligent
+
+Le Designer intègre un système de câblage professionnel pour tracer les chemins de câbles électriques et data.
+
+#### Snap Points par Équipement
+Chaque équipement a des points de connexion prédéfinis :
+
+| Équipement | Points de Connexion |
+|------------|---------------------|
+| **Container HD5** | Toit (4 points), Panneaux latéraux (2), Terre |
+| **Cooling EC2-DT** | Alimentation ventilateurs, Contrôle, Bus data, Terre |
+| **Transformateur** | Sortie HT, Sortie BT, Terre, Neutre, Contrôle |
+| **PDU** | Entrée principale, Sorties circuits (3), Sortie toit, Terre, Monitoring |
+| **Générateur** | Sortie puissance, Neutre, Contrôle démarrage, Terre |
+| **Switchgear** | Entrée HT, Départs BT (3), Terre, Bus communication |
+
+#### Types de Connexion (Couleurs)
+| Type | Couleur | Usage |
+|------|---------|-------|
+| `power-ht` | 🔴 Rouge | Haute tension |
+| `power-bt` | 🟠 Orange | Basse tension |
+| `data` | 🔵 Bleu | Réseau data |
+| `control` | 🟣 Violet | Câbles de contrôle |
+| `earth` | 🟢 Vert | Mise à terre |
+
+#### Système de Zones
+- **Zone de passage** : Hauteur minimum 3m pour allées
+- **Zone technique** : Hauteur selon équipement + clearance
+- **Zone interdite** : Pas de câbles (sorties air chaud, radiateurs, accès maintenance)
+
+#### Calcul Automatique de Hauteur
+Le système calcule automatiquement la hauteur optimale des câbles selon :
+- Hauteur des équipements traversés
+- Clearance minimum (0.3m au-dessus des équipements)
+- Points de connexion départ/arrivée
+- Hauteur max configurable (6m par défaut)
+
+#### Types de Chemins de Câbles
+| Type | Largeur | Usage |
+|------|---------|-------|
+| **Ladder (Échelle)** | 300-600mm | Câbles de puissance |
+| **Wire Mesh (Grillagé)** | 200mm | Câbles data/réseau |
+| **Conduit** | 50mm | Câbles de contrôle individuels |
+| **Busbar** | 100mm | Jeu de barres haute tension |
+
+#### Raccourcis Câblage
+| Touche | Action |
+|--------|--------|
+| P | Mode Tracer |
+| V | Mode Sélection |
+| S | Toggle Snap magnétique |
+| G | Toggle Grille |
+| Entrée | Terminer tracé |
+| Échap | Annuler tracé |
+
 ### 3D Editor Pro Tools (DÉBRIDÉ)
 
 #### Outils de Visualisation
@@ -862,6 +917,12 @@ cd frontend && npm run build && npm start
 - `components/designer/toolbar.tsx` - Barre d'outils flottante bottom
 - `components/designer/object-3d-editor.tsx` - Composants 3D Three.js
 - `components/designer/object-3d-preview.tsx` - Preview 3D pour cartes
+
+### Frontend Components - Câblage Intelligent (New)
+- `components/designer/cable-snap-points.ts` - Définitions snap points par type d'équipement
+- `components/designer/cable-zone-manager.ts` - Gestion zones et calcul hauteurs automatiques
+- `components/designer/cable-routing-tool.tsx` - Panneau UI de routage de câbles
+- `components/designer/cable-3d-renderer.tsx` - Rendu 3D des chemins de câbles
 
 ### Frontend Components (Core)
 - `components/ErrorBoundary.tsx` - React error boundary

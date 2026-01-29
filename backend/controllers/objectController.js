@@ -10,7 +10,7 @@ const { supabase } = require('../config/supabase');
 const logger = require('../utils/logger');
 
 // Categories disponibles (pour validation)
-const VALID_CATEGORIES = ['racks', 'pdu', 'cooling', 'networking', 'containers', 'transformers', 'powerblocks', 'modules'];
+const VALID_CATEGORIES = ['racks', 'pdu', 'cooling', 'networking', 'containers', 'transformers', 'powerblocks', 'modules', 'security', 'solar'];
 
 // Object subtypes with default properties
 const OBJECT_SUBTYPES = {
@@ -478,6 +478,116 @@ const OBJECT_SUBTYPES = {
       description: 'Fiber Patch Panel',
       dimensions: { width: 440, height: 44, depth: 200 },
       ports: 24
+    }
+  },
+  security: {
+    'rmu-3-func': {
+      description: 'Ring Main Unit 3 fonctions (Cellule HT)',
+      manufacturer: 'Schneider/ABB',
+      model: 'RM6/SM6',
+      dimensions: { width: 1200, height: 1800, depth: 900 },
+      voltage: 33000,
+      functions: 3,
+      type: 'rmu',
+      certifications: ['IEC 62271', 'IEEE C37'],
+      color: '#1f2937'
+    },
+    'rmu-6-func': {
+      description: 'Ring Main Unit 6 fonctions (Cellule HT)',
+      manufacturer: 'Schneider/ABB',
+      model: 'RM6/SM6',
+      dimensions: { width: 2400, height: 1800, depth: 900 },
+      voltage: 33000,
+      functions: 6,
+      type: 'rmu',
+      certifications: ['IEC 62271', 'IEEE C37'],
+      color: '#1f2937'
+    },
+    'security-zone-ht': {
+      description: 'Zone de sécurité HT (marquage au sol)',
+      dimensions: { width: 6000, height: 10, depth: 6000 },
+      zoneType: 'HT',
+      type: 'zone-ht',
+      norme: 'NF C 15-100',
+      color: '#dc2626'
+    },
+    'security-zone-bt': {
+      description: 'Zone de sécurité BT (marquage au sol)',
+      dimensions: { width: 4000, height: 10, depth: 3000 },
+      zoneType: 'BT',
+      type: 'zone-bt',
+      norme: 'NF C 15-100',
+      color: '#f97316'
+    },
+    'security-fence-6m': {
+      description: 'Grillage de sécurité 6m avec portillon',
+      dimensions: { width: 6000, height: 2000, depth: 60 },
+      withGate: true,
+      gateWidth: 1200,
+      type: 'grillage',
+      norme: 'NF C 13-200',
+      color: '#71717a'
+    },
+    'security-fence-12m': {
+      description: 'Grillage de sécurité 12m avec portillon',
+      dimensions: { width: 12000, height: 2000, depth: 60 },
+      withGate: true,
+      gateWidth: 1200,
+      type: 'grillage',
+      norme: 'NF C 13-200',
+      color: '#71717a'
+    },
+    'fire-extinguisher-co2': {
+      description: 'Extincteur CO2 5kg (mural)',
+      dimensions: { width: 160, height: 600, depth: 160 },
+      type: 'extincteur',
+      extinguisherType: 'CO2',
+      capacity: 5,
+      norme: 'NF EN 3',
+      color: '#b91c1c'
+    },
+    'danger-sign-electrical': {
+      description: 'Panneau Danger Électrique',
+      dimensions: { width: 400, height: 400, depth: 10 },
+      signType: 'electrical',
+      type: 'danger',
+      norme: 'ISO 7010 W012',
+      color: '#fbbf24'
+    },
+    'emergency-stop': {
+      description: 'Arrêt d\'urgence coup de poing',
+      dimensions: { width: 120, height: 120, depth: 80 },
+      type: 'arret-urgence',
+      norme: 'IEC 60947-5-5',
+      color: '#dc2626'
+    },
+    'badge-reader': {
+      description: 'Lecteur de badge RFID',
+      dimensions: { width: 80, height: 120, depth: 25 },
+      type: 'badge-reader',
+      color: '#1e3a5f'
+    }
+  },
+  solar: {
+    'solar-canopy-8x': {
+      description: 'Ombrière solaire 8 containers (40×25m)',
+      dimensions: { width: 40000, height: 2000, depth: 25000 },
+      containerCapacity: 8,
+      extractorOpenings: 8,
+      clearanceAboveCooling: 4000,
+      panelAngle: 25,
+      type: 'canopy',
+      color: '#1e3a5f'
+    },
+    'solar-canopy-16x': {
+      description: 'Ombrière solaire 16 containers (60×35m)',
+      dimensions: { width: 60000, height: 2000, depth: 35000 },
+      containerCapacity: 16,
+      extractorOpenings: 16,
+      clearanceAboveCooling: 4000,
+      panelAngle: 25,
+      type: 'canopy',
+      color: '#1e3a5f'
     }
   }
 };

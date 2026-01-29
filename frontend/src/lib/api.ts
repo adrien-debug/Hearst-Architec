@@ -285,6 +285,7 @@ export interface Object3D {
   id: string;
   name: string;
   type: string;
+  objectType?: string;
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };
   scale: { x: number; y: number; z: number };
@@ -425,6 +426,18 @@ export const objectsApi = {
         { id: 'canopy-2-containers', name: 'Canopy Solaire 2 Containers', type: 'solar-canopy', dimensions: { width: 22000, height: 2000, depth: 10000 }, color: '#1e3a5f', description: '2 containers (1×2) - 22m×10m - 2 ouvertures extraction' },
         { id: 'canopy-parking', name: 'Ombrière Parking Solaire', type: 'solar-canopy', dimensions: { width: 20000, height: 2000, depth: 10000 }, color: '#1e3a5f', description: 'Ombrière parking - 20m×10m - panneaux solaires' },
       ],
+      security: [
+        { id: 'rmu-3-func', name: 'RMU 3 fonctions (Cellule HT)', type: 'rmu', dimensions: { width: 1200, height: 1800, depth: 900 }, color: '#1f2937', description: 'Ring Main Unit 33kV - 3 fonctions - Schneider/ABB' },
+        { id: 'rmu-6-func', name: 'RMU 6 fonctions (Cellule HT)', type: 'rmu', dimensions: { width: 2400, height: 1800, depth: 900 }, color: '#1f2937', description: 'Ring Main Unit 33kV - 6 fonctions - Schneider/ABB' },
+        { id: 'security-zone-ht', name: 'Zone de sécurité HT', type: 'zone-ht', dimensions: { width: 6000, height: 10, depth: 6000 }, color: '#dc2626', description: 'Marquage au sol zone HT - NF C 15-100' },
+        { id: 'security-zone-bt', name: 'Zone de sécurité BT', type: 'zone-bt', dimensions: { width: 4000, height: 10, depth: 3000 }, color: '#f97316', description: 'Marquage au sol zone BT - NF C 15-100' },
+        { id: 'security-fence-6m', name: 'Grillage sécurité 6m + portillon', type: 'grillage', dimensions: { width: 6000, height: 2000, depth: 60 }, color: '#71717a', description: 'Grillage acier H=2m avec portillon - NF C 13-200' },
+        { id: 'security-fence-12m', name: 'Grillage sécurité 12m + portillon', type: 'grillage', dimensions: { width: 12000, height: 2000, depth: 60 }, color: '#71717a', description: 'Grillage acier H=2m avec portillon - NF C 13-200' },
+        { id: 'fire-extinguisher-co2', name: 'Extincteur CO2 5kg', type: 'extincteur', dimensions: { width: 160, height: 600, depth: 160 }, color: '#b91c1c', description: 'Extincteur CO2 mural - NF EN 3' },
+        { id: 'danger-sign-electrical', name: 'Panneau Danger Électrique', type: 'danger', dimensions: { width: 400, height: 400, depth: 10 }, color: '#fbbf24', description: 'Panneau danger électrique - ISO 7010 W012' },
+        { id: 'emergency-stop', name: 'Arrêt d\'urgence', type: 'arret-urgence', dimensions: { width: 120, height: 120, depth: 80 }, color: '#dc2626', description: 'Coup de poing arrêt urgence - IEC 60947-5-5' },
+        { id: 'badge-reader', name: 'Lecteur de badge RFID', type: 'badge-reader', dimensions: { width: 80, height: 120, depth: 25 }, color: '#1e3a5f', description: 'Lecteur badge contrôle accès' },
+      ],
       modules: [],
       powerblocks: [],
     };
@@ -442,7 +455,7 @@ export const objectsApi = {
       // Group templates by category for library display
       const grouped: { [key: string]: InfraObject[] } = {
         racks: [], pdu: [], cooling: [], networking: [],
-        containers: [], transformers: [], powerblocks: [], modules: [], solar: []
+        containers: [], transformers: [], powerblocks: [], modules: [], solar: [], security: []
       };
       
       for (const template of response.data || []) {

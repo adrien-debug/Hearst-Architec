@@ -112,12 +112,29 @@ export interface CableRoutingState {
   gridSize: number;
 }
 
+// Import des types pour snap points intelligents
+import type { WorldSnapPoint, ConnectionType } from './cable-snap-points';
+import type { CableZone } from './cable-zone-manager';
+
 interface CableRoutingToolProps {
   routes: CableRoute[];
   onRoutesChange: (routes: CableRoute[]) => void;
   snapPoints: SnapPoint[];
   selectedObjectIds: string[];
   onClose?: () => void;
+  activeRouteId?: string | null;
+  onActiveRouteChange?: (routeId: string | null) => void;
+  onDrawingStateChange?: (isDrawing: boolean, points: THREE.Vector3[]) => void;
+  // Nouvelles props pour snap points intelligents
+  intelligentSnapPoints?: WorldSnapPoint[];
+  cableZones?: CableZone[];
+  onSnapPointSelect?: (snapPoint: WorldSnapPoint | null) => void;
+  selectedSnapPoint?: WorldSnapPoint | null;
+  onFilterTypesChange?: (types: ConnectionType[]) => void;
+  onHeightChange?: (height: number) => void;
+  currentHeight?: number;
+  showForbiddenZones?: boolean;
+  onShowForbiddenZonesChange?: (show: boolean) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -339,7 +356,20 @@ export default function CableRoutingTool({
   onRoutesChange,
   snapPoints,
   selectedObjectIds,
-  onClose
+  onClose,
+  activeRouteId: externalActiveRouteId,
+  onActiveRouteChange,
+  onDrawingStateChange,
+  // Nouvelles props
+  intelligentSnapPoints = [],
+  cableZones = [],
+  onSnapPointSelect,
+  selectedSnapPoint,
+  onFilterTypesChange,
+  onHeightChange,
+  currentHeight = 3.5,
+  showForbiddenZones = false,
+  onShowForbiddenZonesChange,
 }: CableRoutingToolProps) {
   // ─────────────────────────────────────────────────────────────────────────
   // STATE
@@ -347,7 +377,7 @@ export default function CableRoutingTool({
   
   const [state, setState] = useState<CableRoutingState>({
     mode: 'draw',
-    activeRouteId: null,
+    activeRouteId: externalActiveRouteId || null,
     selectedSegmentIds: [],
     selectedPointIds: [],
     isDrawing: false,
@@ -368,6 +398,20 @@ export default function CableRoutingTool({
   const [activePreset, setActivePreset] = useState<keyof typeof TRAY_PRESETS>('power-branch');
   const [showSettings, setShowSettings] = useState(false);
   const [showRouteList, setShowRouteList] = useState(true);
+  const [showSnapPointsPanel, setShowSnapPointsPanel] = useState(false);
+  const [filterTypes, setFilterTypes] = useState<ConnectionType[]>([]);
+  const [autoHeight, setAutoHeight] = useState(true);
+  
+  // Sync activeRouteId with parent - always emit on change
+  useEffect(() => {
+    console.log('🔄 CableRoutingTool activeRouteId changed:', state.activeRouteId);
+    if (onActiveRouteChange) {
+      onActiveRouteChange(state.activeRouteId);
+    }
+  }, [state.activeRouteId, onActiveRouteChange]);
+  
+  // NOTE: Drawing state is managed by parent (page.tsx) via floor clicks
+  // We don't sync drawingPoints from here to avoid overwriting parent state
   
   // ─────────────────────────────────────────────────────────────────────────
   // COMPUTED VALUES
@@ -923,6 +967,148 @@ export default function CableRoutingTool({
           </div>
         )}
       </div>
+      
+      {/* ═══ SNAP POINTS INTELLIGENTS ═══ */}
+      {intelligentSnapPoints.length > 0 && (
+        <div className="border-b border-slate-200">
+          <button
+            onClick={() => setShowSnapPointsPanel(!showSnapPointsPanel)}
+            className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50"
+          >
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-500" />
+              <span className="text-sm font-medium">Points de Connexion ({intelligentSnapPoints.length})</span>
+            </div>
+            {showSnapPointsPanel ? (
+              <ChevronUp className="w-4 h-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            )}
+          </button>
+          
+          {showSnapPointsPanel && (
+            <div className="px-3 pb-3 space-y-2">
+              {/* Filtres par type */}
+              <div>
+                <p className="text-xs text-slate-500 font-medium mb-1.5">FILTRER PAR TYPE</p>
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { type: 'power-ht' as ConnectionType, label: 'HT', color: '#dc2626' },
+                    { type: 'power-bt' as ConnectionType, label: 'BT', color: '#f97316' },
+                    { type: 'data' as ConnectionType, label: 'Data', color: '#3b82f6' },
+                    { type: 'control' as ConnectionType, label: 'Ctrl', color: '#8b5cf6' },
+                    { type: 'earth' as ConnectionType, label: 'Terre', color: '#22c55e' },
+                  ].map(({ type, label, color }) => {
+                    const isActive = filterTypes.includes(type);
+                    const count = intelligentSnapPoints.filter(sp => sp.connectionType === type).length;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          const newTypes = isActive 
+                            ? filterTypes.filter(t => t !== type)
+                            : [...filterTypes, type];
+                          setFilterTypes(newTypes);
+                          onFilterTypesChange?.(newTypes);
+                        }}
+                        className={`
+                          flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all
+                          ${isActive 
+                            ? 'text-white shadow-sm' 
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
+                        `}
+                        style={isActive ? { backgroundColor: color } : undefined}
+                      >
+                        <div 
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: isActive ? 'white' : color }}
+                        />
+                        {label}
+                        <span className="opacity-60">({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Snap point sélectionné */}
+              {selectedSnapPoint && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-sm"
+                        style={{ 
+                          backgroundColor: 
+                            selectedSnapPoint.connectionType === 'power-ht' ? '#dc2626' :
+                            selectedSnapPoint.connectionType === 'power-bt' ? '#f97316' :
+                            selectedSnapPoint.connectionType === 'data' ? '#3b82f6' :
+                            selectedSnapPoint.connectionType === 'control' ? '#8b5cf6' :
+                            '#22c55e'
+                        }}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-emerald-800">{selectedSnapPoint.label}</p>
+                        <p className="text-xs text-emerald-600">{selectedSnapPoint.objectName}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => onSnapPointSelect?.(null)}
+                      className="p-1 hover:bg-emerald-100 rounded"
+                    >
+                      <X className="w-3 h-3 text-emerald-600" />
+                    </button>
+                  </div>
+                  <div className="mt-2 flex items-center gap-3 text-xs text-emerald-700">
+                    <span>Largeur: {selectedSnapPoint.cableWidth}mm</span>
+                    <span>Capacité: {selectedSnapPoint.currentCables}/{selectedSnapPoint.maxCables}</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Hauteur du câble */}
+              <div className="bg-slate-50 rounded-lg p-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-slate-600 font-medium">HAUTEUR CÂBLES</span>
+                  <label className="flex items-center gap-1 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoHeight}
+                      onChange={(e) => setAutoHeight(e.target.checked)}
+                      className="rounded border-slate-300 text-emerald-500"
+                    />
+                    Auto
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="1"
+                    max="6"
+                    step="0.1"
+                    value={currentHeight}
+                    onChange={(e) => onHeightChange?.(parseFloat(e.target.value))}
+                    disabled={autoHeight}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-mono w-12 text-right">{currentHeight.toFixed(1)}m</span>
+                </div>
+              </div>
+              
+              {/* Zones interdites */}
+              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showForbiddenZones}
+                  onChange={(e) => onShowForbiddenZonesChange?.(e.target.checked)}
+                  className="rounded border-slate-300 text-red-500"
+                />
+                <span className="text-slate-600">Afficher zones interdites</span>
+              </label>
+            </div>
+          )}
+        </div>
+      )}
       
       {/* ═══ STATS ═══ */}
       <div className="px-3 py-2 bg-slate-50">

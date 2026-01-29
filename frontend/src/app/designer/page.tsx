@@ -21,6 +21,18 @@ import PropertiesPanel, { Object3D } from '@/components/designer/properties-pane
 import Toolbar, { Tool, TransformMode } from '@/components/designer/toolbar';
 import CableRoutingTool, { CableRoute, SnapPoint } from '@/components/designer/cable-routing-tool';
 import CableScene from '@/components/designer/cable-3d-renderer';
+import { 
+  generateSnapPointsForObject, 
+  WorldSnapPoint, 
+  ConnectionType,
+} from '@/components/designer/cable-snap-points';
+import { 
+  generateCableZones, 
+  calculateOptimalHeight,
+  CableZone,
+  SimpleObject,
+  DEFAULT_HEIGHT_CONFIG,
+} from '@/components/designer/cable-zone-manager';
 // Smart Alignment désactivé - à reconstruire proprement
 // import SmartAlignmentPanel from '@/components/designer/smart-alignment-panel';
 // import { analyzeScene, SceneObject } from '@/lib/smart-alignment';
@@ -1380,6 +1392,18 @@ function Scene({
   cableIsDrawing = false,
   cableDefaultWidth = 300,
   cableDefaultHeight = 100,
+  onFloorClick,
+  showCableRouting = false,
+  // Nouvelles props pour snap points intelligents
+  intelligentSnapPoints = [],
+  activeIntelligentSnapPointId = null,
+  hoveredSnapPointId = null,
+  onIntelligentSnapPointClick,
+  filterConnectionTypes,
+  cableZones = [],
+  showForbiddenZones = false,
+  showHeightIndicator = false,
+  currentCableHeight = 3.5,
 }: {
   objects: Object3D[];
   selectedIds: string[];
@@ -1409,9 +1433,29 @@ function Scene({
   cableIsDrawing?: boolean;
   cableDefaultWidth?: number;
   cableDefaultHeight?: number;
+  onFloorClick?: (point: THREE.Vector3) => void;
+  showCableRouting?: boolean;
+  // Nouvelles props pour snap points intelligents
+  intelligentSnapPoints?: WorldSnapPoint[];
+  activeIntelligentSnapPointId?: string | null;
+  hoveredSnapPointId?: string | null;
+  onIntelligentSnapPointClick?: (snapPoint: WorldSnapPoint) => void;
+  filterConnectionTypes?: ConnectionType[];
+  cableZones?: CableZone[];
+  showForbiddenZones?: boolean;
+  showHeightIndicator?: boolean;
+  currentCableHeight?: number;
 }) {
-  const handleFloorClick = () => {
-    // Deselect by passing empty string - handled in parent
+  const handleFloorClick = (e: any) => {
+    console.log('🖱️ Floor click - showCableRouting:', showCableRouting, 'point:', e.point);
+    // If cable routing mode is active, capture the click point
+    if (showCableRouting && onFloorClick && e.point) {
+      e.stopPropagation();
+      console.log('📍 Forwarding to cable handler');
+      onFloorClick(e.point.clone());
+      return;
+    }
+    // Otherwise deselect
     onSelect('', false);
   };
 
@@ -1683,7 +1727,7 @@ function Scene({
       ))}
       
       {/* Cable Routing 3D Visualization */}
-      {cableRoutes.length > 0 && (
+      {(cableRoutes.length > 0 || cableIsDrawing || showCableRouting) && (
         <CableScene
           routes={cableRoutes}
           selectedSegmentIds={cableSelectedSegments}
@@ -1699,6 +1743,16 @@ function Scene({
           isDrawing={cableIsDrawing}
           defaultWidth={cableDefaultWidth}
           defaultHeight={cableDefaultHeight}
+          // Nouvelles props pour snap points intelligents
+          intelligentSnapPoints={intelligentSnapPoints}
+          activeIntelligentSnapPointId={activeIntelligentSnapPointId}
+          hoveredSnapPointId={hoveredSnapPointId}
+          onIntelligentSnapPointClick={onIntelligentSnapPointClick}
+          filterConnectionTypes={filterConnectionTypes}
+          cableZones={cableZones}
+          showForbiddenZones={showForbiddenZones}
+          showHeightIndicator={showHeightIndicator}
+          currentHeight={currentCableHeight}
         />
       )}
 
@@ -2039,6 +2093,125 @@ export default function DesignerPage() {
   const [cableIsDrawing, setCableIsDrawing] = useState(false);
   const [cableSelectedSegments, setCableSelectedSegments] = useState<string[]>([]);
   const [cableSelectedPoints, setCableSelectedPoints] = useState<string[]>([]);
+  const [cableActiveRouteId, setCableActiveRouteId] = useState<string | null>(null);
+  
+  // Intelligent snap points & zones state
+  const [intelligentSnapPoints, setIntelligentSnapPoints] = useState<WorldSnapPoint[]>([]);
+  const [cableZones, setCableZones] = useState<CableZone[]>([]);
+  const [selectedIntelligentSnapPoint, setSelectedIntelligentSnapPoint] = useState<WorldSnapPoint | null>(null);
+  const [hoveredSnapPointId, setHoveredSnapPointId] = useState<string | null>(null);
+  const [filterConnectionTypes, setFilterConnectionTypes] = useState<ConnectionType[]>([]);
+  const [currentCableHeight, setCurrentCableHeight] = useState(3.5);
+  const [showForbiddenZones, setShowForbiddenZones] = useState(false);
+  const [autoCalculateHeight, setAutoCalculateHeight] = useState(true);
+  
+  // Cable floor click handler - using ref to track points synchronously
+  const cableDrawingPointsRef = useRef<THREE.Vector3[]>([]);
+  
+  // Reset ref when cable routing is toggled off
+  useEffect(() => {
+    if (!showCableRouting) {
+      cableDrawingPointsRef.current = [];
+      setCableDrawingPoints([]);
+      setCableIsDrawing(false);
+    }
+  }, [showCableRouting]);
+  
+  const handleCableFloorClick = useCallback((point: THREE.Vector3) => {
+    console.log('🔌 Cable floor click - showCableRouting:', showCableRouting, 'activeRouteId:', cableActiveRouteId);
+    
+    if (!showCableRouting) {
+      console.log('❌ Cable routing not active');
+      return;
+    }
+    
+    if (!cableActiveRouteId) {
+      console.log('⚠️ No active route - please create or select a route first');
+      return;
+    }
+    
+    // Calculer la hauteur optimale si auto-calcul activé
+    let height = currentCableHeight;
+    if (autoCalculateHeight && cableZones.length > 0) {
+      const lastPoint = cableDrawingPointsRef.current[cableDrawingPointsRef.current.length - 1];
+      if (lastPoint) {
+        const result = calculateOptimalHeight(lastPoint, point, cableZones, DEFAULT_HEIGHT_CONFIG);
+        height = result.height;
+        // Mettre à jour la hauteur courante
+        setCurrentCableHeight(height);
+      }
+    }
+    
+    // Set cable height to calculated or manual height
+    const cablePoint = new THREE.Vector3(point.x, height, point.z);
+    
+    // Get current points from ref (synchronous)
+    const currentPoints = [...cableDrawingPointsRef.current];
+    console.log('Cable click at:', cablePoint, 'currentPoints:', currentPoints.length);
+    
+    // Add new point to ref immediately (synchronous update)
+    cableDrawingPointsRef.current = [...currentPoints, cablePoint];
+    
+    // Also update state for rendering
+    setCableDrawingPoints(cableDrawingPointsRef.current);
+    setCableIsDrawing(true);
+    
+    // If we have at least 1 previous point, create a segment
+    if (currentPoints.length >= 1) {
+      const prevPoint = currentPoints[currentPoints.length - 1];
+      
+      setCableRoutes(prev => prev.map(route => {
+        if (route.id !== cableActiveRouteId) return route;
+        
+        const timestamp = Date.now();
+        const startPointId = `point-${timestamp}-start`;
+        const endPointId = `point-${timestamp}-end`;
+        
+        // Only add start point if this is the first segment
+        const newPoints = route.points.length === 0 
+          ? [
+              { id: startPointId, position: prevPoint.clone(), type: 'start' as const },
+              { id: endPointId, position: cablePoint.clone(), type: 'waypoint' as const },
+            ]
+          : [
+              ...route.points,
+              { id: endPointId, position: cablePoint.clone(), type: 'waypoint' as const },
+            ];
+        
+        // Get the actual start point ID for the segment
+        const actualStartPointId = route.points.length === 0 
+          ? startPointId 
+          : route.points[route.points.length - 1].id;
+        
+        const newSegment = {
+          id: `seg-${timestamp}`,
+          startPointId: actualStartPointId,
+          endPointId,
+          type: 'ladder' as const,
+          width: 300,
+          height: 100,
+          cableCount: 6,
+          cableTypes: ['power', 'earth'] as ('power' | 'earth')[],
+          color: '#71717a',
+          locked: false,
+          visible: true,
+        };
+        
+        const segmentLength = prevPoint.distanceTo(cablePoint);
+        
+        console.log('✅ Creating segment:', newSegment.id, 'length:', segmentLength.toFixed(2) + 'm');
+        
+        return {
+          ...route,
+          points: newPoints,
+          segments: [...route.segments, newSegment],
+          totalLength: route.totalLength + segmentLength,
+        };
+      }));
+    } else {
+      console.log('📍 First point placed - click again to create a segment');
+    }
+  }, [showCableRouting, cableActiveRouteId, autoCalculateHeight, cableZones, currentCableHeight]);
   
   // Project state
   const [projectName, setProjectName] = useState('Untitled Project');
@@ -2098,15 +2271,19 @@ export default function DesignerPage() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [showProjectSelector, setShowProjectSelector] = useState(false); // Disabled - access via Cloud button
   
-  // Generate snap points from objects for cable routing
+  // Generate snap points from objects for cable routing (legacy + intelligent)
   useEffect(() => {
+    // Legacy snap points (pour compatibilité)
     const snapPoints: SnapPoint[] = [];
+    // Intelligent snap points (nouveau système)
+    const intSnapPoints: WorldSnapPoint[] = [];
+    
     objects.forEach(obj => {
       const w = obj.dimensions.width / 2000;
       const h = obj.dimensions.height / 2000;
       const d = obj.dimensions.depth / 2000;
       
-      // Center point
+      // Legacy: Center point
       snapPoints.push({
         position: new THREE.Vector3(obj.position.x, obj.position.y + h, obj.position.z),
         objectId: obj.id,
@@ -2114,7 +2291,7 @@ export default function DesignerPage() {
         type: 'center',
       });
       
-      // Corner points (top of object)
+      // Legacy: Corner points (top of object)
       const corners = [
         [w, h, d], [-w, h, d], [w, h, -d], [-w, h, -d],
       ];
@@ -2127,7 +2304,7 @@ export default function DesignerPage() {
         });
       });
       
-      // Edge midpoints (for cable connections)
+      // Legacy: Edge midpoints (for cable connections)
       const edges = [
         [0, h, d], [0, h, -d], [w, h, 0], [-w, h, 0],
       ];
@@ -2139,8 +2316,33 @@ export default function DesignerPage() {
           type: 'edge',
         });
       });
+      
+      // Nouveau: Snap points intelligents par type d'équipement
+      const objSnapPoints = generateSnapPointsForObject(
+        obj.id,
+        obj.name,
+        obj.objectType || 'generic',
+        new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z),
+        new THREE.Euler(0, (obj.rotation?.y || 0) * Math.PI / 180, 0),
+        obj.dimensions
+      );
+      intSnapPoints.push(...objSnapPoints);
     });
+    
     setCableSnapPoints(snapPoints);
+    setIntelligentSnapPoints(intSnapPoints);
+    
+    // Générer les zones de câblage
+    const simpleObjects: SimpleObject[] = objects.map(obj => ({
+      id: obj.id,
+      name: obj.name,
+      objectType: obj.objectType || 'generic',
+      position: new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z),
+      rotation: new THREE.Euler(0, (obj.rotation?.y || 0) * Math.PI / 180, 0),
+      dimensions: obj.dimensions,
+    }));
+    const zones = generateCableZones(simpleObjects, DEFAULT_HEIGHT_CONFIG);
+    setCableZones(zones);
   }, [objects]);
   
   // Keyboard controls for moving objects
@@ -3200,6 +3402,18 @@ export default function DesignerPage() {
             cablePreviewPoint={cablePreviewPoint}
             cableSnapPoints={cableSnapPoints}
             cableIsDrawing={cableIsDrawing}
+            onFloorClick={handleCableFloorClick}
+            showCableRouting={showCableRouting}
+            // Nouvelles props pour snap points intelligents
+            intelligentSnapPoints={intelligentSnapPoints}
+            activeIntelligentSnapPointId={selectedIntelligentSnapPoint?.id || null}
+            hoveredSnapPointId={hoveredSnapPointId}
+            onIntelligentSnapPointClick={setSelectedIntelligentSnapPoint}
+            filterConnectionTypes={filterConnectionTypes}
+            cableZones={cableZones}
+            showForbiddenZones={showForbiddenZones}
+            showHeightIndicator={true}
+            currentCableHeight={currentCableHeight}
           />
         </Canvas>
 
@@ -3284,6 +3498,18 @@ export default function DesignerPage() {
             snapPoints={cableSnapPoints}
             selectedObjectIds={selectedIds}
             onClose={() => setShowCableRouting(false)}
+            activeRouteId={cableActiveRouteId}
+            onActiveRouteChange={setCableActiveRouteId}
+            // Nouvelles props pour snap points intelligents
+            intelligentSnapPoints={intelligentSnapPoints}
+            cableZones={cableZones}
+            onSnapPointSelect={setSelectedIntelligentSnapPoint}
+            selectedSnapPoint={selectedIntelligentSnapPoint}
+            onFilterTypesChange={setFilterConnectionTypes}
+            onHeightChange={setCurrentCableHeight}
+            currentHeight={currentCableHeight}
+            showForbiddenZones={showForbiddenZones}
+            onShowForbiddenZonesChange={setShowForbiddenZones}
           />
         )}
 
