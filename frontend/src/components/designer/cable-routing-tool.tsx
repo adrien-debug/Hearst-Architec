@@ -866,7 +866,7 @@ export default function CableRoutingTool({
             <div className="max-h-48 overflow-y-auto space-y-1">
               {routes.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-4">
-                  Aucune route. Cliquez sur "Nouvelle Route" pour commencer.
+                  Aucune route. Cliquez sur &quot;Nouvelle Route&quot; pour commencer.
                 </p>
               ) : (
                 routes.map(route => (

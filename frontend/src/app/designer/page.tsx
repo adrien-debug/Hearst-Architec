@@ -19,6 +19,8 @@ import { InfraObject, aiApi, AIPlacement, AIImplantationResult, layoutsApi, Layo
 import LibraryDrawer from '@/components/designer/library-drawer';
 import PropertiesPanel, { Object3D } from '@/components/designer/properties-panel';
 import Toolbar, { Tool, TransformMode } from '@/components/designer/toolbar';
+import CableRoutingTool, { CableRoute, SnapPoint } from '@/components/designer/cable-routing-tool';
+import CableScene from '@/components/designer/cable-3d-renderer';
 // Smart Alignment désactivé - à reconstruire proprement
 // import SmartAlignmentPanel from '@/components/designer/smart-alignment-panel';
 // import { analyzeScene, SceneObject } from '@/lib/smart-alignment';
@@ -490,75 +492,86 @@ function EditableObject({
         
         {/* === FAN PLATFORM (Top - dark frame) === */}
         <mesh position={[0, h/2 + 0.02, 0]} castShadow>
-          <boxGeometry args={[w - cornerPostSize * 2, 0.04, d - cornerPostSize * 2]} />
+          <boxGeometry args={[w - cornerPostSize * 2, 0.05, d - cornerPostSize * 2]} />
           <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
         </mesh>
         
-        {/* === LONG RECTANGULAR GRILL FANS (2 rows full width) === */}
-        {Array.from({ length: fanRows }).map((_, rowIdx) => {
-          const grillWidth = w - cornerPostSize * 2 - 0.2;
-          const grillDepth = (d - 0.6) / fanRows - 0.1;
-          const zPos = -d/2 + 0.3 + (grillDepth + 0.1) * rowIdx + grillDepth/2;
+        {/* === EC2-DT AXIAL FANS (2 rows × 6 fans = 12 large fans) === */}
+        {(() => {
+          const fansPerRow = 6;
+          const fanDiameter = 0.9; // 900mm axial fans
+          const fanSpacingX = (w - 1) / fansPerRow;
+          const rowSpacing = d * 0.4;
           
-          return (
-            <group key={`grill-row-${rowIdx}`} position={[0, h/2 + 0.06, zPos]}>
-              {/* Grill frame (dark) */}
-              <mesh castShadow>
-                <boxGeometry args={[grillWidth, 0.08, grillDepth]} />
-                <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
-              </mesh>
+          return Array.from({ length: 2 }).map((_, rowIdx) => 
+            Array.from({ length: fansPerRow }).map((_, colIdx) => {
+              const xPos = -w/2 + 0.5 + fanSpacingX * (colIdx + 0.5);
+              const zPos = (rowIdx === 0 ? -rowSpacing/2 : rowSpacing/2);
+              const bladeRadius = fanDiameter / 2;
               
-              {/* Fan motors with VISIBLE BLADES */}
-              {Array.from({ length: Math.floor(grillWidth / 1.5) }).map((_, i) => {
-                const motorX = -grillWidth/2 + 0.75 + i * 1.5;
-                const bladeRadius = 0.4;
-                return (
-                  <group key={`motor-${i}`} position={[motorX, 0.05, 0]}>
-                    {/* Circular grill opening */}
-                    <mesh rotation={[Math.PI/2, 0, 0]}>
-                      <ringGeometry args={[bladeRadius - 0.03, bladeRadius + 0.03, 32]} />
+              return (
+                <group key={`fan-${rowIdx}-${colIdx}`} position={[xPos, h/2 + 0.08, zPos]}>
+                  {/* Fan shroud/housing (circular) */}
+                  <mesh castShadow>
+                    <cylinderGeometry args={[bladeRadius + 0.05, bladeRadius + 0.05, 0.15, 32]} />
+                    <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
+                  </mesh>
+                  
+                  {/* Inner ring */}
+                  <mesh position={[0, 0.08, 0]}>
+                    <cylinderGeometry args={[bladeRadius, bladeRadius, 0.02, 32]} />
+                    <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
+                  </mesh>
+                  
+                  {/* === VISIBLE FAN BLADES (7 blades - industrial axial) === */}
+                  {[0, 51.4, 102.8, 154.2, 205.7, 257.1, 308.5].map((angle, j) => (
+                    <mesh 
+                      key={`blade-${j}`} 
+                      position={[0, 0.1, 0]}
+                      rotation={[0.18, (angle * Math.PI) / 180, 0]}
+                    >
+                      {/* Blade shape - tapered */}
+                      <boxGeometry args={[bladeRadius * 0.85, 0.025, 0.15]} />
+                      <meshStandardMaterial color="#d1d5db" metalness={0.7} roughness={0.25} />
+                    </mesh>
+                  ))}
+                  
+                  {/* Center motor hub */}
+                  <mesh position={[0, 0.1, 0]}>
+                    <cylinderGeometry args={[0.12, 0.12, 0.08, 24]} />
+                    <meshStandardMaterial color="#1f2937" metalness={0.8} roughness={0.2} />
+                  </mesh>
+                  
+                  {/* Hub cap */}
+                  <mesh position={[0, 0.15, 0]}>
+                    <cylinderGeometry args={[0.08, 0.06, 0.04, 16]} />
+                    <meshStandardMaterial color="#374151" metalness={0.7} roughness={0.3} />
+                  </mesh>
+                  
+                  {/* Protective wire guard (finger guard) */}
+                  <mesh position={[0, 0.12, 0]}>
+                    <cylinderGeometry args={[bladeRadius - 0.02, bladeRadius - 0.02, 0.02, 32]} />
+                    <meshStandardMaterial color="#6b7280" metalness={0.5} roughness={0.4} wireframe />
+                  </mesh>
+                  
+                  {/* Guard ring */}
+                  <mesh position={[0, 0.13, 0]} rotation={[Math.PI/2, 0, 0]}>
+                    <torusGeometry args={[bladeRadius - 0.02, 0.015, 8, 32]} />
+                    <meshStandardMaterial color="#4b5563" metalness={0.6} roughness={0.4} />
+                  </mesh>
+                  
+                  {/* Motor mount cross bars */}
+                  {[0, 90].map((angle, k) => (
+                    <mesh key={`bar-${k}`} position={[0, 0.06, 0]} rotation={[0, (angle * Math.PI) / 180, 0]}>
+                      <boxGeometry args={[bladeRadius * 1.8, 0.02, 0.03]} />
                       <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
                     </mesh>
-                    
-                    {/* === VISIBLE FAN BLADES (6 blades) === */}
-                    {[0, 60, 120, 180, 240, 300].map((angle, j) => (
-                      <mesh 
-                        key={`blade-${j}`} 
-                        position={[0, 0.02, 0]}
-                        rotation={[0.12, (angle * Math.PI) / 180, 0]}
-                      >
-                        <boxGeometry args={[bladeRadius * 0.85, 0.02, 0.1]} />
-                        <meshStandardMaterial color="#e5e7eb" metalness={0.6} roughness={0.3} />
-                      </mesh>
-                    ))}
-                    
-                    {/* Center hub */}
-                    <mesh position={[0, 0.03, 0]}>
-                      <cylinderGeometry args={[0.08, 0.08, 0.05, 16]} />
-                      <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
-                    </mesh>
-                    
-                    {/* Protective wire grill */}
-                    <mesh position={[0, 0.06, 0]}>
-                      <cylinderGeometry args={[bladeRadius - 0.02, bladeRadius - 0.02, 0.01, 24]} />
-                      <meshStandardMaterial color="#6b7280" metalness={0.4} roughness={0.5} wireframe />
-                    </mesh>
-                  </group>
-                );
-              })}
-              
-              {/* Frame edges */}
-              <mesh position={[-grillWidth/2, 0.02, 0]} castShadow>
-                <boxGeometry args={[0.06, 0.12, grillDepth + 0.04]} />
-                <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
-              </mesh>
-              <mesh position={[grillWidth/2, 0.02, 0]} castShadow>
-                <boxGeometry args={[0.06, 0.12, grillDepth + 0.04]} />
-                <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} />
-              </mesh>
-            </group>
+                  ))}
+                </group>
+              );
+            })
           );
-        })}
+        })()}
         
         {/* === ANTSPACE LOGO - Offset to avoid z-fighting === */}
         <mesh position={[w * 0.15, h * 0.15, -d/2 - 0.08]}>
@@ -1346,9 +1359,27 @@ function Scene({
   tool,
   onTransformEnd,
   showGrid,
+  showAxes,
+  showDistanceX,
+  showDistanceZ,
   viewDirection,
   orbitRef,
-  cameraLocked = false
+  cameraLocked = false,
+  // Cable routing props
+  cableRoutes = [],
+  cableSelectedSegments = [],
+  cableSelectedPoints = [],
+  onCableSegmentClick,
+  onCablePointClick,
+  showCableDimensions = true,
+  showCableLabels = true,
+  cableDrawingPoints = [],
+  cablePreviewPoint = null,
+  cableSnapPoints = [],
+  cableActiveSnapPoint = null,
+  cableIsDrawing = false,
+  cableDefaultWidth = 300,
+  cableDefaultHeight = 100,
 }: {
   objects: Object3D[];
   selectedIds: string[];
@@ -1357,9 +1388,27 @@ function Scene({
   tool: Tool;
   onTransformEnd: (id: string, position: THREE.Vector3, rotation: THREE.Euler, scale: THREE.Vector3) => void;
   showGrid: boolean;
+  showAxes: boolean;
+  showDistanceX: boolean;
+  showDistanceZ: boolean;
   viewDirection: 'front' | 'back' | 'left' | 'right' | 'top' | 'perspective' | null;
   orbitRef: React.RefObject<any>;
   cameraLocked?: boolean;
+  // Cable routing types
+  cableRoutes?: CableRoute[];
+  cableSelectedSegments?: string[];
+  cableSelectedPoints?: string[];
+  onCableSegmentClick?: (segmentId: string) => void;
+  onCablePointClick?: (pointId: string) => void;
+  showCableDimensions?: boolean;
+  showCableLabels?: boolean;
+  cableDrawingPoints?: THREE.Vector3[];
+  cablePreviewPoint?: THREE.Vector3 | null;
+  cableSnapPoints?: SnapPoint[];
+  cableActiveSnapPoint?: THREE.Vector3 | null;
+  cableIsDrawing?: boolean;
+  cableDefaultWidth?: number;
+  cableDefaultHeight?: number;
 }) {
   const handleFloorClick = () => {
     // Deselect by passing empty string - handled in parent
@@ -1431,6 +1480,195 @@ function Scene({
           fadeStrength={1}
         />
       )}
+      
+      {/* === AXES WITH DISTANCES === */}
+      {showAxes && (
+        <group>
+          {/* X Axis (Red) - 100m */}
+          <Line
+            points={[[-50, 0.05, 0], [50, 0.05, 0]]}
+            color="#ef4444"
+            lineWidth={3}
+          />
+          {/* X Arrow head */}
+          <mesh position={[50, 0.05, 0]} rotation={[0, 0, -Math.PI/2]}>
+            <coneGeometry args={[0.3, 0.8, 8]} />
+            <meshStandardMaterial color="#ef4444" />
+          </mesh>
+          {/* X Label */}
+          <Text position={[52, 0.5, 0]} fontSize={1} color="#ef4444" anchorX="left">
+            X
+          </Text>
+          {/* X Distance markers every 10m */}
+          {[-40, -30, -20, -10, 0, 10, 20, 30, 40, 50].map((x) => (
+            <group key={`x-marker-${x}`}>
+              <mesh position={[x, 0.05, 0]}>
+                <boxGeometry args={[0.1, 0.5, 0.1]} />
+                <meshStandardMaterial color="#ef4444" />
+              </mesh>
+              <Text 
+                position={[x, 1.2, 0]} 
+                fontSize={0.8} 
+                color="#ef4444" 
+                anchorX="center"
+              >
+                {x}m
+              </Text>
+            </group>
+          ))}
+          
+          {/* Z Axis (Blue) - 100m */}
+          <Line
+            points={[[0, 0.05, -50], [0, 0.05, 50]]}
+            color="#3b82f6"
+            lineWidth={3}
+          />
+          {/* Z Arrow head */}
+          <mesh position={[0, 0.05, 50]} rotation={[Math.PI/2, 0, 0]}>
+            <coneGeometry args={[0.3, 0.8, 8]} />
+            <meshStandardMaterial color="#3b82f6" />
+          </mesh>
+          {/* Z Label */}
+          <Text position={[0, 0.5, 52]} fontSize={1} color="#3b82f6" anchorX="center">
+            Z
+          </Text>
+          {/* Z Distance markers every 10m */}
+          {[-40, -30, -20, -10, 0, 10, 20, 30, 40, 50].map((z) => (
+            <group key={`z-marker-${z}`}>
+              <mesh position={[0, 0.05, z]}>
+                <boxGeometry args={[0.1, 0.5, 0.1]} />
+                <meshStandardMaterial color="#3b82f6" />
+              </mesh>
+              <Text 
+                position={[1.5, 1.2, z]} 
+                fontSize={0.8} 
+                color="#3b82f6" 
+                anchorX="center"
+              >
+                {z}m
+              </Text>
+            </group>
+          ))}
+          
+          {/* Y Axis (Green) - Vertical 20m */}
+          <Line
+            points={[[0, 0, 0], [0, 20, 0]]}
+            color="#22c55e"
+            lineWidth={3}
+          />
+          {/* Y Arrow head */}
+          <mesh position={[0, 20, 0]}>
+            <coneGeometry args={[0.3, 0.8, 8]} />
+            <meshStandardMaterial color="#22c55e" />
+          </mesh>
+          {/* Y Label */}
+          <Text position={[0.5, 21, 0]} fontSize={1} color="#22c55e" anchorX="left">
+            Y (hauteur)
+          </Text>
+          {/* Y Distance markers every 5m */}
+          {[0, 5, 10, 15, 20].map((y) => (
+            <group key={`y-marker-${y}`}>
+              <mesh position={[0, y, 0]}>
+                <boxGeometry args={[0.3, 0.1, 0.3]} />
+                <meshStandardMaterial color="#22c55e" />
+              </mesh>
+              <Text 
+                position={[1, y, 0]} 
+                fontSize={0.6} 
+                color="#22c55e" 
+                anchorX="left"
+              >
+                {y}m
+              </Text>
+            </group>
+          ))}
+          
+          {/* Origin marker */}
+          <mesh position={[0, 0.1, 0]}>
+            <sphereGeometry args={[0.4, 16, 16]} />
+            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.5} />
+          </mesh>
+          <Text position={[0, 2, 0]} fontSize={0.8} color="#fbbf24" anchorX="center">
+            ORIGIN (0,0,0)
+          </Text>
+        </group>
+      )}
+
+      {/* === DISTANCE X MEASUREMENTS (Red lines from objects to Z-axis) === */}
+      {showDistanceX && objects.map((obj) => {
+        const objX = obj.position.x;
+        const objZ = obj.position.z;
+        const distX = Math.abs(objX).toFixed(1);
+        const measureY = 0.55;
+        
+        return (
+          <group key={`distX-${obj.id}`}>
+            <Line
+              points={[[objX, measureY, objZ], [0, measureY, objZ]]}
+              color="#dc2626"
+              lineWidth={3}
+            />
+            <mesh position={[objX, measureY, objZ]}>
+              <sphereGeometry args={[0.1, 12, 12]} />
+              <meshStandardMaterial color="#dc2626" />
+            </mesh>
+            <mesh position={[0, measureY, objZ]}>
+              <sphereGeometry args={[0.1, 12, 12]} />
+              <meshStandardMaterial color="#dc2626" />
+            </mesh>
+            <Html position={[objX / 2, measureY + 0.3, objZ]} center style={{ pointerEvents: 'none' }}>
+              <div style={{
+                background: '#dc2626',
+                color: 'white',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '700',
+                fontFamily: 'system-ui',
+                whiteSpace: 'nowrap'
+              }}>
+                {distX}m
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+
+      {/* === DISTANCE Z MEASUREMENTS (Blue lines from objects to X-axis) === */}
+      {showDistanceZ && objects.map((obj) => {
+        const objX = obj.position.x;
+        const objZ = obj.position.z;
+        const distZ = Math.abs(objZ).toFixed(1);
+        const measureY = 0.55;
+        
+        return (
+          <group key={`distZ-${obj.id}`}>
+            <Line
+              points={[[objX, measureY, objZ], [objX, measureY, 0]]}
+              color="#2563eb"
+              lineWidth={3}
+            />
+            <mesh position={[objX, measureY, 0]}>
+              <sphereGeometry args={[0.1, 12, 12]} />
+              <meshStandardMaterial color="#2563eb" />
+            </mesh>
+            <Html position={[objX, measureY + 0.3, objZ / 2]} center style={{ pointerEvents: 'none' }}>
+              <div style={{
+                background: '#2563eb',
+                color: 'white',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '700',
+                fontFamily: 'system-ui',
+                whiteSpace: 'nowrap'
+              }}>
+                {distZ}m
+              </div>
+            </Html>
+          </group>
+        );
+      })}
 
       {/* Objects */}
       {objects.map((obj) => (
@@ -1443,6 +1681,26 @@ function Scene({
           onTransformEnd={(pos, rot, scale) => onTransformEnd(obj.id, pos, rot, scale)}
         />
       ))}
+      
+      {/* Cable Routing 3D Visualization */}
+      {cableRoutes.length > 0 && (
+        <CableScene
+          routes={cableRoutes}
+          selectedSegmentIds={cableSelectedSegments}
+          selectedPointIds={cableSelectedPoints}
+          onSegmentClick={onCableSegmentClick || (() => {})}
+          onPointClick={onCablePointClick || (() => {})}
+          showDimensions={showCableDimensions}
+          showLabels={showCableLabels}
+          drawingPoints={cableDrawingPoints}
+          previewPoint={cablePreviewPoint}
+          snapPoints={cableSnapPoints}
+          activeSnapPoint={cableActiveSnapPoint}
+          isDrawing={cableIsDrawing}
+          defaultWidth={cableDefaultWidth}
+          defaultHeight={cableDefaultHeight}
+        />
+      )}
 
     </>
   );
@@ -1761,6 +2019,9 @@ export default function DesignerPage() {
   
   // View state
   const [showGrid, setShowGrid] = useState(true);
+  const [showAxes, setShowAxes] = useState(false);
+  const [showDistanceX, setShowDistanceX] = useState(false);
+  const [showDistanceZ, setShowDistanceZ] = useState(false);
   const [viewDirection, setViewDirection] = useState<'front' | 'back' | 'left' | 'right' | 'top' | 'perspective' | null>(null);
   
   // UI state
@@ -1768,6 +2029,16 @@ export default function DesignerPage() {
   const [showProjects, setShowProjects] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
+  const [showCableRouting, setShowCableRouting] = useState(false);
+  
+  // Cable routing state
+  const [cableRoutes, setCableRoutes] = useState<CableRoute[]>([]);
+  const [cableSnapPoints, setCableSnapPoints] = useState<SnapPoint[]>([]);
+  const [cableDrawingPoints, setCableDrawingPoints] = useState<THREE.Vector3[]>([]);
+  const [cablePreviewPoint, setCablePreviewPoint] = useState<THREE.Vector3 | null>(null);
+  const [cableIsDrawing, setCableIsDrawing] = useState(false);
+  const [cableSelectedSegments, setCableSelectedSegments] = useState<string[]>([]);
+  const [cableSelectedPoints, setCableSelectedPoints] = useState<string[]>([]);
   
   // Project state
   const [projectName, setProjectName] = useState('Untitled Project');
@@ -1826,6 +2097,51 @@ export default function DesignerPage() {
   const [showDbPanel, setShowDbPanel] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [showProjectSelector, setShowProjectSelector] = useState(false); // Disabled - access via Cloud button
+  
+  // Generate snap points from objects for cable routing
+  useEffect(() => {
+    const snapPoints: SnapPoint[] = [];
+    objects.forEach(obj => {
+      const w = obj.dimensions.width / 2000;
+      const h = obj.dimensions.height / 2000;
+      const d = obj.dimensions.depth / 2000;
+      
+      // Center point
+      snapPoints.push({
+        position: new THREE.Vector3(obj.position.x, obj.position.y + h, obj.position.z),
+        objectId: obj.id,
+        objectName: obj.name,
+        type: 'center',
+      });
+      
+      // Corner points (top of object)
+      const corners = [
+        [w, h, d], [-w, h, d], [w, h, -d], [-w, h, -d],
+      ];
+      corners.forEach(([cx, cy, cz]) => {
+        snapPoints.push({
+          position: new THREE.Vector3(obj.position.x + cx, obj.position.y + cy, obj.position.z + cz),
+          objectId: obj.id,
+          objectName: obj.name,
+          type: 'corner',
+        });
+      });
+      
+      // Edge midpoints (for cable connections)
+      const edges = [
+        [0, h, d], [0, h, -d], [w, h, 0], [-w, h, 0],
+      ];
+      edges.forEach(([ex, ey, ez]) => {
+        snapPoints.push({
+          position: new THREE.Vector3(obj.position.x + ex, obj.position.y + ey, obj.position.z + ez),
+          objectId: obj.id,
+          objectName: obj.name,
+          type: 'edge',
+        });
+      });
+    });
+    setCableSnapPoints(snapPoints);
+  }, [objects]);
   
   // Keyboard controls for moving objects
   useEffect(() => {
@@ -2866,9 +3182,24 @@ export default function DesignerPage() {
             tool={activeTool}
             onTransformEnd={handleTransformEnd}
             showGrid={showGrid}
+            showAxes={showAxes}
+            showDistanceX={showDistanceX}
+            showDistanceZ={showDistanceZ}
             viewDirection={viewDirection}
             orbitRef={orbitRef}
             cameraLocked={boxSelectMode}
+            // Cable routing props
+            cableRoutes={cableRoutes}
+            cableSelectedSegments={cableSelectedSegments}
+            cableSelectedPoints={cableSelectedPoints}
+            onCableSegmentClick={(id) => setCableSelectedSegments([id])}
+            onCablePointClick={(id) => setCableSelectedPoints([id])}
+            showCableDimensions={true}
+            showCableLabels={true}
+            cableDrawingPoints={cableDrawingPoints}
+            cablePreviewPoint={cablePreviewPoint}
+            cableSnapPoints={cableSnapPoints}
+            cableIsDrawing={cableIsDrawing}
           />
         </Canvas>
 
@@ -2907,6 +3238,12 @@ export default function DesignerPage() {
           onToolChange={handleToolChange}
           showGrid={showGrid}
           onToggleGrid={() => setShowGrid(!showGrid)}
+          showAxes={showAxes}
+          onToggleAxes={() => setShowAxes(!showAxes)}
+          showDistanceX={showDistanceX}
+          onToggleDistanceX={() => setShowDistanceX(!showDistanceX)}
+          showDistanceZ={showDistanceZ}
+          onToggleDistanceZ={() => setShowDistanceZ(!showDistanceZ)}
           onOpenLibrary={() => setShowLibrary(true)}
           onExport={handleExport}
           onResetView={() => setViewDirection('perspective')}
@@ -2924,6 +3261,8 @@ export default function DesignerPage() {
             }
           }}
           objectCount={objects.length}
+          onCableRouting={() => setShowCableRouting(!showCableRouting)}
+          cableRoutingActive={showCableRouting}
         />
 
       {/* Properties Panel */}
@@ -2934,6 +3273,17 @@ export default function DesignerPage() {
             onDuplicate={handleDuplicate}
             onDelete={handleDelete}
             onClose={() => setSelectedId(null)}
+          />
+        )}
+        
+        {/* Cable Routing Tool Panel */}
+        {showCableRouting && (
+          <CableRoutingTool
+            routes={cableRoutes}
+            onRoutesChange={setCableRoutes}
+            snapPoints={cableSnapPoints}
+            selectedObjectIds={selectedIds}
+            onClose={() => setShowCableRouting(false)}
           />
         )}
 

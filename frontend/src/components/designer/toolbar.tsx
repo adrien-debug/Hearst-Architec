@@ -13,7 +13,9 @@ import {
   ZoomOut,
   Home,
   ArrowUp,
-  Wand2
+  Wand2,
+  Cable,
+  Ruler
 } from 'lucide-react';
 
 export type Tool = 'select' | 'move' | 'rotate' | 'scale';
@@ -24,6 +26,12 @@ interface ToolbarProps {
   onToolChange: (tool: Tool) => void;
   showGrid: boolean;
   onToggleGrid: () => void;
+  showAxes: boolean;
+  onToggleAxes: () => void;
+  showDistanceX: boolean;
+  onToggleDistanceX: () => void;
+  showDistanceZ: boolean;
+  onToggleDistanceZ: () => void;
   onOpenLibrary: () => void;
   onExport: () => void;
   onResetView: () => void;
@@ -34,6 +42,8 @@ interface ToolbarProps {
   onSmartAlignment?: () => void;
   smartAlignmentActive?: boolean;
   alignmentSuggestions?: number;
+  onCableRouting?: () => void;
+  cableRoutingActive?: boolean;
 }
 
 function ToolButton({ 
@@ -88,6 +98,12 @@ export default function Toolbar({
   onToolChange,
   showGrid,
   onToggleGrid,
+  showAxes,
+  onToggleAxes,
+  showDistanceX,
+  onToggleDistanceX,
+  showDistanceZ,
+  onToggleDistanceZ,
   onOpenLibrary,
   onExport,
   onResetView,
@@ -98,6 +114,8 @@ export default function Toolbar({
   onSmartAlignment,
   smartAlignmentActive,
   alignmentSuggestions,
+  onCableRouting,
+  cableRoutingActive,
 }: ToolbarProps) {
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
@@ -138,6 +156,17 @@ export default function Toolbar({
             badge={alignmentSuggestions}
           />
         )}
+        
+        {/* Cable Routing Tool */}
+        {onCableRouting && (
+          <ToolButton 
+            icon={Cable} 
+            label="Câblage Intelligent (C)" 
+            active={cableRoutingActive}
+            onClick={onCableRouting}
+            variant={cableRoutingActive ? 'accent' : 'default'}
+          />
+        )}
 
         <Divider />
 
@@ -151,6 +180,31 @@ export default function Toolbar({
 
         {/* Display */}
         <ToolButton icon={Grid3X3} label="Grid" active={showGrid} onClick={onToggleGrid} />
+        <ToolButton icon={Ruler} label="Axes" active={showAxes} onClick={onToggleAxes} />
+        
+        {/* Distance measurements by axis */}
+        <button
+          onClick={onToggleDistanceX}
+          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            showDistanceX 
+              ? 'bg-red-500 text-white shadow-md' 
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+          title="Distances X (rouge)"
+        >
+          <span className="text-[10px]">📏</span> X
+        </button>
+        <button
+          onClick={onToggleDistanceZ}
+          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            showDistanceZ 
+              ? 'bg-blue-500 text-white shadow-md' 
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+          title="Distances Z (bleu)"
+        >
+          <span className="text-[10px]">📏</span> Z
+        </button>
 
         <Divider />
 

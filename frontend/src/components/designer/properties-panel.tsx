@@ -35,30 +35,63 @@ export default function PropertiesPanel({
   const [localPos, setLocalPos] = useState({ x: 0, y: 0, z: 0 });
   const [localRot, setLocalRot] = useState({ x: 0, y: 0, z: 0 });
   const [localColor, setLocalColor] = useState('#8AFD81');
+  
+  // Text inputs for position/rotation (allows free typing)
+  const [posInputs, setPosInputs] = useState({ x: '0', y: '0', z: '0' });
+  const [rotInputs, setRotInputs] = useState({ x: '0', y: '0', z: '0' });
 
   useEffect(() => {
     if (object) {
       setLocalPos(object.position);
-      setLocalRot({
+      setPosInputs({
+        x: object.position.x.toFixed(2),
+        y: object.position.y.toFixed(2),
+        z: object.position.z.toFixed(2),
+      });
+      const rotDegrees = {
         x: (object.rotation.x * 180 / Math.PI),
         y: (object.rotation.y * 180 / Math.PI),
         z: (object.rotation.z * 180 / Math.PI),
+      };
+      setLocalRot(rotDegrees);
+      setRotInputs({
+        x: rotDegrees.x.toFixed(0),
+        y: rotDegrees.y.toFixed(0),
+        z: rotDegrees.z.toFixed(0),
       });
       setLocalColor(object.color);
     }
-  }, [object]);
+  }, [object?.id]); // Only reset when object ID changes, not on every position update
 
   if (!object) return null;
 
   const handlePositionChange = (axis: 'x' | 'y' | 'z', value: number) => {
     const newPos = { ...localPos, [axis]: value };
     setLocalPos(newPos);
+    setPosInputs(prev => ({ ...prev, [axis]: value.toFixed(2) }));
     onUpdate({ position: newPos });
+  };
+  
+  const handlePositionInputChange = (axis: 'x' | 'y' | 'z', text: string) => {
+    setPosInputs(prev => ({ ...prev, [axis]: text }));
+    // Update dynamically as user types
+    const value = parseFloat(text);
+    if (!isNaN(value)) {
+      const newPos = { ...localPos, [axis]: value };
+      setLocalPos(newPos);
+      onUpdate({ position: newPos });
+    }
+  };
+  
+  const handlePositionBlur = (axis: 'x' | 'y' | 'z') => {
+    const value = parseFloat(posInputs[axis]) || 0;
+    setPosInputs(prev => ({ ...prev, [axis]: value.toFixed(2) }));
   };
 
   const handleRotationChange = (axis: 'x' | 'y' | 'z', degrees: number) => {
     const newRot = { ...localRot, [axis]: degrees };
     setLocalRot(newRot);
+    setRotInputs(prev => ({ ...prev, [axis]: degrees.toFixed(0) }));
     onUpdate({ 
       rotation: {
         x: newRot.x * Math.PI / 180,
@@ -66,6 +99,28 @@ export default function PropertiesPanel({
         z: newRot.z * Math.PI / 180,
       }
     });
+  };
+  
+  const handleRotationInputChange = (axis: 'x' | 'y' | 'z', text: string) => {
+    setRotInputs(prev => ({ ...prev, [axis]: text }));
+    // Update dynamically as user types
+    const value = parseFloat(text);
+    if (!isNaN(value)) {
+      const newRot = { ...localRot, [axis]: value };
+      setLocalRot(newRot);
+      onUpdate({ 
+        rotation: {
+          x: newRot.x * Math.PI / 180,
+          y: newRot.y * Math.PI / 180,
+          z: newRot.z * Math.PI / 180,
+        }
+      });
+    }
+  };
+  
+  const handleRotationBlur = (axis: 'x' | 'y' | 'z') => {
+    const value = parseFloat(rotInputs[axis]) || 0;
+    setRotInputs(prev => ({ ...prev, [axis]: value.toFixed(0) }));
   };
 
   const handleColorChange = (color: string) => {
@@ -75,6 +130,7 @@ export default function PropertiesPanel({
 
   const resetRotation = () => {
     setLocalRot({ x: 0, y: 0, z: 0 });
+    setRotInputs({ x: '0', y: '0', z: '0' });
     onUpdate({ rotation: { x: 0, y: 0, z: 0 } });
   };
 
@@ -142,7 +198,7 @@ export default function PropertiesPanel({
             <div className="grid grid-cols-3 gap-1">
               <div />
               <button 
-                onClick={() => handlePositionChange('z', localPos.z - 0.1)}
+                onClick={() => handlePositionChange('z', localPos.z - 1)}
                 disabled={object.locked}
                 className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-lg transition-colors disabled:opacity-50"
                 title="Avant (↑)"
@@ -151,7 +207,7 @@ export default function PropertiesPanel({
               </button>
               <div />
               <button 
-                onClick={() => handlePositionChange('x', localPos.x - 0.1)}
+                onClick={() => handlePositionChange('x', localPos.x - 1)}
                 disabled={object.locked}
                 className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-lg transition-colors disabled:opacity-50"
                 title="Gauche (←)"
@@ -162,7 +218,7 @@ export default function PropertiesPanel({
                 <Move className="w-4 h-4 text-slate-300" />
               </div>
               <button 
-                onClick={() => handlePositionChange('x', localPos.x + 0.1)}
+                onClick={() => handlePositionChange('x', localPos.x + 1)}
                 disabled={object.locked}
                 className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-lg transition-colors disabled:opacity-50"
                 title="Droite (→)"
@@ -171,7 +227,7 @@ export default function PropertiesPanel({
               </button>
               <div />
               <button 
-                onClick={() => handlePositionChange('z', localPos.z + 0.1)}
+                onClick={() => handlePositionChange('z', localPos.z + 1)}
                 disabled={object.locked}
                 className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-lg transition-colors disabled:opacity-50"
                 title="Arrière (↓)"
@@ -184,7 +240,7 @@ export default function PropertiesPanel({
             {/* Y axis + Rotation */}
             <div className="flex flex-col gap-1">
               <button 
-                onClick={() => handlePositionChange('y', localPos.y + 0.1)}
+                onClick={() => handlePositionChange('y', localPos.y + 1)}
                 disabled={object.locked}
                 className="px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg text-xs text-blue-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
                 title="Monter (A)"
@@ -192,7 +248,7 @@ export default function PropertiesPanel({
                 <ChevronUp className="w-3 h-3" /> Y+
               </button>
               <button 
-                onClick={() => handlePositionChange('y', Math.max(0, localPos.y - 0.1))}
+                onClick={() => handlePositionChange('y', Math.max(0, localPos.y - 1))}
                 disabled={object.locked}
                 className="px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg text-xs text-blue-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
                 title="Descendre (Q)"
@@ -236,10 +292,11 @@ export default function PropertiesPanel({
                 <div key={axis}>
                   <label className={`block text-[10px] font-semibold ${textColors[axis]} uppercase mb-1`}>{axis}</label>
                   <input
-                    type="number"
-                    step="0.1"
-                    value={localPos[axis].toFixed(2)}
-                    onChange={(e) => handlePositionChange(axis, parseFloat(e.target.value) || 0)}
+                    type="text"
+                    inputMode="decimal"
+                    value={posInputs[axis]}
+                    onChange={(e) => handlePositionInputChange(axis, e.target.value)}
+                    onBlur={() => handlePositionBlur(axis)}
                     disabled={object.locked}
                     className={`w-full px-2 py-1.5 rounded-lg border text-sm font-mono text-center focus:ring-2 focus:outline-none ${colors[axis]} ${object.locked ? 'opacity-50' : ''}`}
                   />
@@ -269,10 +326,11 @@ export default function PropertiesPanel({
               <div key={axis}>
                 <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{axis}</label>
                 <input
-                  type="number"
-                  step="15"
-                  value={localRot[axis].toFixed(0)}
-                  onChange={(e) => handleRotationChange(axis, parseFloat(e.target.value) || 0)}
+                  type="text"
+                  inputMode="numeric"
+                  value={rotInputs[axis]}
+                  onChange={(e) => handleRotationInputChange(axis, e.target.value)}
+                  onBlur={() => handleRotationBlur(axis)}
                   disabled={object.locked}
                   className={`w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-sm font-mono text-center focus:ring-2 focus:ring-hearst-green focus:outline-none ${object.locked ? 'opacity-50' : ''}`}
                 />
