@@ -622,6 +622,64 @@ export default function Object3DEditor({
     onSave?.(objects, groups);
   }, [objects, groups, onSave]);
 
+  // Move selected objects
+  const moveSelected = useCallback((dx: number, dy: number, dz: number) => {
+    setObjects(prev => prev.map(obj => 
+      selectedIds.includes(obj.id) && !obj.locked ? {
+        ...obj,
+        position: {
+          x: obj.position.x + dx,
+          y: Math.max(0, obj.position.y + dy), // Don't go below ground
+          z: obj.position.z + dz
+        }
+      } : obj
+    ));
+  }, [selectedIds]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if typing in input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const step = e.shiftKey ? 0.1 : 0.5; // Fine control with Shift
+
+      switch (e.key.toLowerCase()) {
+        // Transform modes
+        case 'v': setTool('select'); break;
+        case 'g': setTransformMode('translate'); setTool('select'); break;
+        case 'r': setTransformMode('rotate'); setTool('select'); break;
+        case 's': if (!e.ctrlKey && !e.metaKey) { setTransformMode('scale'); setTool('select'); } break;
+        case 'm': setTool('measure'); setMeasurePoints([]); break;
+        case 'f': toggleFullscreen(); break;
+
+        // Movement - WASD + QE for Y
+        case 'w': case 'arrowup': e.preventDefault(); moveSelected(0, 0, -step); break;
+        case 's': if (e.ctrlKey || e.metaKey) break; // Don't interfere with save
+        case 'arrowdown': e.preventDefault(); moveSelected(0, 0, step); break;
+        case 'a': case 'arrowleft': e.preventDefault(); moveSelected(-step, 0, 0); break;
+        case 'd': case 'arrowright': e.preventDefault(); moveSelected(step, 0, 0); break;
+        case 'q': e.preventDefault(); moveSelected(0, -step, 0); break; // Down
+        case 'e': e.preventDefault(); moveSelected(0, step, 0); break;  // Up
+
+        // Actions
+        case 'delete': case 'backspace': if (selectedIds.length > 0) { e.preventDefault(); handleDelete(); } break;
+        case 'escape': setSelectedIds([]); setTool('select'); break;
+
+        // Views
+        case '1': setViewDirection('front'); break;
+        case '2': setViewDirection('back'); break;
+        case '3': setViewDirection('left'); break;
+        case '4': setViewDirection('right'); break;
+        case '5': setViewDirection('top'); break;
+        case '0': setViewDirection('perspective'); break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedIds, moveSelected, handleDelete, toggleFullscreen]);
+
   // Export
   const handleExport = useCallback(() => {
     const data = {
@@ -777,58 +835,68 @@ export default function Object3DEditor({
       {/* LEFT SIDEBAR - Object Actions (only when object selected) */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {selectedIds.length > 0 && (
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-2 shadow-xl border border-slate-200 space-y-2">
+        <div className="absolute left-4 bottom-20 z-10">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-2 shadow-xl border border-slate-200 flex items-center gap-1">
             {/* Object Actions */}
-            <div className="space-y-1">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2">Object</div>
-              <ToolbarButton 
-                icon={selectedObject?.locked ? Unlock : Lock} 
-                label={selectedObject?.locked ? "Unlock" : "Lock"} 
-                onClick={toggleLock}
-              />
-              <ToolbarButton 
-                icon={selectedObject?.visible ? EyeOff : Eye} 
-                label={selectedObject?.visible ? "Hide" : "Show"} 
-                onClick={toggleVisibility}
-              />
-            </div>
+            <ToolbarButton 
+              icon={selectedObject?.locked ? Unlock : Lock} 
+              label={selectedObject?.locked ? "Unlock" : "Lock"} 
+              onClick={toggleLock}
+            />
+            <ToolbarButton 
+              icon={selectedObject?.visible ? EyeOff : Eye} 
+              label={selectedObject?.visible ? "Hide" : "Show"} 
+              onClick={toggleVisibility}
+            />
 
-            <div className="h-px bg-slate-200" />
+            <div className="w-px h-6 bg-slate-200 mx-1" />
 
             {/* Edit Actions */}
-            <div className="space-y-1">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2">Edit</div>
-              <ToolbarButton 
-                icon={Copy} 
-                label="Duplicate" 
-                onClick={handleDuplicate}
-              />
-              <ToolbarButton 
-                icon={Trash2} 
-                label="Delete" 
-                variant="danger"
-                onClick={handleDelete}
-              />
-            </div>
+            <ToolbarButton 
+              icon={Copy} 
+              label="Duplicate (Ctrl+D)" 
+              onClick={handleDuplicate}
+            />
+            <ToolbarButton 
+              icon={Trash2} 
+              label="Delete (Del)" 
+              variant="danger"
+              onClick={handleDelete}
+            />
 
-            <div className="h-px bg-slate-200" />
+            <div className="w-px h-6 bg-slate-200 mx-1" />
 
             {/* Group Actions */}
-            <div className="space-y-1">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2">Group</div>
-              <ToolbarButton 
-                icon={Link2} 
-                label="Group Objects" 
-                onClick={handleGroup}
-                disabled={selectedIds.length < 2}
-              />
-              <ToolbarButton 
-                icon={Unlink2} 
-                label="Ungroup" 
-                onClick={handleUngroup}
-                disabled={!selectedObject?.groupId}
-              />
+            <ToolbarButton 
+              icon={Link2} 
+              label="Group Objects" 
+              onClick={handleGroup}
+              disabled={selectedIds.length < 2}
+            />
+            <ToolbarButton 
+              icon={Unlink2} 
+              label="Ungroup" 
+              onClick={handleUngroup}
+              disabled={!selectedObject?.groupId}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* SCENE INFO - Top Right (when no selection) */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {selectedIds.length === 0 && objects.length > 0 && (
+        <div className="absolute top-4 right-4 z-10">
+          <div className="bg-white/90 backdrop-blur rounded-xl px-4 py-2 shadow-lg border border-slate-200 text-xs">
+            <div className="flex items-center gap-4">
+              <div className="text-slate-600">
+                <span className="font-bold text-slate-900">{objects.length}</span> objects
+              </div>
+              <div className="w-px h-4 bg-slate-200" />
+              <div className="text-slate-600">
+                <span className="font-bold text-slate-900">{groups.length}</span> groups
+              </div>
             </div>
           </div>
         </div>
@@ -838,73 +906,124 @@ export default function Object3DEditor({
       {/* RIGHT SIDEBAR - Properties Panel */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {selectedObject && (
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-slate-200 w-72">
-            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+        <div className="absolute right-4 top-4 z-10 max-h-[calc(100%-120px)] overflow-y-auto">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-slate-200 w-64">
+            <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2 pb-2 border-b border-slate-200 text-sm">
               <Settings className="w-4 h-4 text-hearst-green" />
-              Properties
+              {selectedObject.name}
             </h3>
             
-            <div className="space-y-4 text-sm">
-              {/* Name */}
+            <div className="space-y-3 text-sm">
+              {/* Quick Height Control */}
               <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Name</label>
-                <p className="font-semibold text-slate-900 mt-1">{selectedObject.name}</p>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  Height (Y)
+                  <span className="text-slate-500 font-mono">{selectedObject.position.y.toFixed(2)}m</span>
+                </label>
+                <div className="flex items-center gap-2 mt-1">
+                  <button
+                    onClick={() => moveSelected(0, -0.5, 0)}
+                    className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium text-xs flex items-center justify-center gap-1"
+                    disabled={selectedObject.locked}
+                  >
+                    <Minus className="w-3 h-3" /> Down
+                  </button>
+                  <button
+                    onClick={() => moveSelected(0, 0.5, 0)}
+                    className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium text-xs flex items-center justify-center gap-1"
+                    disabled={selectedObject.locked}
+                  >
+                    <Plus className="w-3 h-3" /> Up
+                  </button>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  value={selectedObject.position.y}
+                  onChange={(e) => {
+                    const newY = parseFloat(e.target.value);
+                    setObjects(prev => prev.map(obj => 
+                      obj.id === selectedObject.id ? { ...obj, position: { ...obj.position, y: newY } } : obj
+                    ));
+                  }}
+                  className="w-full mt-2 accent-hearst-green"
+                  disabled={selectedObject.locked}
+                />
+              </div>
+
+              {/* Position - Editable */}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Position (m)</label>
+                <div className="grid grid-cols-3 gap-1 mt-1">
+                  <div className="bg-red-50 rounded-lg p-1 border border-red-100">
+                    <span className="text-[9px] text-red-400 block text-center">X</span>
+                    <input
+                      type="number"
+                      value={selectedObject.position.x.toFixed(2)}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setObjects(prev => prev.map(obj => 
+                          obj.id === selectedObject.id ? { ...obj, position: { ...obj.position, x: val } } : obj
+                        ));
+                      }}
+                      className="w-full text-center font-mono text-xs bg-transparent text-red-600 font-bold focus:outline-none"
+                      step="0.1"
+                      disabled={selectedObject.locked}
+                    />
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-1 border border-green-100">
+                    <span className="text-[9px] text-green-400 block text-center">Y</span>
+                    <input
+                      type="number"
+                      value={selectedObject.position.y.toFixed(2)}
+                      onChange={(e) => {
+                        const val = Math.max(0, parseFloat(e.target.value) || 0);
+                        setObjects(prev => prev.map(obj => 
+                          obj.id === selectedObject.id ? { ...obj, position: { ...obj.position, y: val } } : obj
+                        ));
+                      }}
+                      className="w-full text-center font-mono text-xs bg-transparent text-green-600 font-bold focus:outline-none"
+                      step="0.1"
+                      min="0"
+                      disabled={selectedObject.locked}
+                    />
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-1 border border-blue-100">
+                    <span className="text-[9px] text-blue-400 block text-center">Z</span>
+                    <input
+                      type="number"
+                      value={selectedObject.position.z.toFixed(2)}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setObjects(prev => prev.map(obj => 
+                          obj.id === selectedObject.id ? { ...obj, position: { ...obj.position, z: val } } : obj
+                        ));
+                      }}
+                      className="w-full text-center font-mono text-xs bg-transparent text-blue-600 font-bold focus:outline-none"
+                      step="0.1"
+                      disabled={selectedObject.locked}
+                    />
+                  </div>
+                </div>
               </div>
               
               {/* Dimensions */}
               <div>
                 <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Dimensions (mm)</label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  <div className="bg-slate-50 rounded-lg px-3 py-2 text-center border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block">W</span>
-                    <p className="font-mono font-bold text-slate-900">{selectedObject.dimensions?.width || 0}</p>
+                <div className="grid grid-cols-3 gap-1 mt-1">
+                  <div className="bg-slate-50 rounded-lg p-1 text-center border border-slate-100">
+                    <span className="text-[9px] text-slate-400 block">W</span>
+                    <p className="font-mono text-xs font-bold text-slate-900">{selectedObject.dimensions?.width || 0}</p>
                   </div>
-                  <div className="bg-slate-50 rounded-lg px-3 py-2 text-center border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block">H</span>
-                    <p className="font-mono font-bold text-slate-900">{selectedObject.dimensions?.height || 0}</p>
+                  <div className="bg-slate-50 rounded-lg p-1 text-center border border-slate-100">
+                    <span className="text-[9px] text-slate-400 block">H</span>
+                    <p className="font-mono text-xs font-bold text-slate-900">{selectedObject.dimensions?.height || 0}</p>
                   </div>
-                  <div className="bg-slate-50 rounded-lg px-3 py-2 text-center border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block">D</span>
-                    <p className="font-mono font-bold text-slate-900">{selectedObject.dimensions?.depth || 0}</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Position */}
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Position</label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  <div className="bg-red-50 rounded-lg px-3 py-2 text-center border border-red-100">
-                    <span className="text-[10px] text-red-400 block">X</span>
-                    <p className="font-mono font-bold text-red-600">{selectedObject.position.x.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-green-50 rounded-lg px-3 py-2 text-center border border-green-100">
-                    <span className="text-[10px] text-green-400 block">Y</span>
-                    <p className="font-mono font-bold text-green-600">{selectedObject.position.y.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-blue-50 rounded-lg px-3 py-2 text-center border border-blue-100">
-                    <span className="text-[10px] text-blue-400 block">Z</span>
-                    <p className="font-mono font-bold text-blue-600">{selectedObject.position.z.toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Scale */}
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Scale</label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  <div className="bg-slate-50 rounded-lg px-3 py-2 text-center border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block">X</span>
-                    <p className="font-mono text-sm text-slate-700">{selectedObject.scale.x.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg px-3 py-2 text-center border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block">Y</span>
-                    <p className="font-mono text-sm text-slate-700">{selectedObject.scale.y.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg px-3 py-2 text-center border border-slate-100">
-                    <span className="text-[10px] text-slate-400 block">Z</span>
-                    <p className="font-mono text-sm text-slate-700">{selectedObject.scale.z.toFixed(2)}</p>
+                  <div className="bg-slate-50 rounded-lg p-1 text-center border border-slate-100">
+                    <span className="text-[9px] text-slate-400 block">D</span>
+                    <p className="font-mono text-xs font-bold text-slate-900">{selectedObject.dimensions?.depth || 0}</p>
                   </div>
                 </div>
               </div>
@@ -912,34 +1031,81 @@ export default function Object3DEditor({
               {/* Color */}
               <div>
                 <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Color</label>
-                <div className="flex items-center gap-3 mt-2 bg-slate-50 rounded-lg p-2 border border-slate-100">
+                <div className="flex items-center gap-2 mt-1">
                   <div 
-                    className="w-10 h-10 rounded-lg border-2 border-white shadow-md"
+                    className="w-8 h-8 rounded-lg border-2 border-white shadow-md cursor-pointer"
                     style={{ backgroundColor: selectedObject.color }}
+                    onClick={() => setShowColorPicker(!showColorPicker)}
                   />
-                  <div>
-                    <span className="font-mono text-xs text-slate-600">{selectedObject.color}</span>
-                    <p className="text-[10px] text-slate-400">Click palette to change</p>
-                  </div>
+                  <input
+                    type="text"
+                    value={selectedObject.color}
+                    onChange={(e) => handleColorChange(e.target.value)}
+                    className="flex-1 font-mono text-xs bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200"
+                  />
                 </div>
               </div>
-              
-              {/* Group */}
-              {selectedObject.groupId && (
-                <div>
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Group</label>
-                  <div className="flex items-center gap-2 mt-2 bg-hearst-green/10 rounded-lg p-2 border border-hearst-green/20">
-                    <Layers className="w-4 h-4 text-hearst-green" />
-                    <span className="text-hearst-green font-medium">
-                      {groups.find(g => g.id === selectedObject.groupId)?.name || 'Grouped'}
-                    </span>
-                  </div>
-                </div>
-              )}
+
+              {/* Type Badge */}
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                <span className="px-2 py-1 bg-slate-100 rounded-full text-[10px] font-medium text-slate-600">
+                  {selectedObject.type}
+                </span>
+                {selectedObject.locked && (
+                  <span className="px-2 py-1 bg-orange-100 rounded-full text-[10px] font-medium text-orange-600 flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Locked
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* KEYBOARD SHORTCUTS HELP */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="absolute top-4 left-4 z-10">
+        <details className="group">
+          <summary className="bg-white/90 backdrop-blur rounded-lg px-3 py-2 text-xs font-medium text-slate-600 cursor-pointer hover:bg-white shadow-lg border border-slate-200 list-none flex items-center gap-2">
+            <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded font-mono">?</span>
+            Shortcuts
+          </summary>
+          <div className="mt-2 bg-white/95 backdrop-blur-xl rounded-xl p-3 shadow-xl border border-slate-200 w-56 text-xs">
+            <div className="space-y-2">
+              <div className="font-semibold text-slate-900 pb-1 border-b border-slate-100">Navigation</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-600">
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">W/↑</kbd> Forward</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">S/↓</kbd> Back</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">A/←</kbd> Left</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">D/→</kbd> Right</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">Q</kbd> Down</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">E</kbd> Up</span>
+              </div>
+              
+              <div className="font-semibold text-slate-900 pb-1 border-b border-slate-100 pt-2">Tools</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-600">
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">V</kbd> Select</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">G</kbd> Move</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">R</kbd> Rotate</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">M</kbd> Measure</span>
+              </div>
+              
+              <div className="font-semibold text-slate-900 pb-1 border-b border-slate-100 pt-2">Views</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-600">
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">0</kbd> Perspective</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">5</kbd> Top</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">1-4</kbd> Sides</span>
+                <span><kbd className="bg-slate-100 px-1 rounded text-[10px]">F</kbd> Fullscreen</span>
+              </div>
+              
+              <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-100">
+                Hold <kbd className="bg-slate-100 px-1 rounded">Shift</kbd> for fine control
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
 
       {/* Measurement info */}
       {tool === 'measure' && (

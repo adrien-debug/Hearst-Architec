@@ -7,21 +7,27 @@ import {
   Home,
   Menu,
   X,
-  Settings,
-  Layers
+  Calculator,
+  Activity
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/objects', label: 'Library', icon: Layers },
   { href: '/designer', label: 'Designer', icon: LayoutGrid },
+  { href: '/calculator', label: 'Calculator', icon: Calculator },
+  { href: '/monitoring', label: 'Monitoring', icon: Activity },
 ];
 
 export function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Hide navbar on designer page - it has its own header
+  if (pathname === '/designer') {
+    return null;
+  }
 
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200">
@@ -29,7 +35,7 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-hearst-green rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-hearst-green rounded-full flex items-center justify-center">
               <span className="font-bold text-slate-900">H</span>
             </div>
             <span className="font-semibold text-slate-900 hidden sm:block">
@@ -61,7 +67,7 @@ export function Navbar() {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-slate-100"
+            className="md:hidden p-2 rounded-full hover:bg-slate-100"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={mobileMenuOpen}
@@ -90,7 +96,7 @@ export function Navbar() {
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all',
+                    'flex items-center gap-3 px-4 py-3 rounded-full text-sm font-medium transition-all',
                     isActive
                       ? 'bg-hearst-green text-slate-900'
                       : 'text-slate-600 hover:bg-slate-100'

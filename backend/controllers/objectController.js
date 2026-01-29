@@ -3,33 +3,25 @@
  * Hearst Mining Architect
  * 
  * Handles infrastructure objects (racks, PDU, cooling, networking)
- * CRUD operations with Firebase persistence
+ * ⚠️ RÈGLE ULTIME: CRUD operations avec Supabase LIVE - JAMAIS de mock
  */
 
-const { getFirestore } = require('../config/firebase');
+const { supabase } = require('../config/supabase');
 const logger = require('../utils/logger');
 
-// In-memory storage for mock mode - Empty by default
-let mockObjects = {
-  racks: [],
-  pdu: [],
-  cooling: [],
-  networking: [],
-  containers: [],
-  transformers: [],
-  modules: [] // Assembled modules (container + cooling, etc.)
-};
+// Categories disponibles (pour validation)
+const VALID_CATEGORIES = ['racks', 'pdu', 'cooling', 'networking', 'containers', 'transformers', 'powerblocks', 'modules'];
 
 // Object subtypes with default properties
 const OBJECT_SUBTYPES = {
   containers: {
-    'ANTSPACE-HD5': {
+      'ANTSPACE-HD5': {
       description: 'Bitmain ANTSPACE HD5 - 308 Slot Hydro Container',
       manufacturer: 'Bitmain',
       model: 'ANTSPACE HD5',
       containerType: '40ft ISO',
       // Dimensions in mm
-      dimensions: { width: 12196, height: 2896, depth: 2438 },
+      dimensions: { width: 12192, height: 2896, depth: 2438 },
       // Capacity
       machineSlots: 308,
       slotDistribution: { sidesCount: 2, slotsPerSide: [140, 154] },
@@ -288,6 +280,163 @@ const OBJECT_SUBTYPES = {
       weight: 15000
     }
   },
+  powerblocks: {
+    'PB-16-HD5': {
+      description: 'Power Block 30 MVA - 16x ANTSPACE HD5 Containers',
+      manufacturer: 'Custom',
+      model: 'PB-16-HD5',
+      // Dimensions in mm (footprint for full power block installation)
+      dimensions: { width: 25000, height: 4000, depth: 15000 },
+      // Power specifications
+      totalCapacityMVA: 30,
+      totalCapacityMW: 28.24,
+      inputVoltageHV: 33000, // 33kV primary
+      outputVoltageLV: 400, // 400V secondary
+      frequency: '50/60Hz',
+      // Container support
+      maxContainers: 16,
+      containerType: 'ANTSPACE-HD5',
+      powerPerContainer: 1.765, // MW
+      // Transformer configuration
+      transformerConfig: {
+        type: 'transformer-3.75mva',
+        count: 8,
+        arrangement: '2x4 grid',
+        containersPerTransformer: 2
+      },
+      // HV Switchgear
+      hvSwitchgear: {
+        type: 'Ring Main Unit (RMU)',
+        voltage: 33000,
+        panels: 10,
+        incomers: 2,
+        feeders: 8,
+        manufacturer: 'ABB/Schneider/Siemens'
+      },
+      // LV Switchgear
+      lvSwitchgear: {
+        type: 'Low Voltage Distribution Board',
+        voltage: 400,
+        busbars: 8,
+        mainBreakersAmps: 4000,
+        outgoingBreakersAmps: 1200,
+        manufacturer: 'ABB/Schneider/Siemens'
+      },
+      // Cabling
+      cabling: {
+        hvCableType: 'XLPE 33kV 3x240mm²',
+        lvCableType: 'XLPE 0.6/1kV 4x400mm²',
+        hvCableLengthM: 500,
+        lvCableLengthPerContainerM: 50
+      },
+      // Protection
+      protection: {
+        hvProtection: ['Overcurrent', 'Earth Fault', 'Differential'],
+        lvProtection: ['MCCB', 'ACB', 'Surge Protection'],
+        earthingSystem: 'TN-S',
+        lightningProtection: true
+      },
+      // Auxiliary systems
+      auxiliary: {
+        scadaMonitoring: true,
+        powerMetering: 'Smart Meters per feeder',
+        ups: '10kVA for control systems',
+        emergencyGenerator: 'Optional 100kVA'
+      },
+      // Physical
+      weightTons: 120,
+      footprintM2: 375,
+      clearanceRequiredM: 3,
+      // Installation
+      installationTime: '8-12 weeks',
+      craneRequiredTons: 50,
+      foundationType: 'Reinforced concrete pad',
+      // Certifications
+      certifications: ['IEC 61439', 'IEC 62271', 'IEEE C57'],
+      // Cost estimate (reference only)
+      estimatedCostUSD: 1500000
+    },
+    'PB-8-HD5': {
+      description: 'Power Block 15 MVA - 8x ANTSPACE HD5 Containers',
+      manufacturer: 'Custom',
+      model: 'PB-8-HD5',
+      dimensions: { width: 15000, height: 4000, depth: 12000 },
+      totalCapacityMVA: 15,
+      totalCapacityMW: 14.12,
+      inputVoltageHV: 33000,
+      outputVoltageLV: 400,
+      frequency: '50/60Hz',
+      maxContainers: 8,
+      containerType: 'ANTSPACE-HD5',
+      powerPerContainer: 1.765,
+      transformerConfig: {
+        type: 'transformer-3.75mva',
+        count: 4,
+        arrangement: '2x2 grid',
+        containersPerTransformer: 2
+      },
+      hvSwitchgear: {
+        type: 'Ring Main Unit (RMU)',
+        voltage: 33000,
+        panels: 6,
+        incomers: 1,
+        feeders: 4
+      },
+      lvSwitchgear: {
+        type: 'Low Voltage Distribution Board',
+        voltage: 400,
+        busbars: 4,
+        mainBreakersAmps: 2500,
+        outgoingBreakersAmps: 1200
+      },
+      weightTons: 65,
+      footprintM2: 180,
+      estimatedCostUSD: 850000
+    },
+    'PB-32-HD5': {
+      description: 'Power Block 60 MVA - 32x ANTSPACE HD5 Containers',
+      manufacturer: 'Custom',
+      model: 'PB-32-HD5',
+      dimensions: { width: 40000, height: 4000, depth: 20000 },
+      totalCapacityMVA: 60,
+      totalCapacityMW: 56.48,
+      inputVoltageHV: 132000, // 132kV for large installations
+      outputVoltageLV: 400,
+      frequency: '50/60Hz',
+      maxContainers: 32,
+      containerType: 'ANTSPACE-HD5',
+      powerPerContainer: 1.765,
+      transformerConfig: {
+        type: 'transformer-3.75mva',
+        count: 16,
+        arrangement: '4x4 grid',
+        containersPerTransformer: 2,
+        note: 'Requires 132/33kV step-down transformer'
+      },
+      hvSwitchgear: {
+        type: 'GIS (Gas Insulated Switchgear)',
+        voltage: 132000,
+        panels: 4
+      },
+      mvSwitchgear: {
+        type: 'Ring Main Unit (RMU)',
+        voltage: 33000,
+        panels: 18,
+        incomers: 2,
+        feeders: 16
+      },
+      lvSwitchgear: {
+        type: 'Low Voltage Distribution Board',
+        voltage: 400,
+        busbars: 16,
+        mainBreakersAmps: 4000,
+        outgoingBreakersAmps: 1200
+      },
+      weightTons: 220,
+      footprintM2: 800,
+      estimatedCostUSD: 3200000
+    }
+  },
   racks: {
     'rack-42u': {
       description: 'Server Rack 42U',
@@ -336,18 +485,55 @@ const OBJECT_SUBTYPES = {
 /**
  * Get all objects by category
  * GET /api/objects
+ * ⚠️ SUPABASE LIVE - Lit depuis infrastructure_objects
  */
 exports.getAllObjects = async (req, res) => {
   try {
     const { category } = req.query;
     
-    let result = {};
+    let query = supabase.from('infrastructure_objects').select('*');
     
-    if (category && mockObjects[category]) {
-      result[category] = mockObjects[category];
-    } else {
-      result = mockObjects;
+    if (category && VALID_CATEGORIES.includes(category)) {
+      query = query.eq('category', category);
     }
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) {
+      logger.error('Supabase query error', { error: error.message });
+      throw error;
+    }
+    
+    // Grouper par catégorie
+    const result = {};
+    VALID_CATEGORIES.forEach(cat => { result[cat] = []; });
+    
+    (data || []).forEach(obj => {
+      if (result[obj.category]) {
+        // Convertir format DB vers format API
+        result[obj.category].push({
+          id: obj.id,
+          name: obj.name,
+          type: obj.category.slice(0, -1), // containers -> container
+          subtype: obj.subtype_id,
+          dimensions: {
+            width: obj.width_mm,
+            height: obj.height_mm,
+            depth: obj.depth_mm
+          },
+          color: obj.color,
+          position: {
+            x: obj.position_x,
+            y: obj.position_y,
+            z: obj.position_z
+          },
+          status: obj.status,
+          ...obj.custom_props,
+          createdAt: obj.created_at,
+          updatedAt: obj.updated_at
+        });
+      }
+    });
 
     const totalCount = Object.values(result).reduce(
       (sum, arr) => sum + arr.length, 0
@@ -355,13 +541,13 @@ exports.getAllObjects = async (req, res) => {
 
     res.json({
       success: true,
-      data: result,
+      data: category ? { [category]: result[category] } : result,
       count: totalCount,
-      categories: Object.keys(mockObjects)
+      categories: VALID_CATEGORIES
     });
   } catch (error) {
     logger.error('Get objects error', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch objects' });
+    res.status(500).json({ error: 'Failed to fetch objects from Supabase' });
   }
 };
 
@@ -373,129 +559,180 @@ exports.getObjectById = async (req, res) => {
   try {
     const { id } = req.params;
     
-    for (const category of Object.keys(mockObjects)) {
-      const obj = mockObjects[category].find(o => o.id === id);
-      if (obj) {
-        return res.json({
-          success: true,
-          data: obj,
-          category
-        });
-      }
+    const { data, error } = await supabase
+      .from('infrastructure_objects')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error || !data) {
+      return res.status(404).json({ error: 'Object not found' });
     }
 
-    res.status(404).json({ error: 'Object not found' });
+    res.json({
+      success: true,
+      data: {
+        id: data.id,
+        name: data.name,
+        type: data.category.slice(0, -1),
+        subtype: data.subtype_id,
+        dimensions: { width: data.width_mm, height: data.height_mm, depth: data.depth_mm },
+        color: data.color,
+        ...data.custom_props,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      },
+      category: data.category
+    });
   } catch (error) {
     logger.error('Get object error', { objectId: req.params.id, error: error.message });
-    res.status(500).json({ error: 'Failed to fetch object' });
+    res.status(500).json({ error: 'Failed to fetch object from Supabase' });
   }
 };
 
 /**
  * Create new object
  * POST /api/objects
+ * ⚠️ SUPABASE LIVE
  */
 exports.createObject = async (req, res) => {
   try {
-    const { category, ...objectData } = req.body;
+    const { category, name, dimensions, color, subtype, ...customProps } = req.body;
 
-    if (!category || !mockObjects[category]) {
+    if (!category || !VALID_CATEGORIES.includes(category)) {
       return res.status(400).json({ 
         error: 'Valid category required',
-        validCategories: Object.keys(mockObjects)
+        validCategories: VALID_CATEGORIES
       });
     }
 
-    if (!objectData.name || !objectData.dimensions) {
+    if (!name || !dimensions) {
       return res.status(400).json({ 
         error: 'Name and dimensions are required'
       });
     }
 
-    const newObject = {
-      id: `${category.slice(0, -1)}-${Date.now()}`,
-      type: category.slice(0, -1),
-      ...objectData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    const { data, error } = await supabase
+      .from('infrastructure_objects')
+      .insert({
+        category,
+        subtype_id: subtype || null,
+        name,
+        width_mm: dimensions.width,
+        height_mm: dimensions.height,
+        depth_mm: dimensions.depth,
+        color: color || '#6b7280',
+        custom_props: customProps,
+        status: 'planned'
+      })
+      .select()
+      .single();
 
-    mockObjects[category].push(newObject);
+    if (error) {
+      logger.error('Supabase insert error', { error: error.message });
+      throw error;
+    }
 
-    logger.info('Object created', { objectId: newObject.id, category });
+    logger.info('Object created in Supabase', { objectId: data.id, category });
 
     res.status(201).json({
       success: true,
-      data: newObject
+      data: {
+        id: data.id,
+        name: data.name,
+        type: category.slice(0, -1),
+        dimensions: { width: data.width_mm, height: data.height_mm, depth: data.depth_mm },
+        color: data.color,
+        createdAt: data.created_at
+      }
     });
   } catch (error) {
     logger.error('Create object error', { error: error.message });
-    res.status(500).json({ error: 'Failed to create object' });
+    res.status(500).json({ error: 'Failed to create object in Supabase' });
   }
 };
 
 /**
  * Update object
  * PUT /api/objects/:id
+ * ⚠️ SUPABASE LIVE
  */
 exports.updateObject = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const { name, dimensions, color, ...customProps } = req.body;
 
-    for (const category of Object.keys(mockObjects)) {
-      const index = mockObjects[category].findIndex(o => o.id === id);
-      if (index !== -1) {
-        mockObjects[category][index] = {
-          ...mockObjects[category][index],
-          ...updates,
-          id, // Prevent ID change
-          updatedAt: new Date().toISOString()
-        };
-
-        logger.info('Object updated', { objectId: id, category });
-
-        return res.json({
-          success: true,
-          data: mockObjects[category][index]
-        });
-      }
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (color) updateData.color = color;
+    if (dimensions) {
+      updateData.width_mm = dimensions.width;
+      updateData.height_mm = dimensions.height;
+      updateData.depth_mm = dimensions.depth;
+    }
+    if (Object.keys(customProps).length > 0) {
+      updateData.custom_props = customProps;
     }
 
-    res.status(404).json({ error: 'Object not found' });
+    const { data, error } = await supabase
+      .from('infrastructure_objects')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Object not found' });
+    }
+
+    logger.info('Object updated in Supabase', { objectId: id });
+
+    res.json({
+      success: true,
+      data: {
+        id: data.id,
+        name: data.name,
+        dimensions: { width: data.width_mm, height: data.height_mm, depth: data.depth_mm },
+        color: data.color,
+        updatedAt: data.updated_at
+      }
+    });
   } catch (error) {
     logger.error('Update object error', { objectId: req.params.id, error: error.message });
-    res.status(500).json({ error: 'Failed to update object' });
+    res.status(500).json({ error: 'Failed to update object in Supabase' });
   }
 };
 
 /**
  * Delete object
  * DELETE /api/objects/:id
+ * ⚠️ SUPABASE LIVE
  */
 exports.deleteObject = async (req, res) => {
   try {
     const { id } = req.params;
 
-    for (const category of Object.keys(mockObjects)) {
-      const index = mockObjects[category].findIndex(o => o.id === id);
-      if (index !== -1) {
-        const deleted = mockObjects[category].splice(index, 1)[0];
-        
-        logger.info('Object deleted', { objectId: id, category });
+    const { data, error } = await supabase
+      .from('infrastructure_objects')
+      .delete()
+      .eq('id', id)
+      .select()
+      .single();
 
-        return res.json({
-          success: true,
-          message: 'Object deleted',
-          data: deleted
-        });
-      }
+    if (error || !data) {
+      return res.status(404).json({ error: 'Object not found' });
     }
 
-    res.status(404).json({ error: 'Object not found' });
+    logger.info('Object deleted from Supabase', { objectId: id });
+
+    res.json({
+      success: true,
+      message: 'Object deleted',
+      data: { id: data.id, name: data.name }
+    });
   } catch (error) {
     logger.error('Delete object error', { objectId: req.params.id, error: error.message });
-    res.status(500).json({ error: 'Failed to delete object' });
+    res.status(500).json({ error: 'Failed to delete object from Supabase' });
   }
 };
 
@@ -508,44 +745,74 @@ exports.duplicateObject = async (req, res) => {
     const { id } = req.params;
     const { newName } = req.body;
 
-    for (const category of Object.keys(mockObjects)) {
-      const obj = mockObjects[category].find(o => o.id === id);
-      if (obj) {
-        const duplicate = {
-          ...obj,
-          id: `${obj.type}-${Date.now()}`,
-          name: newName || `${obj.name} (Copy)`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
+    // Récupérer l'objet original depuis Supabase
+    const { data: original, error: fetchError } = await supabase
+      .from('infrastructure_objects')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-        mockObjects[category].push(duplicate);
-
-        logger.info('Object duplicated', { originalId: id, newId: duplicate.id });
-
-        return res.status(201).json({
-          success: true,
-          data: duplicate
-        });
-      }
+    if (fetchError || !original) {
+      return res.status(404).json({ error: 'Object not found' });
     }
 
-    res.status(404).json({ error: 'Object not found' });
+    // Créer la copie
+    const { data: duplicate, error: insertError } = await supabase
+      .from('infrastructure_objects')
+      .insert({
+        category: original.category,
+        subtype_id: original.subtype_id,
+        name: newName || `${original.name} (Copy)`,
+        width_mm: original.width_mm,
+        height_mm: original.height_mm,
+        depth_mm: original.depth_mm,
+        color: original.color,
+        custom_props: original.custom_props,
+        status: 'planned',
+        project_id: original.project_id,
+        template_id: original.template_id
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    logger.info('Object duplicated in Supabase', { originalId: id, newId: duplicate.id });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: duplicate.id,
+        name: duplicate.name,
+        createdAt: duplicate.created_at
+      }
+    });
   } catch (error) {
     logger.error('Duplicate object error', { objectId: req.params.id, error: error.message });
-    res.status(500).json({ error: 'Failed to duplicate object' });
+    res.status(500).json({ error: 'Failed to duplicate object in Supabase' });
   }
 };
 
 /**
  * Get object categories with counts
  * GET /api/objects/categories
+ * ⚠️ SUPABASE LIVE - Compte les objets depuis la DB
  */
 exports.getCategories = async (req, res) => {
   try {
-    const categories = Object.keys(mockObjects).map(category => ({
+    // Compter les objets par catégorie depuis Supabase
+    const counts = {};
+    for (const cat of VALID_CATEGORIES) {
+      const { count, error } = await supabase
+        .from('infrastructure_objects')
+        .select('*', { count: 'exact', head: true })
+        .eq('category', cat);
+      counts[cat] = error ? 0 : count;
+    }
+
+    const categories = VALID_CATEGORIES.map(category => ({
       name: category,
-      count: mockObjects[category].length,
+      count: counts[category] || 0,
       label: category.charAt(0).toUpperCase() + category.slice(1),
       subtypes: OBJECT_SUBTYPES[category] ? Object.keys(OBJECT_SUBTYPES[category]) : []
     }));
@@ -556,7 +823,7 @@ exports.getCategories = async (req, res) => {
     });
   } catch (error) {
     logger.error('Get categories error', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch categories' });
+    res.status(500).json({ error: 'Failed to fetch categories from Supabase' });
   }
 };
 
@@ -594,6 +861,7 @@ exports.getSubtypes = async (req, res) => {
 /**
  * Create object from subtype template
  * POST /api/objects/from-template
+ * ⚠️ SUPABASE LIVE
  */
 exports.createFromTemplate = async (req, res) => {
   try {
@@ -614,42 +882,93 @@ exports.createFromTemplate = async (req, res) => {
 
     const template = OBJECT_SUBTYPES[category][subtype];
     
-    const newObject = {
-      id: `${category.slice(0, -1)}-${Date.now()}`,
-      name: name || template.description,
-      type: category.slice(0, -1),
-      subtype,
-      ...template,
-      ...customProps, // Allow overrides
-      color: customProps?.color || '#6b7280',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    // Trouver le template_id dans Supabase si existant
+    const { data: dbTemplate } = await supabase
+      .from('infrastructure_templates')
+      .select('id')
+      .eq('subtype_id', subtype)
+      .single();
 
-    mockObjects[category].push(newObject);
+    // Insérer dans Supabase
+    const { data: newObject, error } = await supabase
+      .from('infrastructure_objects')
+      .insert({
+        category,
+        subtype_id: subtype,
+        template_id: dbTemplate?.id || null,
+        name: name || template.description,
+        width_mm: template.dimensions?.width || 1000,
+        height_mm: template.dimensions?.height || 1000,
+        depth_mm: template.dimensions?.depth || 1000,
+        color: customProps?.color || '#6b7280',
+        custom_props: {
+          ...template,
+          ...customProps
+        },
+        status: 'planned'
+      })
+      .select()
+      .single();
 
-    logger.info('Object created from template', { objectId: newObject.id, category, subtype });
+    if (error) {
+      logger.error('Supabase insert error', { error: error.message });
+      throw error;
+    }
+
+    logger.info('Object created from template in Supabase', { objectId: newObject.id, category, subtype });
 
     res.status(201).json({
       success: true,
-      data: newObject
+      data: {
+        id: newObject.id,
+        name: newObject.name,
+        type: category.slice(0, -1),
+        subtype,
+        dimensions: {
+          width: newObject.width_mm,
+          height: newObject.height_mm,
+          depth: newObject.depth_mm
+        },
+        color: newObject.color,
+        ...template,
+        createdAt: newObject.created_at
+      }
     });
   } catch (error) {
     logger.error('Create from template error', { error: error.message });
-    res.status(500).json({ error: 'Failed to create object from template' });
+    res.status(500).json({ error: 'Failed to create object from template in Supabase' });
   }
 };
 
 /**
- * Helper: Find object in mockObjects OR in templates
+ * Helper: Find object in Supabase OR in templates
+ * ⚠️ SUPABASE LIVE - Async function
  */
-function findObjectOrTemplate(objectId) {
-  // First, look in existing objects
-  for (const category of Object.keys(mockObjects)) {
-    const found = mockObjects[category].find(o => o.id === objectId);
-    if (found) {
-      return { object: found, category, isTemplate: false };
-    }
+async function findObjectOrTemplate(objectId) {
+  // First, look in Supabase infrastructure_objects
+  const { data: dbObject } = await supabase
+    .from('infrastructure_objects')
+    .select('*')
+    .eq('id', objectId)
+    .single();
+  
+  if (dbObject) {
+    return {
+      object: {
+        id: dbObject.id,
+        name: dbObject.name,
+        type: dbObject.category.slice(0, -1),
+        subtype: dbObject.subtype_id,
+        dimensions: {
+          width: dbObject.width_mm,
+          height: dbObject.height_mm,
+          depth: dbObject.depth_mm
+        },
+        ...dbObject.custom_props
+      },
+      category: dbObject.category,
+      isTemplate: false
+    };
   }
   
   // Then, look in templates (OBJECT_SUBTYPES)
@@ -660,7 +979,7 @@ function findObjectOrTemplate(objectId) {
         object: {
           id: objectId,
           name: template.description || objectId,
-          type: category.slice(0, -1), // containers -> container
+          type: category.slice(0, -1),
           subtype: objectId,
           ...template
         },
@@ -688,9 +1007,9 @@ exports.assembleModule = async (req, res) => {
       });
     }
 
-    // Find base object (from objects or templates)
+    // Find base object (from Supabase or templates) - ASYNC
     const baseId = baseObjectId || baseTemplateId;
-    const baseResult = findObjectOrTemplate(baseId);
+    const baseResult = await findObjectOrTemplate(baseId);
     
     if (!baseResult) {
       return res.status(404).json({ error: `Base object/template '${baseId}' not found` });
@@ -698,7 +1017,7 @@ exports.assembleModule = async (req, res) => {
     
     const baseObject = baseResult.object;
 
-    // Resolve attachments (from objects or templates)
+    // Resolve attachments (from Supabase or templates) - ASYNC
     const resolvedAttachments = [];
     const allAttachments = [
       ...(attachments || []),
@@ -706,7 +1025,7 @@ exports.assembleModule = async (req, res) => {
     ];
     
     for (const att of allAttachments) {
-      const attResult = findObjectOrTemplate(att.objectId);
+      const attResult = await findObjectOrTemplate(att.objectId);
       if (attResult) {
         resolvedAttachments.push({
           objectId: att.objectId,
@@ -715,60 +1034,71 @@ exports.assembleModule = async (req, res) => {
           mountPoint: att.mountPoint || 'side',
           offset: att.offset || { x: baseObject.dimensions.width + 500, y: 0, z: 0 },
           dimensions: attResult.object.dimensions,
-          isTemplate: attResult.isTemplate
+          isTemplate: attResult.isTemplate,
+          powerKW: attResult.object.powerKW || 0,
+          heatDissipationKW: attResult.object.heatDissipationKW || 0
         });
       }
     }
 
-    // Calculate combined dimensions (side by side for EC2-DT)
+    // Calculate combined dimensions (side by side for container-type cooling)
     let totalWidth = baseObject.dimensions.width;
     let totalHeight = baseObject.dimensions.height;
     let totalDepth = baseObject.dimensions.depth;
     let totalPowerKW = baseObject.powerCapacityMW ? baseObject.powerCapacityMW * 1000 : (baseObject.maxPowerKW || 0);
     
+    // Guardrail stack : avertit en cas d’empilement incohérent "side"
+    function isLogicalVerticalStack(attachments) {
+      return attachments.every(att => att.mountPoint === 'top');
+    }
+    if (resolvedAttachments.length > 1 && !isLogicalVerticalStack(resolvedAttachments)) {
+      logger.warn('Empilement vertical incohérent', { module: name, attachments: resolvedAttachments.map(a=>a.mountPoint) });
+    }
+    
     for (const att of resolvedAttachments) {
       if (att.mountPoint === 'top') {
         totalHeight += att.dimensions.height;
-      } else if (att.mountPoint === 'side' || att.mountPoint === 'side-right') {
-        totalWidth += att.dimensions.width + 500; // 500mm gap
       }
-      // Add cooling power consumption
-      const attResult = findObjectOrTemplate(att.objectId);
-      if (attResult && attResult.object.powerKW) {
-        totalPowerKW += attResult.object.powerKW;
+      if (['side', 'side-right', 'side-left'].includes(att.mountPoint)) {
+        totalWidth += att.dimensions.width;
+      }
+      // Add cooling power consumption (already stored in att)
+      if (att.powerKW) {
+        totalPowerKW += att.powerKW;
       }
     }
 
-    const assembledModule = {
-      id: `module-${Date.now()}`,
-      name,
-      type: 'module',
-      baseObject: {
-        id: baseObject.id,
-        name: baseObject.name || baseObject.description,
-        type: baseObject.type,
-        subtype: baseObject.subtype || baseObject.id
-      },
-      attachments: resolvedAttachments,
-      combinedDimensions: {
-        width: totalWidth,
-        height: totalHeight,
-        depth: totalDepth
-      },
-      totalPowerKW,
-      machineSlots: baseObject.machineSlots || 0,
-      coolingCapacityKW: resolvedAttachments.reduce((sum, att) => {
-        const attResult = findObjectOrTemplate(att.objectId);
-        return sum + (attResult?.object?.heatDissipationKW || 0);
-      }, 0),
-      color: '#10b981',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    // Calculate cooling capacity from attachments
+    const coolingCapacityKW = resolvedAttachments.reduce((sum, att) => {
+      return sum + (att.heatDissipationKW || 0);
+    }, 0);
 
-    mockObjects.modules.push(assembledModule);
+    // Insert module into Supabase infrastructure_modules
+    const { data: assembledModule, error: insertError } = await supabase
+      .from('infrastructure_modules')
+      .insert({
+        name,
+        base_object_id: baseResult.isTemplate ? null : baseObject.id,
+        base_template_id: baseResult.isTemplate ? baseId : null,
+        combined_width_mm: totalWidth,
+        combined_height_mm: totalHeight,
+        combined_depth_mm: totalDepth,
+        total_power_kw: totalPowerKW,
+        machine_slots: baseObject.machineSlots || 0,
+        cooling_capacity_kw: coolingCapacityKW,
+        attachments: resolvedAttachments,
+        color: '#10b981',
+        status: 'planned'
+      })
+      .select()
+      .single();
 
-    logger.info('Module assembled', { 
+    if (insertError) {
+      logger.error('Supabase insert module error', { error: insertError.message });
+      throw insertError;
+    }
+
+    logger.info('Module assembled in Supabase', { 
       moduleId: assembledModule.id, 
       baseId, 
       attachments: resolvedAttachments.length,
@@ -777,11 +1107,32 @@ exports.assembleModule = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: assembledModule
+      data: {
+        id: assembledModule.id,
+        name: assembledModule.name,
+        type: 'module',
+        baseObject: {
+          id: baseObject.id,
+          name: baseObject.name || baseObject.description,
+          type: baseObject.type,
+          subtype: baseObject.subtype || baseObject.id
+        },
+        attachments: resolvedAttachments,
+        combinedDimensions: {
+          width: totalWidth,
+          height: totalHeight,
+          depth: totalDepth
+        },
+        totalPowerKW,
+        machineSlots: baseObject.machineSlots || 0,
+        coolingCapacityKW,
+        color: '#10b981',
+        createdAt: assembledModule.created_at
+      }
     });
   } catch (error) {
     logger.error('Assemble module error', { error: error.message });
-    res.status(500).json({ error: 'Failed to assemble module' });
+    res.status(500).json({ error: 'Failed to assemble module in Supabase' });
   }
 };
 

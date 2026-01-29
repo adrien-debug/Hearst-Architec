@@ -3,12 +3,14 @@
  * Hearst Mining Architect
  * 
  * Handles layout creation, saving, and management
+ * SUPABASE STORAGE - Real database persistence
  */
 
 const logger = require('../utils/logger');
+const { supabase } = require('../config/supabase');
 
-// In-memory storage for mock mode - Empty by default
-let mockLayouts = [];
+// Table name in Supabase
+const LAYOUTS_TABLE = 'mining_layouts';
 
 /**
  * Get all layouts
@@ -18,16 +20,26 @@ exports.getAllLayouts = async (req, res) => {
   try {
     const { status } = req.query;
     
-    let layouts = mockLayouts;
+    let query = supabase
+      .from(LAYOUTS_TABLE)
+      .select('*')
+      .order('updated_at', { ascending: false });
     
     if (status) {
-      layouts = layouts.filter(l => l.status === status);
+      query = query.eq('status', status);
+    }
+
+    const { data: layouts, error } = await query;
+
+    if (error) {
+      logger.error('Supabase get layouts error', { error: error.message });
+      throw error;
     }
 
     res.json({
       success: true,
-      data: layouts,
-      count: layouts.length
+      data: layouts || [],
+      count: (layouts || []).length
     });
   } catch (error) {
     logger.error('Get layouts error', { error: error.message });
@@ -42,9 +54,14 @@ exports.getAllLayouts = async (req, res) => {
 exports.getLayoutById = async (req, res) => {
   try {
     const { id } = req.params;
-    const layout = mockLayouts.find(l => l.id === id);
+    
+    const { data: layout, error } = await supabase
+      .from(LAYOUTS_TABLE)
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!layout) {
+    if (error || !layout) {
       return res.status(404).json({ error: 'Layout not found' });
     }
 
@@ -68,7 +85,9 @@ exports.createLayout = async (req, res) => {
       name, 
       description,
       dimensions = { width: 30000, height: 20000, depth: 5000 },
-      grid = { cellSize: 1000, rows: 20, cols: 30 }
+      grid = { cellSize: 1000, rows: 20, cols: 30 },
+      objects = [],
+      groups = []
     } = req.body;
 
     if (!name) {
@@ -76,11 +95,12 @@ exports.createLayout = async (req, res) => {
     }
 
     const newLayout = {
-      id: `layout-${Date.now()}`,
       name,
       description: description || '',
       dimensions,
       grid,
+      objects, // 3D objects array
+      groups,  // Object groups
       placements: [],
       infrastructure: {
         racks: [],
@@ -96,18 +116,25 @@ exports.createLayout = async (req, res) => {
         totalPowerMW: 0,
         estimatedCost: 0
       },
-      status: 'draft',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      status: 'draft'
     };
 
-    mockLayouts.push(newLayout);
+    const { data: created, error } = await supabase
+      .from(LAYOUTS_TABLE)
+      .insert(newLayout)
+      .select()
+      .single();
 
-    logger.info('Layout created', { layoutId: newLayout.id, name });
+    if (error) {
+      logger.error('Supabase create layout error', { error: error.message });
+      throw error;
+    }
+
+    logger.info('Layout created', { layoutId: created.id, name });
 
     res.status(201).json({
       success: true,
-      data: newLayout
+      data: created
     });
   } catch (error) {
     logger.error('Create layout error', { error: error.message });
@@ -124,34 +151,51 @@ exports.updateLayout = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    const index = mockLayouts.findIndex(l => l.id === id);
-    
-    if (index === -1) {
-      return res.status(404).json({ error: 'Layout not found' });
-    }
-
-    // Calculate statistics if placements changed
-    if (updates.placements) {
+    // Calculate statistics if objects changed
+    if (updates.objects) {
+      const containers = updates.objects.filter(o => o.type?.includes('container'));
+      const transformers = updates.objects.filter(o => o.type?.includes('transformer'));
+      const coolers = updates.objects.filter(o => o.type?.includes('cooler') || o.type?.includes('dry'));
+      
       updates.statistics = {
-        totalMachines: updates.placements.length,
-        totalHashrateTH: updates.placements.reduce((sum, p) => sum + (p.hashrateTH || 0), 0),
-        totalPowerMW: updates.placements.reduce((sum, p) => sum + (p.powerWatts || 0), 0) / 1000000,
-        estimatedCost: updates.placements.reduce((sum, p) => sum + (p.cost || 0), 0)
+        totalObjects: updates.objects.length,
+        containers: containers.length,
+        transformers: transformers.length,
+        coolers: coolers.length,
+        totalMachines: updates.placements?.length || 0,
+        totalHashrateTH: updates.placements?.reduce((sum, p) => sum + (p.hashrateTH || 0), 0) || 0,
+        totalPowerMW: updates.placements?.reduce((sum, p) => sum + (p.powerWatts || 0), 0) / 1000000 || 0,
+        estimatedCost: updates.placements?.reduce((sum, p) => sum + (p.cost || 0), 0) || 0
       };
     }
 
-    mockLayouts[index] = {
-      ...mockLayouts[index],
-      ...updates,
-      id, // Prevent ID change
-      updatedAt: new Date().toISOString()
-    };
+    // Remove id from updates to prevent overwriting
+    delete updates.id;
+    delete updates.created_at;
+
+    const { data: updated, error } = await supabase
+      .from(LAYOUTS_TABLE)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Supabase update layout error', { error: error.message });
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Layout not found' });
+      }
+      throw error;
+    }
 
     logger.info('Layout updated', { layoutId: id });
 
     res.json({
       success: true,
-      data: mockLayouts[index]
+      data: updated
     });
   } catch (error) {
     logger.error('Update layout error', { layoutId: req.params.id, error: error.message });
@@ -166,20 +210,34 @@ exports.updateLayout = async (req, res) => {
 exports.deleteLayout = async (req, res) => {
   try {
     const { id } = req.params;
-    const index = mockLayouts.findIndex(l => l.id === id);
 
-    if (index === -1) {
+    // First get the layout to return it
+    const { data: layout } = await supabase
+      .from(LAYOUTS_TABLE)
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (!layout) {
       return res.status(404).json({ error: 'Layout not found' });
     }
 
-    const deleted = mockLayouts.splice(index, 1)[0];
+    const { error } = await supabase
+      .from(LAYOUTS_TABLE)
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      logger.error('Supabase delete layout error', { error: error.message });
+      throw error;
+    }
 
     logger.info('Layout deleted', { layoutId: id });
 
     res.json({
       success: true,
       message: 'Layout deleted',
-      data: deleted
+      data: layout
     });
   } catch (error) {
     logger.error('Delete layout error', { layoutId: req.params.id, error: error.message });
@@ -196,9 +254,14 @@ exports.addPlacement = async (req, res) => {
     const { id } = req.params;
     const { objectId, objectType, position, rotation = 0 } = req.body;
 
-    const layout = mockLayouts.find(l => l.id === id);
-    
-    if (!layout) {
+    // Get current layout
+    const { data: layout, error: fetchError } = await supabase
+      .from(LAYOUTS_TABLE)
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !layout) {
       return res.status(404).json({ error: 'Layout not found' });
     }
 
@@ -215,11 +278,23 @@ exports.addPlacement = async (req, res) => {
       addedAt: new Date().toISOString()
     };
 
-    layout.placements.push(placement);
-    layout.updatedAt = new Date().toISOString();
+    const updatedPlacements = [...(layout.placements || []), placement];
 
-    // Update statistics
-    layout.statistics.totalMachines = layout.placements.filter(p => p.objectType === 'machine').length;
+    const { data: updated, error } = await supabase
+      .from(LAYOUTS_TABLE)
+      .update({
+        placements: updatedPlacements,
+        statistics: {
+          ...layout.statistics,
+          totalMachines: updatedPlacements.filter(p => p.objectType === 'machine').length
+        },
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     logger.info('Placement added', { layoutId: id, placementId: placement.placementId });
 
@@ -241,23 +316,40 @@ exports.removePlacement = async (req, res) => {
   try {
     const { id, placementId } = req.params;
 
-    const layout = mockLayouts.find(l => l.id === id);
-    
-    if (!layout) {
+    // Get current layout
+    const { data: layout, error: fetchError } = await supabase
+      .from(LAYOUTS_TABLE)
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !layout) {
       return res.status(404).json({ error: 'Layout not found' });
     }
 
-    const index = layout.placements.findIndex(p => p.placementId === placementId);
+    const placements = layout.placements || [];
+    const index = placements.findIndex(p => p.placementId === placementId);
     
     if (index === -1) {
       return res.status(404).json({ error: 'Placement not found' });
     }
 
-    const removed = layout.placements.splice(index, 1)[0];
-    layout.updatedAt = new Date().toISOString();
+    const removed = placements[index];
+    const updatedPlacements = placements.filter(p => p.placementId !== placementId);
 
-    // Update statistics
-    layout.statistics.totalMachines = layout.placements.filter(p => p.objectType === 'machine').length;
+    const { error } = await supabase
+      .from(LAYOUTS_TABLE)
+      .update({
+        placements: updatedPlacements,
+        statistics: {
+          ...layout.statistics,
+          totalMachines: updatedPlacements.filter(p => p.objectType === 'machine').length
+        },
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) throw error;
 
     logger.info('Placement removed', { layoutId: id, placementId });
 
@@ -281,28 +373,39 @@ exports.duplicateLayout = async (req, res) => {
     const { id } = req.params;
     const { newName } = req.body;
 
-    const layout = mockLayouts.find(l => l.id === id);
-    
-    if (!layout) {
+    // Get original layout
+    const { data: layout, error: fetchError } = await supabase
+      .from(LAYOUTS_TABLE)
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !layout) {
       return res.status(404).json({ error: 'Layout not found' });
     }
 
+    // Create duplicate without id and timestamps
+    const { id: _, created_at, updated_at, ...layoutData } = layout;
+    
     const duplicate = {
-      ...JSON.parse(JSON.stringify(layout)), // Deep clone
-      id: `layout-${Date.now()}`,
+      ...layoutData,
       name: newName || `${layout.name} (Copy)`,
-      status: 'draft',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      status: 'draft'
     };
 
-    mockLayouts.push(duplicate);
+    const { data: created, error } = await supabase
+      .from(LAYOUTS_TABLE)
+      .insert(duplicate)
+      .select()
+      .single();
 
-    logger.info('Layout duplicated', { originalId: id, newId: duplicate.id });
+    if (error) throw error;
+
+    logger.info('Layout duplicated', { originalId: id, newId: created.id });
 
     res.status(201).json({
       success: true,
-      data: duplicate
+      data: created
     });
   } catch (error) {
     logger.error('Duplicate layout error', { layoutId: req.params.id, error: error.message });
@@ -317,9 +420,14 @@ exports.duplicateLayout = async (req, res) => {
 exports.exportLayout = async (req, res) => {
   try {
     const { id } = req.params;
-    const layout = mockLayouts.find(l => l.id === id);
+    
+    const { data: layout, error } = await supabase
+      .from(LAYOUTS_TABLE)
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!layout) {
+    if (error || !layout) {
       return res.status(404).json({ error: 'Layout not found' });
     }
 
@@ -350,22 +458,31 @@ exports.importLayout = async (req, res) => {
       return res.status(400).json({ error: 'Invalid layout data' });
     }
 
+    // Remove any existing id and timestamps from import
+    const { id, created_at, updated_at, exportedAt, ...cleanData } = layoutData;
+
     const imported = {
-      ...layoutData,
-      id: `layout-${Date.now()}`,
+      ...cleanData,
       status: 'draft',
-      importedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      imported_from: id || null
     };
 
-    mockLayouts.push(imported);
+    const { data: created, error } = await supabase
+      .from(LAYOUTS_TABLE)
+      .insert(imported)
+      .select()
+      .single();
 
-    logger.info('Layout imported', { layoutId: imported.id, name: imported.name });
+    if (error) {
+      logger.error('Supabase import layout error', { error: error.message });
+      throw error;
+    }
+
+    logger.info('Layout imported', { layoutId: created.id, name: created.name });
 
     res.status(201).json({
       success: true,
-      data: imported
+      data: created
     });
   } catch (error) {
     logger.error('Import layout error', { error: error.message });

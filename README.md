@@ -176,6 +176,74 @@ npm run test:database-integrity
 
 ---
 
+## 🚨 RÈGLE ABSOLUE #2 - POSITION = EMPLACEMENT DE ZONE
+
+### ⚠️ DÉFINITION STRICTE DE LA POSITION ⚠️
+
+**CETTE RÈGLE EST NON-NÉGOCIABLE ET DÉFINIT LA TERMINOLOGIE DU PROJET.**
+
+### Principe Fondamental
+
+Dans Hearst Mining Architect, **POSITION** signifie toujours **EMPLACEMENT D'UNE ZONE** sur le terrain de la ferme mining.
+
+### Définitions
+
+| Terme | Signification | Unité |
+|-------|---------------|-------|
+| **Position** | Emplacement d'une zone sur le terrain | Mètres (m) |
+| **Position X** | Emplacement horizontal (est-ouest) | Mètres |
+| **Position Y** | Hauteur verticale (sol = 0) | Mètres |
+| **Position Z** | Emplacement profondeur (nord-sud) | Mètres |
+
+### Configuration par Défaut - Layout Standard
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    HEARST MINING FARM LAYOUT                     │
+│                                                                  │
+│  Rangée 1 (X=0)              15m              Rangée 2 (X=27.2m) │
+│  ┌─────────────┐                              ┌─────────────┐    │
+│  │ Container 1 │        ALLÉE CENTRALE        │ Container 5 │    │
+│  │ + Cooling   │◄──────── 15 mètres ────────►│ + Cooling   │    │
+│  └─────────────┘    (portes face à face)      └─────────────┘    │
+│        4m ↓                                         4m ↓         │
+│  ┌─────────────┐                              ┌─────────────┐    │
+│  │ Container 2 │                              │ Container 6 │    │
+│  │ + Cooling   │                              │ + Cooling   │    │
+│  └─────────────┘                              └─────────────┘    │
+│        4m ↓                                         4m ↓         │
+│  ┌─────────────┐                              ┌─────────────┐    │
+│  │ Container 3 │                              │ Container 7 │    │
+│  │ + Cooling   │                              │ + Cooling   │    │
+│  └─────────────┘                              └─────────────┘    │
+│        4m ↓                                         4m ↓         │
+│  ┌─────────────┐                              ┌─────────────┐    │
+│  │ Container 4 │                              │ Container 8 │    │
+│  │ + Cooling   │                              │ + Cooling   │    │
+│  └─────────────┘                              └─────────────┘    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Règles de Positionnement
+
+1. **Container + Cooling** = 1 module (cooling sur le toit)
+2. **Espacement entre modules** = 4 mètres
+3. **Distance face à face** = 15 mètres entre les portes
+4. **La porte est à l'arrière** du container (bande verte = indicateur porte)
+
+### Dimensions Standard (40ft ISO Container)
+
+| Dimension | Valeur |
+|-----------|--------|
+| Largeur (X) | 12.192 m |
+| Hauteur (Y) | 2.896 m |
+| Profondeur (Z) | 2.438 m |
+
+**Cette règle est NON-NÉGOCIABLE, CRITIQUE et PERMANENTE.**
+
+---
+
 ## Overview
 
 Hearst Mining Architect is a comprehensive platform for designing, calculating, and managing Bitcoin mining operations. It provides professional-grade tools for:
@@ -305,6 +373,12 @@ Frontend runs on `http://localhost:3106`
 - `DELETE /api/objects/:id` - Delete object
 - `POST /api/objects/:id/duplicate` - Duplicate object
 
+### AI (Implantation)
+- `GET /api/ai/status` - Check AI service availability
+- `POST /api/ai/implantation` - Generate optimal layout using AI
+- `POST /api/ai/optimize` - Optimize existing layout
+- `POST /api/ai/suggest` - Get AI suggestions for current layout
+
 ### Layouts
 - `GET /api/layouts` - Get all layouts
 - `POST /api/layouts` - Create new layout
@@ -316,6 +390,21 @@ Frontend runs on `http://localhost:3106`
 - `GET /api/layouts/:id/export` - Export layout as JSON
 - `POST /api/layouts/:id/placements` - Add placement to layout
 - `DELETE /api/layouts/:id/placements/:placementId` - Remove placement
+
+### Advanced Tools (PRO - DÉBRIDÉ)
+- `GET /api/tools/search?q=query` - Recherche équipements mining (base de données interne)
+- `GET /api/tools/equipment/:id` - Specs détaillées d'un équipement
+- `GET /api/tools/equipment` - Liste tous les équipements
+- `POST /api/tools/thermal` - Calculs thermiques avancés (BTU, CFM, dew point)
+- `POST /api/tools/electrical` - Dimensionnement électrique (transfo, PDU, câbles)
+- `GET /api/tools/market` - Données marché mining live (BTC, difficulty, profitability)
+- `POST /api/tools/recommendations` - Recommandations intelligentes pour layout
+- `POST /api/tools/export/dxf` - Export layout en DXF (CAD)
+- `POST /api/tools/export/json` - Export layout en JSON
+- `GET /api/tools/quick/btu?kw=X` - Conversion rapide kW → BTU
+- `GET /api/tools/quick/cfm?kw=X&deltaT=Y` - Calcul CFM pour air cooling
+- `GET /api/tools/quick/waterflow?kw=X&deltaT=Y` - Calcul débit eau hydro cooling
+- `GET /api/tools/quick/cable?kw=X&voltage=Y&distance=Z` - Dimensionnement câble
 
 ## Configuration
 
@@ -336,6 +425,10 @@ QATAR_ELECTRICITY_RATE=0.03
 
 # CORS
 CORS_ORIGINS=http://localhost:3106
+
+# AI APIs (for AI Implantation)
+OPENAI_API_KEY=sk-...          # GPT-4.1 for complex layouts
+GEMINI_API_KEY=AIza...         # Gemini Flash for fast generation
 ```
 
 ### Frontend Environment Variables
@@ -362,13 +455,41 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
 - Compare multiple machines side-by-side
 - Add custom machines
 
-### Object Editor (`/objects`)
-- Create and modify infrastructure objects
-- Categories: Racks, PDU, Cooling, Networking, Containers, Transformers
-- Full dimension editing (width, height, depth in mm)
-- Category-specific properties (slots, capacity, power)
-- Color customization for 3D visualization
-- Duplicate and delete objects
+### 🎨 Designer 2.0 (`/designer`) - UNIFIED INTERFACE
+
+L'interface a été entièrement repensée pour une expérience unifiée :
+
+**Vue 3D Full-Screen**
+- Scène 3D Three.js immersive plein écran
+- Pas de sidebar permanente - espace de travail maximisé
+- Mesure entre objets intégrée
+- Contrôles caméra (vue dessus, perspective, zoom)
+
+**Library Drawer**
+- Accès via bouton [+ ADD] ou [📦 LIBRARY]
+- Catégories visuelles : Containers, Cooling, Transformers, PDU, Racks, Networking, Modules
+- Cartes d'objets avec preview 3D miniature
+- Clic = ajout direct à la scène (pas de "Select an object")
+- Recherche intégrée
+
+**Properties Panel Contextuel**
+- Apparaît uniquement quand un objet est sélectionné
+- Modification directe : position, rotation, couleur
+- Actions : Duplicate, Delete, Lock, Hide
+- Se ferme automatiquement quand on désélectionne
+
+**Toolbar Flottante**
+- Outils de transformation : Select, Move, Rotate, Scale
+- Outil de mesure
+- Contrôles de vue : Grid, Dimensions, Reset View, Top View
+- Accès AI Implantation
+- Save, Export, Open Project
+
+**Workflow Simplifié**
+```
+AVANT: /objects → chercher → /designer → sidebar → ajouter → panel
+APRÈS: /designer → [+ADD] → clic carte → objet sur scène → modifier direct
+```
 
 ### Pre-loaded Catalog (Supabase)
 
@@ -403,20 +524,222 @@ Equipment is stored in the `catalog` table with full specs in JSONB format.
 | **Powers** | 2× ANTSPACE HD5 containers |
 | **Price** | $35,000 |
 
-### Layout Builder (`/layouts`)
-- Create new mining facility layouts from scratch
-- Grid-based 2D canvas with snapping
-- Place machines and infrastructure objects
-- Tools: Select/Move, Place, Delete
-- Object palette with machines and infrastructure
-- Save, export, and import layouts
-- Layout statistics (total items, machines, infrastructure)
+### Farm Designer (`/designer`) - UNIFIED 3D EDITOR
+- **Full-screen 3D** Three.js visualization avec vue immersive
+- **Library Drawer** avec catégories et cartes d'objets avec preview 3D
+- **Clic = Ajout direct** - Pas de workflow complexe
+- **Toolbar flottante** avec tous les outils essentiels
+- **Properties Panel contextuel** pour édition rapide
+- **Mesure intégrée** entre objets sur la scène
+- **AI Implantation** - Génération automatique de layouts optimisés
+- **Save/Load/Export** projets en JSON
+- Infrastructure complète : Containers, Cooling, Transformers, PDU, Racks, Networking, Modules assemblés
 
-### Farm Designer (`/designer`)
-- 2D grid-based layout
-- 3D Three.js visualization
-- Drag-and-drop machine placement
-- Infrastructure components (racks, PDUs, cooling)
+### AI Implantation (GPT-4.1 & Gemini Flash)
+- **Génération automatique** de layouts de ferme mining
+- **Optimisation intelligente** (densité, refroidissement, maintenance)
+- **Dual AI** : GPT-4.1 pour layouts complexes, Gemini Flash pour rapidité
+- **Sélection auto** du meilleur modèle selon la complexité
+- **Validation** des placements (collisions, limites, contraintes)
+- **Recommandations** d'amélioration de layout
+- **Statistiques** : puissance totale, slots machines, utilisation
+- **AI Status Panel** : Affichage en temps réel de l'état des providers (GPT-4.1, Gemini)
+
+### 🗄️ Cloud Storage (Supabase)
+- **Sauvegarde en base de données** : Layouts persistants dans Supabase
+- **Bouton "Save DB"** dans le header pour sauvegarde rapide
+- **Cloud Panel** : Gestion des layouts (Open, Save, Delete)
+- **Last Saved** : Affichage de la dernière sauvegarde
+- **Multi-layouts** : Gestion de plusieurs projets
+- **Import/Export** : Compatible JSON local + base de données
+
+### ⌨️ Raccourcis Clavier Designer
+
+| Catégorie | Touche | Action |
+|-----------|--------|--------|
+| **Navigation** | W / ↑ | Déplacer vers l'avant (Z-) |
+| | S / ↓ | Déplacer vers l'arrière (Z+) |
+| | A / ← | Déplacer à gauche (X-) |
+| | D / → | Déplacer à droite (X+) |
+| | Q | Descendre (Y-) |
+| | E | Monter (Y+) |
+| | PageUp | Monter (Y+) |
+| | PageDown | Descendre (Y-) |
+| | Shift | Mouvement fin (0.1m au lieu de 0.5m) |
+| **Outils** | V | Outil sélection |
+| | G | Outil déplacement |
+| | R | Outil rotation |
+| | M | Outil mesure |
+| **Actions** | Delete / Backspace | Supprimer objet |
+| | Ctrl+D | Dupliquer objet |
+| | Escape | Désélectionner |
+| | Ctrl+S | Sauvegarde rapide (localStorage) |
+| **Vues** | 0 | Vue perspective |
+| | 1 | Vue front |
+| | 2 | Vue back |
+| | 3 | Vue gauche |
+| | 4 | Vue droite |
+| | 5 | Vue dessus |
+| | F | Plein écran |
+
+### Contrôles Hauteur (Y-Axis)
+- **Slider** de hauteur dans le panneau propriétés
+- **Boutons Up/Down** pour ajustement rapide (+/- 0.5m)
+- **Inputs éditables** pour position X, Y, Z précise
+- **Protection sol** : Y ne peut pas être négatif
+
+### 🧞 GENIE - Assistant IA Intégré
+
+Le Genie est un assistant IA conversationnel intégré directement dans l'éditeur 3D.
+
+#### Commandes Vocales/Texte
+| Commande | Action |
+|----------|--------|
+| `"Ferme 5 MW"` | Génère automatiquement une ferme de 5 MW |
+| `"Ajoute 4 containers"` | Ajoute 4 containers HD5 au layout |
+| `"Ajoute 2 coolers"` | Ajoute 2 dry coolers EC2-DT |
+| `"Analyse"` | Détecte tous les problèmes du layout |
+| `"Fix"` | Corrige automatiquement tous les problèmes |
+| `"Coût"` | Estime le budget total (équipement + installation) |
+| `"Aligne"` | Aligne tous les objets sur la grille |
+| `"Espace 2m"` | Applique un espacement de 2m entre objets |
+| `"Aide"` | Affiche toutes les commandes disponibles |
+
+#### Farm Presets
+| Preset | Description |
+|--------|-------------|
+| 🏭 **Starter 1 MW** | 2 containers HD5 + 1 dry cooler + 1 transfo |
+| ⚡ **Medium 5 MW** | 8 containers + 4 dry coolers + 2 transfos |
+| 🔥 **Mega 20 MW** | 32 containers + 16 coolers + 8 transfos |
+| 🏜️ **Qatar Optimized** | Layout optimisé climat chaud (+40°C) |
+| 🏗️ **Site Complet 8 Containers** | **TOUT INCLUS** - Voir détails ci-dessous |
+
+#### 🏗️ Preset "Site Complet 8 Containers" - Détails
+
+Ce preset génère un site minier **professionnel clé en main** avec :
+
+**Mining (8 containers)**
+- 8× ANTSPACE HD5 (308 slots chacun = 2464 machines)
+- 4× EC2-DT Dry Coolers (refroidissement hydro)
+
+**Électricité**
+- 3× Transformateurs 3.75 MVA
+- 1× PDU Principal 5MW
+- 2× PDU Secondaires
+- 2× Gensets CAT 3516B 2MW (backup)
+- 1× Fuel Tank 20,000L
+
+**Eau & Refroidissement**
+- 2× Water Tanks 50m³
+- 2× Pompes de circulation
+- 1× Water Treatment Unit
+- 2× AHU (Air Handling Units)
+
+**Sécurité**
+- 1× Fire Suppression Tank
+- 1× Fire Pump House
+- 1× Security Cabin
+- 1× Guard Tower
+
+**Control & Network**
+- 1× Control Room Container
+- 1× Network POP Container
+- 1× Satellite VSAT
+
+**Logistique**
+- 1× Spare Parts Container
+- 1× Maintenance Workshop
+- 1× Main Gate
+- 1× Parking Zone
+- 1× Loading Dock
+
+**Électricité Avancée**
+- 3× Cable Trays (HT/BT)
+- 1× Raccordement HT Poste Source
+- 1× Poste Livraison HTA
+- 1× UPS 500kVA + Battery Bank
+
+**Infrastructure Complète**
+- 4× Clôtures Périmétriques (N/S/E/O)
+- 6× Mâts Éclairage LED
+- 4× Dalles Béton (fondations)
+- 3× Tuyauteries Eau (froid/chaud/collecteur)
+- 1× Station Météo
+- 4× Caméras PTZ Surveillance
+- 1× Compresseur Air Industriel
+
+**Confort Personnel**
+- 1× Bloc Sanitaire
+- 1× Réfectoire Container
+
+### 📋 Bill of Materials (BOM)
+
+Le Genie génère automatiquement un BOM complet avec :
+- **Catégorie** par type d'équipement
+- **Quantité** comptée automatiquement
+- **Prix unitaire** basé sur les fournisseurs réels
+- **Total** par ligne
+- **Fournisseur** suggéré (Bitmain, ABB, Caterpillar, etc.)
+- **Délai de livraison** estimé
+
+**Export disponible:**
+- 📥 CSV (Excel compatible)
+- 📄 JSON (intégration systèmes)
+
+#### Auto-Detection & Fix
+- ⚠️ Détection automatique manque de refroidissement
+- ⚡ Détection insuffisance transformateurs
+- 🚧 Détection violations de clearance
+- 📐 Détection mauvais alignement
+- 🔧 **Un clic pour tout corriger automatiquement**
+
+#### Estimation Coûts
+- 💰 Calcul automatique du coût des équipements
+- 📊 Estimation installation (15% du matériel)
+- 💵 Total projet en temps réel
+
+### 3D Editor Pro Tools (DÉBRIDÉ)
+
+#### Outils de Visualisation
+| Outil | Description |
+|-------|-------------|
+| **Snap to Grid** | Accrochage magnétique à la grille (1-5m configurable) |
+| **Airflow** | Visualise flux d'air chaud (rouge) et froid (bleu) |
+| **Power Path** | Trace le chemin électrique (transfo → PDU → containers) |
+| **Clearance Zones** | Affiche zones de sécurité et violations de distance |
+| **Metrics Panel** | Métriques mining en temps réel (power, cooling ratio, slots) |
+
+#### Outils d'Alignement & Distribution
+| Outil | Description |
+|-------|-------------|
+| **Align Left/Center/Right** | Aligne objets sélectionnés sur X |
+| **Align Top/Middle/Bottom** | Aligne objets sélectionnés sur Z |
+| **Distribute H/V** | Espace équidistant (min 3 objets) |
+| **Auto Spacing** | Espacement automatique (1.5m, 2m, 3m, 4m) pour allées maintenance |
+
+#### Clone & Mirror
+| Outil | Description |
+|-------|-------------|
+| **Array Clone** | Duplique en grille (rows × cols) avec espacement |
+| **Mirror X/Z** | Symétrie horizontale/verticale |
+
+#### Calculatrices Avancées
+| Calcul | Description |
+|--------|-------------|
+| **Thermal** | BTU, CFM, tons of cooling, dew point, condensation risk |
+| **Electrical** | Transfo sizing, courant, PDU count, section câbles |
+| **PUE Estimate** | Estimation automatique du PUE selon type cooling |
+| **Water Flow** | Débit eau m³/h pour hydro cooling |
+
+#### Base de Données Équipements Intégrée
+- **ASICs** : S21 XP Hydro (473 TH), S21 Pro (234 TH), M66S (298 TH), etc.
+- **Containers** : ANTSPACE HK3 (210 slots), HD5 (308 slots), HD3 (144 slots)
+- **Cooling** : EC2-DT (1500 kW), CDU-S1 (500 kW), Adiabatic
+- **Transformers** : 3750 kVA, 2500 kVA, 1000 kVA avec specs complètes
+
+#### Export Formats
+- **JSON** : Export complet avec métriques
+- **DXF** : Export CAD basique pour AutoCAD/DraftSight
 
 ### Monitoring Dashboard
 - Real-time hashrate tracking
@@ -515,26 +838,39 @@ cd frontend && npm run build && npm start
 ### Backend Controllers (New/Updated)
 - `controllers/objectController.js` - Infrastructure objects CRUD
 - `controllers/layoutController.js` - Layout management & placements
+- `controllers/aiController.js` - AI implantation endpoints
 - `routes/objectRoutes.js` - Object API routes
 - `routes/layoutRoutes.js` - Layout API routes
+- `routes/aiRoutes.js` - AI API routes
+- `services/aiService.js` - AI service (GPT-4.1 & Gemini Flash)
 
 ### Backend Middleware
 - `middleware/authMiddleware.js` - JWT authentication & demo mode
 - `middleware/validationMiddleware.js` - Input validation with express-validator
 - `middleware/index.js` - Middleware exports
 
-### Frontend Pages (New)
-- `app/objects/page.tsx` - Object Editor page
-- `app/layouts/page.tsx` - Layout Builder page
+### Frontend Pages
+- `app/designer/page.tsx` - **UNIFIED** 3D Designer (refonte complète v2.0)
+- `app/calculator/page.tsx` - Profitability Calculator
+- `app/monitoring/page.tsx` - Monitoring Dashboard
+- `app/machines/page.tsx` - ASIC Machine Catalog
 
-### Frontend Components (New)
+### Frontend Components - Designer 2.0 (New)
+- `components/designer/library-drawer.tsx` - Drawer avec catégories et cartes preview
+- `components/designer/object-card.tsx` - Carte objet avec preview 3D miniature
+- `components/designer/properties-panel.tsx` - Panneau d'édition contextuel
+- `components/designer/toolbar.tsx` - Barre d'outils flottante bottom
+- `components/designer/object-3d-editor.tsx` - Composants 3D Three.js
+- `components/designer/object-3d-preview.tsx` - Preview 3D pour cartes
+
+### Frontend Components (Core)
 - `components/ErrorBoundary.tsx` - React error boundary
 - `components/ui/skeleton.tsx` - Loading skeleton components
 - `hooks/useApi.ts` - Custom API hooks
 - `types/index.ts` - Shared TypeScript types
 
 ### Frontend API (Updated)
-- `lib/api.ts` - Added objectsApi and layoutsApi clients
+- `lib/api.ts` - Added objectsApi, layoutsApi, and aiApi clients
 
 ### Navigation (Updated)
 - `components/layout/navbar.tsx` - Added Objects and Layouts menu items
@@ -551,4 +887,71 @@ Proprietary - Hearst Corporation
 
 ---
 
-Hearst Mining Architect v1.2.0 - Object Editor & Layout Builder
+Hearst Mining Architect v2.0.0 - 🎨 DESIGNER 2.0 (Interface unifiée full-screen, Library Drawer, Properties Panel)
+
+---
+
+## 🤖 PROMPT GPT - Mining Farm Designer
+
+Copie ce prompt pour utiliser GPT comme assistant de design de fermes mining :
+
+```
+Tu es un expert en conception de fermes de mining Bitcoin. Tu as accès à un outil 3D appelé "Hearst Mining Architect" avec un assistant IA nommé "Genie".
+
+### Contexte
+- Je conçois des fermes de mining Bitcoin professionnelles
+- J'utilise des containers ANTSPACE HD5 (308 machines, 12.2m × 2.9m × 2.4m, hydro cooling)
+- Dry Coolers EC2-DT pour le refroidissement
+- Transformateurs 3.75 MVA
+- Site au Qatar (climat chaud +40°C, humidité 50%)
+
+### Équipements Disponibles
+| Type | Modèle | Specs | Prix USD |
+|------|--------|-------|----------|
+| Container Mining | ANTSPACE HD5 | 308 slots, 1765kW max, hydro | $180,000 |
+| Container Mining | ANTSPACE HK3 | 210 slots, 1200kW max, air | $95,000 |
+| Dry Cooler | EC2-DT | 1500kW capacity | $120,000 |
+| Transformateur | 3.75 MVA | Oil-immersed | $85,000 |
+| PDU | 5MW | Distribution principale | $65,000 |
+| Genset | CAT 3516B | 2MW backup | $280,000 |
+| Water Tank | 50m³ | Stockage eau | $25,000 |
+| UPS | 500kVA | Backup électrique | $95,000 |
+
+### Commandes Genie Disponibles
+- "ajoute X containers" → Ajoute des HD5
+- "ajoute X coolers" → Ajoute des EC2-DT
+- "ajoute X transfos" → Ajoute des transformateurs
+- "ferme X MW" → Génère une ferme de X MW
+- "site complet" / "tout" / "8 containers" → Site pro clé en main
+- "analyse" → Détecte les problèmes de layout
+- "fix" → Corrige automatiquement
+- "bom" / "devis" → Génère le Bill of Materials
+- "coût" → Estimation budget total
+- "aligne" → Aligne sur grille
+- "espace Xm" → Espacement maintenance
+
+### Règles de Dimensionnement
+1. **Cooling** : 1 EC2-DT pour 2 containers max
+2. **Électrique** : 1 Transfo 3.75MVA pour 3MW de charge
+3. **Clearance** : 2m minimum entre équipements
+4. **Maintenance** : Allées de 3m pour accès camion
+5. **Water Flow** : Q = P / (1.16 × ΔT) m³/h
+6. **PUE cible** : < 1.15 pour hydro cooling
+
+### Calculs Thermiques
+- Heat Load (kW) = Puissance IT × 1.05 (pertes)
+- BTU/h = kW × 3412
+- Tons of Cooling = kW / 3.517
+- CFM = kW / (1.2 × ΔT) × 2118.88
+
+### Ce que je veux
+[DÉCRIS TON PROJET ICI]
+- Nombre de containers souhaité
+- Puissance totale cible
+- Contraintes spécifiques (espace, budget, délai)
+- Questions sur le dimensionnement
+
+Réponds en français avec des recommandations techniques précises.
+```
+
+---

@@ -16,7 +16,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 const routes = require('./routes');
-const { initializeFirebase } = require('./config/firebase');
+const { testConnection: testSupabaseConnection } = require('./config/supabase');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -138,13 +138,9 @@ app.use((err, req, res, next) => {
 
 const startServer = async () => {
   try {
-    // Initialize Firebase
-    const { mockMode } = initializeFirebase();
-    
-    if (mockMode) {
-      logger.warn('⚠️ Running in MOCK MODE - Firebase not connected');
-      logger.info('   Configure .env with Firebase credentials for persistence');
-    }
+    // ⚠️ RÈGLE ULTIME: Connexion Supabase OBLIGATOIRE
+    // Le mode mock est INTERDIT - cette fonction quitte si pas connecté
+    await testSupabaseConnection();
 
     // Start server
     app.listen(PORT, () => {

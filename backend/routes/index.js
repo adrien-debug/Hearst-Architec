@@ -13,6 +13,8 @@ const monitoringRoutes = require('./monitoringRoutes');
 const networkRoutes = require('./networkRoutes');
 const objectRoutes = require('./objectRoutes');
 const layoutRoutes = require('./layoutRoutes');
+const aiRoutes = require('./aiRoutes');
+const advancedToolsRoutes = require('./advancedToolsRoutes');
 
 // Mount routes
 router.use('/calculator', calculatorRoutes);
@@ -22,6 +24,8 @@ router.use('/monitoring', monitoringRoutes);
 router.use('/network', networkRoutes);
 router.use('/objects', objectRoutes);
 router.use('/layouts', layoutRoutes);
+router.use('/ai', aiRoutes);
+router.use('/tools', advancedToolsRoutes);
 
 // API root info
 router.get('/', (req, res) => {
@@ -36,7 +40,9 @@ router.get('/', (req, res) => {
       monitoring: '/api/monitoring - Real-time monitoring',
       network: '/api/network - Bitcoin network data',
       objects: '/api/objects - Infrastructure objects (racks, PDU, cooling, etc.)',
-      layouts: '/api/layouts - Layout design management'
+      layouts: '/api/layouts - Layout design management',
+      ai: '/api/ai - AI-powered implantation (Claude 4.5, GPT-4.1 & Gemini Flash)',
+      tools: '/api/tools - Advanced pro tools (thermal, electrical, market data, export)'
     },
     documentation: '/api/docs'
   });

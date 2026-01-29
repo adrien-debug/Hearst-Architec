@@ -1,9 +1,31 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useRef, useState, memo, useMemo, useCallback } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, PerspectiveCamera, Environment, Text } from '@react-three/drei';
 import * as THREE from 'three';
+
+// Shared geometries - created once
+const sharedGeometries = {
+  machineBox: new THREE.BoxGeometry(1, 0.5, 0.8),
+  led: new THREE.SphereGeometry(0.03, 16, 16),
+  fanLarge: new THREE.CircleGeometry(0.15, 32),
+  fanSmall: new THREE.CircleGeometry(0.1, 32),
+  rackFrame: new THREE.BoxGeometry(2, 2.5, 0.8),
+  rackPost: new THREE.BoxGeometry(0.1, 2.5, 0.1),
+};
+
+// Shared materials - created once
+const sharedMaterials = {
+  machineGreen: new THREE.MeshStandardMaterial({ color: '#8AFD81', metalness: 0.3, roughness: 0.4 }),
+  machineHover: new THREE.MeshStandardMaterial({ color: '#6BD563', metalness: 0.3, roughness: 0.4 }),
+  led: new THREE.MeshStandardMaterial({ color: '#00ff00', emissive: '#00ff00', emissiveIntensity: 2 }),
+  fanGrill: new THREE.MeshStandardMaterial({ color: '#333' }),
+  rackFrame: new THREE.MeshStandardMaterial({ color: '#374151', metalness: 0.6, roughness: 0.3 }),
+  rackPost: new THREE.MeshStandardMaterial({ color: '#1f2937', metalness: 0.7, roughness: 0.2 }),
+  floor: new THREE.MeshStandardMaterial({ color: '#f1f5f9' }),
+  wall: new THREE.MeshStandardMaterial({ color: '#e2e8f0' }),
+};
 
 interface PlacedMachine {
   id: string;
@@ -20,55 +42,53 @@ interface FarmViewer3DProps {
   onRemoveMachine: (id: string) => void;
 }
 
-function ASICMachine({ machine, onClick }: { machine: PlacedMachine; onClick: () => void }) {
+const ASICMachine = memo(function ASICMachine({ machine, onClick }: { machine: PlacedMachine; onClick: () => void }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
+  // Only animate when hovered
   useFrame((state) => {
     if (meshRef.current && hovered) {
       meshRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 2) * 0.1;
     }
   });
 
+  const handleClick = useCallback((e: any) => {
+    e.stopPropagation();
+    onClick();
+  }, [onClick]);
+
+  const handlePointerOver = useCallback(() => setHovered(true), []);
+  const handlePointerOut = useCallback(() => setHovered(false), []);
+
   return (
     <group position={[machine.position.x * 1.5, 0.4, machine.position.y * 1.5]}>
       <mesh
         ref={meshRef}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick();
-        }}
-        onPointerOver={() => setHovered(true)}
-        onPointerOut={() => setHovered(false)}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
         castShadow
         receiveShadow
       >
-        <boxGeometry args={[1, 0.5, 0.8]} />
-        <meshStandardMaterial 
-          color={hovered ? '#6BD563' : '#8AFD81'} 
-          metalness={0.3}
-          roughness={0.4}
-        />
+        <primitive object={sharedGeometries.machineBox} attach="geometry" />
+        <primitive object={hovered ? sharedMaterials.machineHover : sharedMaterials.machineGreen} attach="material" />
       </mesh>
       
       {/* LED indicator */}
       <mesh position={[0.4, 0.1, 0.41]}>
-        <sphereGeometry args={[0.03, 16, 16]} />
-        <meshStandardMaterial 
-          color="#00ff00" 
-          emissive="#00ff00"
-          emissiveIntensity={2}
-        />
+        <primitive object={sharedGeometries.led} attach="geometry" />
+        <primitive object={sharedMaterials.led} attach="material" />
       </mesh>
       
       {/* Fan grilles */}
       <mesh position={[0, 0, 0.41]}>
-        <circleGeometry args={[0.15, 32]} />
-        <meshStandardMaterial color="#333" />
+        <primitive object={sharedGeometries.fanLarge} attach="geometry" />
+        <primitive object={sharedMaterials.fanGrill} attach="material" />
       </mesh>
       <mesh position={[-0.25, 0, 0.41]}>
-        <circleGeometry args={[0.1, 32]} />
-        <meshStandardMaterial color="#333" />
+        <primitive object={sharedGeometries.fanSmall} attach="geometry" />
+        <primitive object={sharedMaterials.fanGrill} attach="material" />
       </mesh>
 
       {/* Hover label */}
@@ -87,49 +107,72 @@ function ASICMachine({ machine, onClick }: { machine: PlacedMachine; onClick: ()
       )}
     </group>
   );
-}
+});
 
-function Floor({ onFloorClick }: { onFloorClick: (position: { x: number; y: number; z: number }) => void }) {
+const Floor = memo(function Floor({ onFloorClick }: { onFloorClick: (position: { x: number; y: number; z: number }) => void }) {
+  const handleClick = useCallback((e: any) => {
+    e.stopPropagation();
+    const point = e.point as THREE.Vector3;
+    const gridX = Math.round(point.x / 1.5);
+    const gridY = Math.round(point.z / 1.5);
+    onFloorClick({ x: gridX, y: gridY, z: 0 });
+  }, [onFloorClick]);
+
   return (
     <mesh 
       rotation={[-Math.PI / 2, 0, 0]} 
       position={[10, 0, 10]}
       receiveShadow
-      onClick={(e) => {
-        e.stopPropagation();
-        const point = e.point;
-        const gridX = Math.round(point.x / 1.5);
-        const gridY = Math.round(point.z / 1.5);
-        onFloorClick({ x: gridX, y: gridY, z: 0 });
-      }}
+      onClick={handleClick}
     >
       <planeGeometry args={[30, 30]} />
-      <meshStandardMaterial color="#f1f5f9" />
+      <primitive object={sharedMaterials.floor} attach="material" />
     </mesh>
   );
-}
+});
 
-function Rack({ position }: { position: [number, number, number] }) {
+// Pre-calculated rack post positions
+const rackPostPositions: [number, number, number][] = [
+  [-0.9, 0, 0.3], [0.9, 0, 0.3], [-0.9, 0, -0.3], [0.9, 0, -0.3]
+];
+
+const Rack = memo(function Rack({ position }: { position: [number, number, number] }) {
   return (
     <group position={position}>
       {/* Rack frame */}
       <mesh castShadow>
-        <boxGeometry args={[2, 2.5, 0.8]} />
-        <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.3} />
+        <primitive object={sharedGeometries.rackFrame} attach="geometry" />
+        <primitive object={sharedMaterials.rackFrame} attach="material" />
       </mesh>
       
       {/* Vertical posts */}
-      {[[-0.9, 0, 0.3], [0.9, 0, 0.3], [-0.9, 0, -0.3], [0.9, 0, -0.3]].map((pos, i) => (
-        <mesh key={i} position={pos as [number, number, number]} castShadow>
-          <boxGeometry args={[0.1, 2.5, 0.1]} />
-          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.2} />
+      {rackPostPositions.map((pos, i) => (
+        <mesh key={i} position={pos} castShadow>
+          <primitive object={sharedGeometries.rackPost} attach="geometry" />
+          <primitive object={sharedMaterials.rackPost} attach="material" />
         </mesh>
       ))}
     </group>
   );
-}
+});
 
-function Scene({ machines, onAddMachine, onRemoveMachine }: FarmViewer3DProps) {
+// Static rack positions
+const rackPositions: [number, number, number][] = [
+  [-2, 1.25, 5],
+  [-2, 1.25, 10],
+  [-2, 1.25, 15],
+];
+
+const Scene = memo(function Scene({ machines, onAddMachine, onRemoveMachine }: FarmViewer3DProps) {
+  // Memoize onClick handlers for machines
+  const machineClickHandlers = useMemo(() => {
+    const handlers: Record<string, () => void> = {};
+    machines.forEach(machine => {
+      handlers[machine.id] = () => onRemoveMachine(machine.id);
+    });
+    return handlers;
+  }, [machines, onRemoveMachine]);
+
   return (
     <>
       <PerspectiveCamera makeDefault position={[15, 15, 15]} fov={50} />
@@ -170,31 +213,31 @@ function Scene({ machines, onAddMachine, onRemoveMachine }: FarmViewer3DProps) {
       />
 
       {/* Sample racks */}
-      <Rack position={[-2, 1.25, 5]} />
-      <Rack position={[-2, 1.25, 10]} />
-      <Rack position={[-2, 1.25, 15]} />
+      {rackPositions.map((pos, i) => (
+        <Rack key={i} position={pos} />
+      ))}
 
       {/* ASIC Machines */}
       {machines.map((machine) => (
         <ASICMachine 
           key={machine.id} 
           machine={machine}
-          onClick={() => onRemoveMachine(machine.id)}
+          onClick={machineClickHandlers[machine.id]}
         />
       ))}
 
       {/* Walls (optional, for context) */}
       <mesh position={[-3, 3, 10]} receiveShadow>
         <boxGeometry args={[0.2, 6, 30]} />
-        <meshStandardMaterial color="#e2e8f0" />
+        <primitive object={sharedMaterials.wall} attach="material" />
       </mesh>
     </>
   );
-}
+});
 
-export default function FarmViewer3D({ machines, onAddMachine, onRemoveMachine }: FarmViewer3DProps) {
+const FarmViewer3D = memo(function FarmViewer3D({ machines, onAddMachine, onRemoveMachine }: FarmViewer3DProps) {
   return (
-    <div className="w-full h-[600px] bg-gradient-to-b from-slate-200 to-slate-300 rounded-b-2xl">
+    <div className="w-full h-[600px] bg-white rounded-b-2xl border border-slate-200 shadow-lg">
       <Canvas shadows>
         <Scene 
           machines={machines} 
@@ -204,4 +247,6 @@ export default function FarmViewer3D({ machines, onAddMachine, onRemoveMachine }
       </Canvas>
     </div>
   );
-}
+});
+
+export default FarmViewer3D;

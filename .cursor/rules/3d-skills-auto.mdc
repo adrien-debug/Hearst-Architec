@@ -1,0 +1,87 @@
+# Règle Auto-Skills 3D
+
+## Déclenchement
+
+Cette règle s'applique **automatiquement** quand :
+- Fichiers contenant `three`, `@react-three/fiber`, `@react-three/drei`
+- Fichiers dans `components/designer/`
+- Fichiers avec noms contenant `3d`, `viewer`, `scene`, `canvas`
+
+## Instructions Obligatoires
+
+**AVANT toute modification de code 3D, l'agent DOIT :**
+
+1. **Lire les skills 3D pertinents** dans `.cursor/skills/` :
+   - `threejs-performance/SKILL.md` - Pour TOUTE création/modification de composant 3D
+   - `threejs-models/SKILL.md` - Pour création de modèles industriels
+   - `r3f-components/SKILL.md` - Pour patterns React Three Fiber
+   - `threejs-lighting/SKILL.md` - Pour setup éclairage
+   - `threejs-animation/SKILL.md` - Pour animations
+   - `threejs-interaction/SKILL.md` - Pour interactions utilisateur
+   - `threejs-export/SKILL.md` - Pour export de données
+
+2. **Appliquer SYSTÉMATIQUEMENT** les patterns de `threejs-performance` :
+   - ✅ Shared geometries (module-level)
+   - ✅ Shared materials (module-level)
+   - ✅ `memo()` sur TOUS les composants 3D
+   - ✅ `useMemo()` pour arrays/positions
+   - ✅ `useCallback()` pour handlers
+   - ✅ InstancedMesh pour 10+ objets identiques
+
+3. **Vérifications après modification** :
+   - Lint check (`npm run lint`)
+   - TypeScript check (`npx tsc --noEmit`)
+   - Pas de re-création d'objets dans render
+
+## Checklist Obligatoire (à cocher mentalement)
+
+```
+[ ] Skill performance lu
+[ ] Shared geometries utilisées
+[ ] Shared materials utilisées
+[ ] Composants wrappés avec memo()
+[ ] Arrays pré-calculés avec useMemo()
+[ ] Handlers avec useCallback()
+[ ] useFrame optimisé (delta, early return)
+[ ] Pas d'objets créés dans useFrame
+```
+
+## Anti-Patterns INTERDITS
+
+```typescript
+// ❌ INTERDIT - Geometry inline
+<boxGeometry args={[1, 1, 1]} />
+
+// ✅ OBLIGATOIRE - Shared geometry
+<primitive object={sharedGeometries.box} attach="geometry" />
+```
+
+```typescript
+// ❌ INTERDIT - Material inline avec color
+<meshStandardMaterial color="#888" metalness={0.8} />
+
+// ✅ OBLIGATOIRE - Shared material
+<primitive object={sharedMaterials.metal} attach="material" />
+```
+
+```typescript
+// ❌ INTERDIT - Composant non-memoized
+function MyComponent() { ... }
+
+// ✅ OBLIGATOIRE - Memoized
+const MyComponent = memo(function MyComponent() { ... });
+```
+
+```typescript
+// ❌ INTERDIT - Array dans JSX
+{Array.from({ length: 10 }).map(...)}
+
+// ✅ OBLIGATOIRE - Pré-calculé
+const items = useMemo(() => Array.from({ length: 10 }, ...), []);
+{items.map(...)}
+```
+
+## Rappel
+
+> **Cette règle est NON-NÉGOCIABLE pour tout code 3D.**
+> **Les skills DOIVENT être lus et appliqués.**
