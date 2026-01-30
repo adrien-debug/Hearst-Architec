@@ -34,6 +34,161 @@ import {
   Minus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import type { WorldSnapPoint } from './cable-snap-points';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTO-WIRING UTILITY : Transformateur → PDU → 2 Containers
+// Points de connexion aux BORDS des équipements (pas au centre)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type EquipForAutoWire = { 
+  id: string; 
+  position: THREE.Vector3;
+  dimensions?: { width: number; height: number; depth: number };
+  rotation?: { y: number };
+};
+
+// Calcule le point de sortie BT du transformateur (côté containers)
+function getTransformerOutputPoint(transformer: EquipForAutoWire): THREE.Vector3 {
+  const pos = transformer.position.clone();
+  const width = (transformer.dimensions?.width || 2500) / 1000; // ~2.5m
+  const rotY = transformer.rotation?.y || 0;
+  
+  // Sortie BT sur le côté (vers les containers) - au niveau du sol + 0.5m
+  const offsetX = Math.cos(rotY) * (width / 2 + 0.3);
+  const offsetZ = Math.sin(rotY) * (width / 2 + 0.3);
+  
+  return new THREE.Vector3(
+    pos.x + offsetX,
+    pos.y - 0.5, // Descendre vers le niveau des câbles (pas sur le toit)
+    pos.z + offsetZ
+  );
+}
+
+// Calcule le point d'entrée du PDU (côté transformateur)
+function getPDUInputPoint(pdu: EquipForAutoWire): THREE.Vector3 {
+  const pos = pdu.position.clone();
+  const depth = (pdu.dimensions?.depth || 800) / 1000; // ~0.8m
+  
+  // Entrée sur le côté arrière, niveau milieu
+  return new THREE.Vector3(
+    pos.x,
+    pos.y - 0.3, // Légèrement en dessous du centre
+    pos.z - (depth / 2 + 0.2)
+  );
+}
+
+// Calcule le point de sortie du PDU vers container
+function getPDUOutputPoint(pdu: EquipForAutoWire, containerIndex: number): THREE.Vector3 {
+  const pos = pdu.position.clone();
+  const depth = (pdu.dimensions?.depth || 800) / 1000;
+  
+  // Sorties sur le côté avant, décalées
+  const offsetX = containerIndex === 0 ? -0.2 : 0.2;
+  return new THREE.Vector3(
+    pos.x + offsetX,
+    pos.y - 0.5,
+    pos.z + (depth / 2 + 0.2)
+  );
+}
+
+// Calcule le point d'entrée électrique du container
+function getContainerInputPoint(container: EquipForAutoWire): THREE.Vector3 {
+  const pos = container.position.clone();
+  const width = (container.dimensions?.width || 12192) / 1000; // ~12m
+  const rotY = container.rotation?.y || 0;
+  
+  // Entrée sur le côté gauche du container (panneau électrique)
+  const offsetX = -Math.cos(rotY) * (width / 2 - 1);
+  const offsetZ = -Math.sin(rotY) * (width / 2 - 1);
+  
+  return new THREE.Vector3(
+    pos.x + offsetX,
+    pos.y - 0.8, // Près du sol
+    pos.z + offsetZ
+  );
+}
+
+export function autoWireTransformerToContainers(
+  transformer: EquipForAutoWire,
+  pdu: EquipForAutoWire,
+  containers: [EquipForAutoWire, EquipForAutoWire],
+  cableType: 'power' | 'earth' = 'power'
+): CableRoute[] {
+  const routes: CableRoute[] = [];
+  const timestamp = Date.now();
+
+  // Points de connexion sur les BORDS (pas au centre)
+  const txOutputPos = getTransformerOutputPoint(transformer);
+  const pduInputPos = getPDUInputPoint(pdu);
+
+  // Route : Transfo → PDU (busbar HT)
+  routes.push({
+    id: `route-tx-to-pdu-${transformer.id}-${pdu.id}-${timestamp}`,
+    name: `Transfo→PDU`,
+    segments: [
+      {
+        id: `seg-tx-${transformer.id}-pdu-${pdu.id}-${timestamp}`,
+        startPointId: `tx-${transformer.id}`,
+        endPointId: `pdu-input-${pdu.id}`,
+        type: 'busbar',
+        width: 100,
+        height: 150,
+        cableCount: 3,
+        cableTypes: [cableType],
+        color: '#b45309',
+        locked: false,
+        visible: true,
+      },
+    ],
+    points: [
+      { id: `tx-${transformer.id}`, position: txOutputPos, type: 'start' },
+      { id: `pdu-input-${pdu.id}`, position: pduInputPos, type: 'waypoint' }
+    ],
+    routeType: 'main',
+    voltage: 'hv',
+    totalLength: txOutputPos.distanceTo(pduInputPos),
+    color: '#b45309',
+    visible: true,
+  });
+
+  // Routes : PDU → Container #1 et #2 (ladder BT)
+  containers.forEach((container, idx) => {
+    const pduOutputPos = getPDUOutputPoint(pdu, idx);
+    const containerInputPos = getContainerInputPoint(container);
+    
+    routes.push({
+      id: `route-pdu-to-ctnr${idx + 1}-${pdu.id}-${container.id}-${timestamp}`,
+      name: `PDU→Container${idx + 1}`,
+      segments: [
+        {
+          id: `seg-pdu-${pdu.id}-ctnr-${container.id}-${timestamp}`,
+          startPointId: `pdu-output-${pdu.id}-${idx + 1}`,
+          endPointId: `ctnr-${container.id}`,
+          type: 'ladder',
+          width: 300,
+          height: 100,
+          cableCount: 6,
+          cableTypes: ['power', 'earth'],
+          color: '#71717a',
+          locked: false,
+          visible: true,
+        },
+      ],
+      points: [
+        { id: `pdu-output-${pdu.id}-${idx + 1}`, position: pduOutputPos, type: 'start' },
+        { id: `ctnr-${container.id}`, position: containerInputPos, type: 'waypoint' }
+      ],
+      routeType: 'branch',
+      voltage: 'lv',
+      totalLength: pduOutputPos.distanceTo(containerInputPos),
+      color: '#71717a',
+      visible: true,
+    });
+  });
+  
+  return routes;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -82,13 +237,8 @@ export interface CableFitting {
   connectedSegments: string[];
 }
 
-export interface SnapPoint {
+// export interface SnapPoint {
   position: THREE.Vector3;
-  objectId: string;
-  objectName: string;
-  type: 'connection' | 'edge' | 'center' | 'corner';
-  direction?: THREE.Vector3;
-}
 
 export type CableToolMode = 'select' | 'draw' | 'edit' | 'delete' | 'junction';
 
@@ -112,29 +262,20 @@ export interface CableRoutingState {
   gridSize: number;
 }
 
-// Import des types pour snap points intelligents
-import type { WorldSnapPoint, ConnectionType } from './cable-snap-points';
-import type { CableZone } from './cable-zone-manager';
+// Type pour objets de scène (auto-câblage)
+interface SceneObject {
+  id: string;
+  type: string;
+  position: { x: number; y: number; z: number };
+}
 
 interface CableRoutingToolProps {
   routes: CableRoute[];
   onRoutesChange: (routes: CableRoute[]) => void;
-  snapPoints: SnapPoint[];
+  snapPoints: WorldSnapPoint[];
   selectedObjectIds: string[];
   onClose?: () => void;
-  activeRouteId?: string | null;
-  onActiveRouteChange?: (routeId: string | null) => void;
-  onDrawingStateChange?: (isDrawing: boolean, points: THREE.Vector3[]) => void;
-  // Nouvelles props pour snap points intelligents
-  intelligentSnapPoints?: WorldSnapPoint[];
-  cableZones?: CableZone[];
-  onSnapPointSelect?: (snapPoint: WorldSnapPoint | null) => void;
-  selectedSnapPoint?: WorldSnapPoint | null;
-  onFilterTypesChange?: (types: ConnectionType[]) => void;
-  onHeightChange?: (height: number) => void;
-  currentHeight?: number;
-  showForbiddenZones?: boolean;
-  onShowForbiddenZonesChange?: (show: boolean) => void;
+  objects?: SceneObject[]; // Objets de la scène pour auto-câblage
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -186,10 +327,10 @@ const snapToGrid = (point: THREE.Vector3, gridSize: number): THREE.Vector3 => {
 
 const findNearestSnapPoint = (
   position: THREE.Vector3,
-  snapPoints: SnapPoint[],
+  snapPoints: WorldSnapPoint[],
   radius: number
-): SnapPoint | null => {
-  let nearest: SnapPoint | null = null;
+): WorldSnapPoint | null => {
+  let nearest: WorldSnapPoint | null = null;
   let minDistance = radius;
   
   for (const sp of snapPoints) {
@@ -204,50 +345,7 @@ const findNearestSnapPoint = (
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CABLE TRAY STYLES (Types de chemins de câbles)
-// ═══════════════════════════════════════════════════════════════════════════
-
-export type CableTrayStyle = 'ladder' | 'wire-mesh' | 'conduit' | 'busbar';
-
-const TRAY_STYLES: Record<CableTrayStyle, { 
-  name: string; 
-  description: string;
-  icon: string;
-  color: string;
-  supportsPerMeter: number; // Supports tous les X mètres
-}> = {
-  'ladder': {
-    name: 'Échelle',
-    description: 'Chemin échelle galvanisé pour câbles de puissance',
-    icon: '🪜',
-    color: '#71717a',
-    supportsPerMeter: 3, // Support tous les 3m
-  },
-  'wire-mesh': {
-    name: 'Grillagé',
-    description: 'Chemin grillagé pour câbles data/contrôle',
-    icon: '🔲',
-    color: '#3b82f6',
-    supportsPerMeter: 2.5, // Support tous les 2.5m
-  },
-  'conduit': {
-    name: 'Conduit',
-    description: 'Tube rigide pour câbles sensibles',
-    icon: '🔵',
-    color: '#f59e0b',
-    supportsPerMeter: 2, // Support tous les 2m
-  },
-  'busbar': {
-    name: 'Busbar',
-    description: 'Jeu de barres pour distribution HT',
-    icon: '⚡',
-    color: '#b45309',
-    supportsPerMeter: 4, // Support tous les 4m
-  },
-};
-
-// ═══════════════════════════════════════════════════════════════════════════
-// CABLE TRAY PRESETS (Configurations prédéfinies)
+// CABLE TRAY PRESETS
 // ═══════════════════════════════════════════════════════════════════════════
 
 const TRAY_PRESETS = {
@@ -325,7 +423,7 @@ const ToolButton = memo(function ToolButton({
       onClick={onClick}
       disabled={disabled}
       className={`
-        ${sizeClasses} rounded-lg transition-all flex items-center justify-center
+        ${sizeClasses} rounded-full transition-all flex items-center justify-center
         ${active 
           ? 'bg-emerald-500 text-white shadow-sm' 
           : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'}
@@ -355,7 +453,7 @@ const PresetButton = memo(function PresetButton({
     <button
       onClick={onClick}
       className={`
-        flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all
+        flex items-center gap-2 px-3 py-2 rounded-full text-sm transition-all
         ${active 
           ? 'bg-slate-900 text-white' 
           : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
@@ -368,89 +466,6 @@ const PresetButton = memo(function PresetButton({
       <span className="font-medium">{label}</span>
       <span className="text-xs opacity-60">{config.width}mm</span>
     </button>
-  );
-});
-
-// Style de chemin de câbles - Sélecteur visuel
-const StyleSelector = memo(function StyleSelector({
-  selectedStyle,
-  onStyleChange,
-  selectedWidth,
-  onWidthChange,
-}: {
-  selectedStyle: CableTrayStyle;
-  onStyleChange: (style: CableTrayStyle) => void;
-  selectedWidth: number;
-  onWidthChange: (width: number) => void;
-}) {
-  const widthOptions = [100, 150, 200, 300, 400, 600];
-  
-  return (
-    <div className="space-y-3">
-      {/* Sélecteur de style */}
-      <div>
-        <p className="text-xs text-slate-500 font-semibold mb-2">STYLE DU CHEMIN</p>
-        <div className="grid grid-cols-2 gap-2">
-          {(Object.keys(TRAY_STYLES) as CableTrayStyle[]).map((style) => {
-            const config = TRAY_STYLES[style];
-            const isActive = selectedStyle === style;
-            return (
-              <button
-                key={style}
-                onClick={() => onStyleChange(style)}
-                className={`
-                  flex items-center gap-2 p-2.5 rounded-xl text-left transition-all border-2
-                  ${isActive 
-                    ? 'border-emerald-500 bg-emerald-50 shadow-sm' 
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}
-                `}
-              >
-                <span className="text-xl">{config.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold ${isActive ? 'text-emerald-700' : 'text-slate-700'}`}>
-                    {config.name}
-                  </p>
-                  <p className="text-[10px] text-slate-500 truncate">
-                    {config.description}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      
-      {/* Sélecteur de largeur */}
-      <div>
-        <p className="text-xs text-slate-500 font-semibold mb-2">LARGEUR (mm)</p>
-        <div className="flex flex-wrap gap-1.5">
-          {widthOptions.map((w) => (
-            <button
-              key={w}
-              onClick={() => onWidthChange(w)}
-              className={`
-                px-3 py-1.5 rounded-lg text-sm font-medium transition-all
-                ${selectedWidth === w 
-                  ? 'bg-slate-900 text-white' 
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
-              `}
-            >
-              {w}
-            </button>
-          ))}
-        </div>
-      </div>
-      
-      {/* Info supports */}
-      <div className="bg-slate-50 rounded-lg p-2 text-xs text-slate-600">
-        <div className="flex items-center gap-2">
-          <span>📐</span>
-          <span>
-            Supports automatiques tous les <strong>{TRAY_STYLES[selectedStyle].supportsPerMeter}m</strong>
-          </span>
-        </div>
-      </div>
-    </div>
   );
 });
 
@@ -483,19 +498,7 @@ export default function CableRoutingTool({
   snapPoints,
   selectedObjectIds,
   onClose,
-  activeRouteId: externalActiveRouteId,
-  onActiveRouteChange,
-  onDrawingStateChange,
-  // Nouvelles props
-  intelligentSnapPoints = [],
-  cableZones = [],
-  onSnapPointSelect,
-  selectedSnapPoint,
-  onFilterTypesChange,
-  onHeightChange,
-  currentHeight = 3.5,
-  showForbiddenZones = false,
-  onShowForbiddenZonesChange,
+  objects = []
 }: CableRoutingToolProps) {
   // ─────────────────────────────────────────────────────────────────────────
   // STATE
@@ -503,7 +506,7 @@ export default function CableRoutingTool({
   
   const [state, setState] = useState<CableRoutingState>({
     mode: 'draw',
-    activeRouteId: externalActiveRouteId || null,
+    activeRouteId: null,
     selectedSegmentIds: [],
     selectedPointIds: [],
     isDrawing: false,
@@ -522,25 +525,8 @@ export default function CableRoutingTool({
   });
   
   const [activePreset, setActivePreset] = useState<keyof typeof TRAY_PRESETS>('power-branch');
-  const [selectedStyle, setSelectedStyle] = useState<CableTrayStyle>('ladder');
-  const [selectedWidth, setSelectedWidth] = useState(300);
   const [showSettings, setShowSettings] = useState(false);
-  const [showStylePanel, setShowStylePanel] = useState(true);
   const [showRouteList, setShowRouteList] = useState(true);
-  const [showSnapPointsPanel, setShowSnapPointsPanel] = useState(false);
-  const [filterTypes, setFilterTypes] = useState<ConnectionType[]>([]);
-  const [autoHeight, setAutoHeight] = useState(true);
-  
-  // Sync activeRouteId with parent - always emit on change
-  useEffect(() => {
-    console.log('🔄 CableRoutingTool activeRouteId changed:', state.activeRouteId);
-    if (onActiveRouteChange) {
-      onActiveRouteChange(state.activeRouteId);
-    }
-  }, [state.activeRouteId, onActiveRouteChange]);
-  
-  // NOTE: Drawing state is managed by parent (page.tsx) via floor clicks
-  // We don't sync drawingPoints from here to avoid overwriting parent state
   
   // ─────────────────────────────────────────────────────────────────────────
   // COMPUTED VALUES
@@ -805,117 +791,128 @@ export default function CableRoutingTool({
   return (
     <div className="absolute right-4 top-20 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-40">
       {/* ═══ HEADER ═══ */}
-      <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-4 py-3">
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Cable className="w-5 h-5" />
-            <h2 className="font-bold">🔌 Câblage</h2>
+            <Cable className="w-5 h-5 text-emerald-400" />
+            <h2 className="font-bold">Câblage Intelligent</h2>
           </div>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+              className="p-1 hover:bg-white/10 rounded-full transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
+        <p className="text-xs text-slate-400 mt-1">
+          Tracé professionnel • Raccordement automatique
+        </p>
       </div>
       
-      {/* ═══ INSTRUCTIONS SIMPLES ═══ */}
-      <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-200">
-        <div className="flex items-start gap-3">
-          <div className="text-2xl">👆</div>
-          <div>
-            <p className="font-semibold text-emerald-800 text-sm">
-              Cliquez sur les points colorés
-            </p>
-            <p className="text-xs text-emerald-600 mt-0.5">
-              Les sphères sur les équipements sont les points de connexion. Cliquez pour tracer un câble.
-            </p>
-          </div>
-        </div>
-      </div>
       
-      {/* ═══ TOOLBAR SIMPLIFIÉE ═══ */}
-      <div className="px-3 py-2 border-b border-slate-200 bg-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <ToolButton 
-              icon={PenTool} 
-              label="Tracer" 
-              active={state.mode === 'draw'} 
-              onClick={() => setMode('draw')} 
-            />
-            <ToolButton 
-              icon={MousePointer} 
-              label="Sélection" 
-              active={state.mode === 'select'} 
-              onClick={() => setMode('select')} 
-            />
-            <ToolButton 
-              icon={Trash2} 
-              label="Supprimer" 
-              active={state.mode === 'delete'} 
-              onClick={() => setMode('delete')} 
-            />
-          </div>
+      {/* ═══ TOOLBAR ═══ */}
+      <div className="px-3 py-2 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center gap-1">
+          <ToolButton 
+            icon={MousePointer} 
+            label="Sélection (V)" 
+            active={state.mode === 'select'} 
+            onClick={() => setMode('select')} 
+          />
+          <ToolButton 
+            icon={PenTool} 
+            label="Tracer (P)" 
+            active={state.mode === 'draw'} 
+            onClick={() => setMode('draw')} 
+          />
+          <ToolButton 
+            icon={Move} 
+            label="Éditer (E)" 
+            active={state.mode === 'edit'} 
+            onClick={() => setMode('edit')} 
+          />
+          <ToolButton 
+            icon={GitBranch} 
+            label="Jonction (J)" 
+            active={state.mode === 'junction'} 
+            onClick={() => setMode('junction')} 
+          />
+          <ToolButton 
+            icon={Trash2} 
+            label="Supprimer (Del)" 
+            active={state.mode === 'delete'} 
+            onClick={() => setMode('delete')} 
+          />
           
-          <div className="flex items-center gap-1">
-            <ToolButton 
-              icon={Magnet} 
-              label="Snap" 
-              active={state.snapEnabled} 
-              onClick={() => toggleSetting('snapEnabled')} 
-              size="sm"
-            />
-            <ToolButton 
-              icon={Settings} 
-              label="Options" 
-              active={showSettings} 
-              onClick={() => setShowSettings(!showSettings)} 
-              size="sm"
-            />
-          </div>
+          <div className="w-px h-6 bg-slate-300 mx-1" />
+          
+          <ToolButton 
+            icon={Magnet} 
+            label="Snap (S)" 
+            active={state.snapEnabled} 
+            onClick={() => toggleSetting('snapEnabled')} 
+          />
+          <ToolButton 
+            icon={Grid} 
+            label="Grille (G)" 
+            active={state.gridSnap} 
+            onClick={() => toggleSetting('gridSnap')} 
+          />
+          <ToolButton 
+            icon={Ruler} 
+            label="Dimensions" 
+            active={state.showDimensions} 
+            onClick={() => toggleSetting('showDimensions')} 
+          />
+          
+          <div className="w-px h-6 bg-slate-300 mx-1" />
+          
+          <ToolButton 
+            icon={Settings} 
+            label="Paramètres" 
+            active={showSettings} 
+            onClick={() => setShowSettings(!showSettings)} 
+          />
         </div>
       </div>
       
-      {/* ═══ SÉLECTEUR DE STYLE ═══ */}
-      <div className="border-b border-slate-200">
-        <button
-          onClick={() => setShowStylePanel(!showStylePanel)}
-          className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{TRAY_STYLES[selectedStyle].icon}</span>
-            <div>
-              <span className="text-sm font-semibold text-slate-800">{TRAY_STYLES[selectedStyle].name}</span>
-              <span className="text-xs text-slate-500 ml-2">{selectedWidth}mm</span>
-            </div>
-          </div>
-          {showStylePanel ? (
-            <ChevronUp className="w-4 h-4 text-slate-400" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-slate-400" />
-          )}
-        </button>
-        
-        {showStylePanel && (
-          <div className="px-3 pb-3">
-            <StyleSelector
-              selectedStyle={selectedStyle}
-              onStyleChange={(style) => {
-                setSelectedStyle(style);
-                setState(prev => ({ ...prev, defaultTrayType: style }));
-              }}
-              selectedWidth={selectedWidth}
-              onWidthChange={(w) => {
-                setSelectedWidth(w);
-                setState(prev => ({ ...prev, defaultWidth: w }));
-              }}
-            />
-          </div>
-        )}
+      {/* ═══ PRESETS ═══ */}
+      <div className="px-3 py-2 border-b border-slate-200">
+        <p className="text-xs text-slate-500 font-medium mb-2">TYPE DE CHEMIN</p>
+        <div className="flex flex-wrap gap-1.5">
+          <PresetButton 
+            preset="power-main" 
+            label="Principal" 
+            active={activePreset === 'power-main'} 
+            onClick={() => handlePresetChange('power-main')} 
+          />
+          <PresetButton 
+            preset="power-branch" 
+            label="Dérivation" 
+            active={activePreset === 'power-branch'} 
+            onClick={() => handlePresetChange('power-branch')} 
+          />
+          <PresetButton 
+            preset="data-main" 
+            label="Data" 
+            active={activePreset === 'data-main'} 
+            onClick={() => handlePresetChange('data-main')} 
+          />
+          <PresetButton 
+            preset="control" 
+            label="Contrôle" 
+            active={activePreset === 'control'} 
+            onClick={() => handlePresetChange('control')} 
+          />
+          <PresetButton 
+            preset="busbar" 
+            label="Busbar" 
+            active={activePreset === 'busbar'} 
+            onClick={() => handlePresetChange('busbar')} 
+          />
+        </div>
       </div>
       
       {/* ═══ SETTINGS PANEL (Collapsible) ═══ */}
@@ -980,14 +977,14 @@ export default function CableRoutingTool({
             <div className="flex items-center gap-1">
               <button
                 onClick={finishDrawing}
-                className="px-2 py-1 bg-emerald-500 text-white text-xs rounded-lg hover:bg-emerald-600"
+                className="px-2 py-1 bg-emerald-500 text-white text-xs rounded-full hover:bg-emerald-600"
               >
                 <Check className="w-3 h-3 inline mr-1" />
                 Terminer
               </button>
               <button
                 onClick={cancelDrawing}
-                className="px-2 py-1 bg-slate-200 text-slate-600 text-xs rounded-lg hover:bg-slate-300"
+                className="px-2 py-1 bg-slate-200 text-slate-600 text-xs rounded-full hover:bg-slate-300"
               >
                 <X className="w-3 h-3 inline mr-1" />
                 Annuler
@@ -1019,7 +1016,7 @@ export default function CableRoutingTool({
             {/* Add Route Button */}
             <button
               onClick={createNewRoute}
-              className="w-full px-3 py-2 mb-2 flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium"
+              className="w-full px-3 py-2 mb-2 flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
               Nouvelle Route
@@ -1037,7 +1034,7 @@ export default function CableRoutingTool({
                     key={route.id}
                     onClick={() => setState(prev => ({ ...prev, activeRouteId: route.id }))}
                     className={`
-                      flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors
+                      flex items-center gap-2 px-2 py-1.5 rounded-full cursor-pointer transition-colors
                       ${state.activeRouteId === route.id 
                         ? 'bg-slate-900 text-white' 
                         : 'hover:bg-slate-100'}
@@ -1087,147 +1084,72 @@ export default function CableRoutingTool({
         )}
       </div>
       
-      {/* ═══ SNAP POINTS INTELLIGENTS ═══ */}
-      {intelligentSnapPoints.length > 0 && (
-        <div className="border-b border-slate-200">
-          <button
-            onClick={() => setShowSnapPointsPanel(!showSnapPointsPanel)}
-            className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50"
-          >
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-500" />
-              <span className="text-sm font-medium">Points de Connexion ({intelligentSnapPoints.length})</span>
-            </div>
-            {showSnapPointsPanel ? (
-              <ChevronUp className="w-4 h-4 text-slate-400" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            )}
-          </button>
-          
-          {showSnapPointsPanel && (
-            <div className="px-3 pb-3 space-y-2">
-              {/* Filtres par type */}
-              <div>
-                <p className="text-xs text-slate-500 font-medium mb-1.5">FILTRER PAR TYPE</p>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    { type: 'power-ht' as ConnectionType, label: 'HT', color: '#dc2626' },
-                    { type: 'power-bt' as ConnectionType, label: 'BT', color: '#f97316' },
-                    { type: 'data' as ConnectionType, label: 'Data', color: '#3b82f6' },
-                    { type: 'control' as ConnectionType, label: 'Ctrl', color: '#8b5cf6' },
-                    { type: 'earth' as ConnectionType, label: 'Terre', color: '#22c55e' },
-                  ].map(({ type, label, color }) => {
-                    const isActive = filterTypes.includes(type);
-                    const count = intelligentSnapPoints.filter(sp => sp.connectionType === type).length;
-                    return (
-                      <button
-                        key={type}
-                        onClick={() => {
-                          const newTypes = isActive 
-                            ? filterTypes.filter(t => t !== type)
-                            : [...filterTypes, type];
-                          setFilterTypes(newTypes);
-                          onFilterTypesChange?.(newTypes);
-                        }}
-                        className={`
-                          flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all
-                          ${isActive 
-                            ? 'text-white shadow-sm' 
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
-                        `}
-                        style={isActive ? { backgroundColor: color } : undefined}
-                      >
-                        <div 
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: isActive ? 'white' : color }}
+      {/* ═══ ÉDITEUR DE POINTS (mode edit) ═══ */}
+      {state.mode === 'edit' && state.activeRouteId && (() => {
+        const activeRoute = routes.find(r => r.id === state.activeRouteId);
+        if (!activeRoute || activeRoute.points.length === 0) return null;
+        
+        return (
+          <div className="px-3 py-2 border-b border-slate-200 bg-amber-50">
+            <p className="text-xs text-amber-700 font-semibold mb-2 flex items-center gap-1">
+              <Move className="w-3 h-3" />
+              ÉDITION DES POINTS - {activeRoute.name}
+            </p>
+            <div className="max-h-40 overflow-y-auto space-y-2">
+              {activeRoute.points.map((point, idx) => (
+                <div key={point.id} className="bg-white rounded-2xl p-2 border border-amber-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-slate-700">
+                      {point.type === 'start' ? '🟢 Départ' : point.type === 'end' ? '🔴 Arrivée' : `📍 Point ${idx + 1}`}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {['x', 'y', 'z'].map((axis) => (
+                      <div key={axis} className="flex flex-col">
+                        <label className="text-[9px] text-slate-500 uppercase">{axis}</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={point.position[axis as 'x' | 'y' | 'z'].toFixed(2)}
+                          onChange={(e) => {
+                            const newValue = parseFloat(e.target.value) || 0;
+                            const updatedRoutes = routes.map(r => {
+                              if (r.id !== state.activeRouteId) return r;
+                              return {
+                                ...r,
+                                points: r.points.map(p => {
+                                  if (p.id !== point.id) return p;
+                                  const newPos = p.position.clone();
+                                  newPos[axis as 'x' | 'y' | 'z'] = newValue;
+                                  return { ...p, position: newPos };
+                                }),
+                                // Recalculer la longueur totale
+                                totalLength: r.segments.reduce((sum, seg) => {
+                                  const startP = r.points.find(p => p.id === seg.startPointId);
+                                  const endP = r.points.find(p => p.id === seg.endPointId);
+                                  if (startP && endP) {
+                                    return sum + startP.position.distanceTo(endP.position);
+                                  }
+                                  return sum;
+                                }, 0)
+                              };
+                            });
+                            onRoutesChange(updatedRoutes);
+                          }}
+                          className="w-full px-1.5 py-1 text-xs border border-slate-200 rounded focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                         />
-                        {label}
-                        <span className="opacity-60">({count})</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              
-              {/* Snap point sélectionné */}
-              {selectedSnapPoint && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-sm"
-                        style={{ 
-                          backgroundColor: 
-                            selectedSnapPoint.connectionType === 'power-ht' ? '#dc2626' :
-                            selectedSnapPoint.connectionType === 'power-bt' ? '#f97316' :
-                            selectedSnapPoint.connectionType === 'data' ? '#3b82f6' :
-                            selectedSnapPoint.connectionType === 'control' ? '#8b5cf6' :
-                            '#22c55e'
-                        }}
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-emerald-800">{selectedSnapPoint.label}</p>
-                        <p className="text-xs text-emerald-600">{selectedSnapPoint.objectName}</p>
                       </div>
-                    </div>
-                    <button
-                      onClick={() => onSnapPointSelect?.(null)}
-                      className="p-1 hover:bg-emerald-100 rounded"
-                    >
-                      <X className="w-3 h-3 text-emerald-600" />
-                    </button>
-                  </div>
-                  <div className="mt-2 flex items-center gap-3 text-xs text-emerald-700">
-                    <span>Largeur: {selectedSnapPoint.cableWidth}mm</span>
-                    <span>Capacité: {selectedSnapPoint.currentCables}/{selectedSnapPoint.maxCables}</span>
+                    ))}
                   </div>
                 </div>
-              )}
-              
-              {/* Hauteur du câble */}
-              <div className="bg-slate-50 rounded-lg p-2">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-600 font-medium">HAUTEUR CÂBLES</span>
-                  <label className="flex items-center gap-1 text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoHeight}
-                      onChange={(e) => setAutoHeight(e.target.checked)}
-                      className="rounded border-slate-300 text-emerald-500"
-                    />
-                    Auto
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="1"
-                    max="6"
-                    step="0.1"
-                    value={currentHeight}
-                    onChange={(e) => onHeightChange?.(parseFloat(e.target.value))}
-                    disabled={autoHeight}
-                    className="flex-1"
-                  />
-                  <span className="text-sm font-mono w-12 text-right">{currentHeight.toFixed(1)}m</span>
-                </div>
-              </div>
-              
-              {/* Zones interdites */}
-              <label className="flex items-center gap-2 text-xs cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showForbiddenZones}
-                  onChange={(e) => onShowForbiddenZonesChange?.(e.target.checked)}
-                  className="rounded border-slate-300 text-red-500"
-                />
-                <span className="text-slate-600">Afficher zones interdites</span>
-              </label>
+              ))}
             </div>
-          )}
-        </div>
-      )}
+            <p className="text-[10px] text-amber-600 mt-2">
+              💡 Modifiez X/Z pour déplacer, Y pour la hauteur (inclinaison)
+            </p>
+          </div>
+        );
+      })()}
       
       {/* ═══ STATS ═══ */}
       <div className="px-3 py-2 bg-slate-50">
@@ -1239,32 +1161,10 @@ export default function CableRoutingTool({
         </div>
       </div>
       
-      {/* ═══ LÉGENDE COULEURS ═══ */}
-      <div className="px-3 py-2 bg-slate-50 border-t border-slate-200">
-        <p className="text-[10px] text-slate-500 font-medium mb-1.5">LÉGENDE DES POINTS</p>
-        <div className="flex flex-wrap gap-2">
-          <span className="flex items-center gap-1 text-[10px]">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500" /> HT
-          </span>
-          <span className="flex items-center gap-1 text-[10px]">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> BT
-          </span>
-          <span className="flex items-center gap-1 text-[10px]">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Data
-          </span>
-          <span className="flex items-center gap-1 text-[10px]">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Ctrl
-          </span>
-          <span className="flex items-center gap-1 text-[10px]">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Terre
-          </span>
-        </div>
-      </div>
-      
-      {/* ═══ RACCOURCIS ═══ */}
-      <div className="px-3 py-2 bg-slate-100">
-        <p className="text-[10px] text-slate-400">
-          <strong>Entrée</strong> = Terminer • <strong>Échap</strong> = Annuler
+      {/* ═══ QUICK TIPS ═══ */}
+      <div className="px-3 py-2 bg-slate-100 border-t border-slate-200">
+        <p className="text-xs text-slate-500">
+          💡 <strong>Raccourcis:</strong> P=Tracer, V=Sélection, S=Snap, G=Grille, Entrée=Terminer, Échap=Annuler
         </p>
       </div>
     </div>
@@ -1275,5 +1175,5 @@ export default function CableRoutingTool({
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export { TRAY_PRESETS, TRAY_STYLES };
+export { TRAY_PRESETS };
 export type { CableRoutingToolProps };
