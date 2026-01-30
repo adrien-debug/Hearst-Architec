@@ -219,6 +219,16 @@ const Scene = memo(function Scene({ machines, onAddMachine, onRemoveMachine }: F
         />
       ))}
 
+      {/* Repère d'échelle 1m³ + silhouette humaine (tjrs visible, centre) */}
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#0ea5e9" transparent opacity={0.18} />
+      </mesh>
+      <mesh position={[0, 0.9, 0]}>
+        <cylinderGeometry args={[0.125, 0.125, 1.8, 24]} />
+        <meshStandardMaterial color="#f5d7b5" />
+      </mesh>
+
       {/* Walls (optional, for context) */}
       <mesh position={[-3, 3, 10]} receiveShadow>
         <boxGeometry args={[0.2, 6, 30]} />

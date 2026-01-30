@@ -575,7 +575,7 @@ const AssembledModule = memo(function AssembledModule({
 const OilTransformer = memo(function OilTransformer({ 
   dimensions, 
   position = [0, 0, 0],
-  capacityMVA = 3.75
+  capacityMVA = 5.0  // Default 5 MVA for HD5 S23 (2 containers × 2.116 MW)
 }: { 
   dimensions: { width: number; height: number; depth: number }; 
   position?: [number, number, number];
@@ -780,9 +780,9 @@ function PowerBlock({
           return (
             <OilTransformer
               key={`transformer-${col}-${row}`}
-              dimensions={{ width: 2200, height: 2800, depth: 1800 }}
+              dimensions={{ width: 2500, height: 3000, depth: 2000 }}
               position={[xPos, h * 0.5, zPos]}
-              capacityMVA={3.75}
+              capacityMVA={5.0}
             />
           );
         })
@@ -1082,14 +1082,18 @@ const SolarCanopy = memo(function SolarCanopy({
   position = [0, 0, 0],
   containerRows = 2,
   containersPerRow = 4,
-  extractorOpeningWidth = 2.5, // Width of opening above each cooling unit
-  clearanceAboveCooling = 4,   // 4m clearance above EC2-DT extractors
+  // Extractor opening dimensions matching cooling units (EC2-DT)
+  // Cooling unit: 12.192m x 2.438m - add 1m margin each side
+  extractorOpeningWidth = 14.0, // Width in X (12.192m + 2m margin)
+  extractorOpeningDepth = 4.0,  // Depth in Z (2.438m + 1.5m margin)
+  clearanceAboveCooling = 4,    // 4m clearance above EC2-DT extractors
 }: { 
   dimensions: { width: number; height: number; depth: number }; 
   position?: [number, number, number];
   containerRows?: number;
   containersPerRow?: number;
   extractorOpeningWidth?: number;
+  extractorOpeningDepth?: number;
   clearanceAboveCooling?: number;
 }) {
   const w = dimensions.width / 1000;   // Total width (X axis) ~40m
@@ -1107,46 +1111,50 @@ const SolarCanopy = memo(function SolarCanopy({
   const solarCellColor = '#0f172a';
   const aluminumFrame = '#9ca3af';
   
-  // Calculate post positions (corners and intermediates)
-  const postSpacingX = w / 4;
-  const postSpacingZ = d / 3;
+  // Calculate post positions - AVOID CONTAINER ZONES
+  // Container layout: 2 rows at X = ±13.596m, width 12.192m
+  // Row 1 occupies X: -19.692 to -7.5m
+  // Row 2 occupies X: +7.5 to +19.692m
+  // Central passage: -7.5m to +7.5m (15m wide)
   
-  // Pre-calculate arrays
+  // Posts must be placed:
+  // - At outer edges: ±21m (outside containers)
+  // - In central passage: -5m, 0m, +5m (between equipment)
+  
   const postPositionsX = useMemo(() => {
-    const positions: number[] = [];
-    for (let i = 0; i <= 4; i++) {
-      positions.push(-w/2 + i * postSpacingX);
-    }
-    return positions;
-  }, [w, postSpacingX]);
+    // Outer edges + central passage posts only
+    return [-w/2, -5, 0, 5, w/2]; // -21, -5, 0, +5, +21
+  }, [w]);
   
+  // Container Z positions: -9.657, -3.219, +3.219, +9.657 (depth 2.438m each)
+  // Posts between containers and at edges
   const postPositionsZ = useMemo(() => {
-    const positions: number[] = [];
-    for (let i = 0; i <= 3; i++) {
-      positions.push(-d/2 + i * postSpacingZ);
-    }
-    return positions;
-  }, [d, postSpacingZ]);
+    // Edges + between container pairs
+    return [-d/2, -6.4, 0, 6.4, d/2]; // -12, -6.4, 0, +6.4, +12
+  }, [d]);
   
   // Calculate extractor openings positions (above each cooling unit)
   // 8 containers = 8 cooling units = 8 openings
+  // Real Qatar 100MW layout:
+  // - Container width: 12.192m, depth: 2.438m
+  // - Row 1 X: -13.596m, Row 2 X: +13.596m
+  // - Z spacing: 6.438m (container depth + 4m gap)
   const extractorOpenings = useMemo(() => {
     const openings: Array<{ x: number; z: number }> = [];
     
-    // Container layout: 2 rows x 4 containers
-    // Row 1 at X = -(15/2) - (12.192/2) = -13.596
-    // Row 2 at X = (15/2) + (12.192/2) = 13.596
-    // Z positions: from -9.66 to +9.66, step = 2.438 + 4 = 6.438m
-    
-    const row1X = -13.596;
-    const row2X = 13.596;
-    const containerSpacing = 6.438;
-    const centerOffsetZ = -(containersPerRow - 1) * containerSpacing / 2;
+    // Exact container/cooling positions from Qatar 100MW preset
+    const row1X = -13.596;  // Left row center
+    const row2X = 13.596;   // Right row center
+    const containerDepth = 2.438;
+    const gapBetweenContainers = 4.0;
+    const containerSpacing = containerDepth + gapBetweenContainers; // 6.438m
+    const centerOffsetZ = -(containersPerRow - 1) * containerSpacing / 2; // -9.657m
     
     for (let i = 0; i < containersPerRow; i++) {
       const zPos = centerOffsetZ + i * containerSpacing;
-      openings.push({ x: row1X, z: zPos }); // Row 1
-      openings.push({ x: row2X, z: zPos }); // Row 2
+      // Z positions: -9.657, -3.219, +3.219, +9.657
+      openings.push({ x: row1X, z: zPos }); // Row 1 cooling
+      openings.push({ x: row2X, z: zPos }); // Row 2 cooling
     }
     
     return openings;
@@ -1172,16 +1180,18 @@ const SolarCanopy = memo(function SolarCanopy({
   }, [w, panelWidth]);
   
   // Check if a panel position is above an extractor opening
+  // Uses rectangular openings matching cooling unit dimensions
   const isOverExtractor = useCallback((x: number, z: number) => {
     for (const opening of extractorOpenings) {
       const dx = Math.abs(x - opening.x);
       const dz = Math.abs(z - opening.z);
-      if (dx < extractorOpeningWidth && dz < extractorOpeningWidth) {
+      // Rectangular opening: width in X, depth in Z
+      if (dx < extractorOpeningWidth / 2 && dz < extractorOpeningDepth / 2) {
         return true;
       }
     }
     return false;
-  }, [extractorOpenings, extractorOpeningWidth]);
+  }, [extractorOpenings, extractorOpeningWidth, extractorOpeningDepth]);
   
   return (
     <group position={position}>
@@ -1845,7 +1855,7 @@ const PreviewBox = memo(function PreviewBox({
         <OilTransformer 
           dimensions={dimensions} 
           position={[0, y, 0]}
-          capacityMVA={3.75}
+          capacityMVA={5.0}
         />
       </group>
     );
@@ -2163,7 +2173,7 @@ export default function Object3DPreview({
   })();
 
   return (
-    <div className="w-full h-64 rounded-xl overflow-hidden bg-white relative border border-slate-200 shadow-lg">
+    <div className="w-full h-64 rounded-2xl overflow-hidden bg-white relative border border-slate-200 shadow-lg">
       <Canvas shadows>
         <PerspectiveCamera 
           makeDefault 
@@ -2231,7 +2241,7 @@ export default function Object3DPreview({
       {/* Info overlay */}
       <div className="absolute bottom-3 left-3 right-3">
         {/* Premium white overlay */}
-        <div className="bg-white/90 rounded-xl px-3 py-2 shadow-lg border border-slate-200">
+        <div className="bg-white/90 rounded-2xl px-3 py-2 shadow-lg border border-slate-200">
           <p className="font-bold text-white text-sm truncate">{name}</p>
           <p className="text-xs text-slate-400">
             {(dimensions.width / 1000).toFixed(2)}m × 

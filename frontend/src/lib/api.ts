@@ -402,8 +402,8 @@ export const objectsApi = {
         { id: 'cooling-immersion', name: 'Immersion Tank', type: 'cooling', dimensions: { width: 2000, height: 1500, depth: 1000 }, color: '#1e3a5f', description: 'Immersion cooling tank' },
       ],
       transformers: [
-        { id: 'transformer-3.75mva', name: 'Transformer 3.75 MVA', type: 'transformer', dimensions: { width: 2200, height: 2800, depth: 1800 }, color: '#f59e0b', description: '33kV/400V - Oil ONAN/ONAF - Pour 2 containers HD5' },
-        { id: 'transformer-4mw', name: 'Transformer 4MW', type: 'transformer', dimensions: { width: 2500, height: 3000, depth: 2000 }, color: '#f59e0b', description: '4MW power transformer' },
+        { id: 'transformer-5mva', name: 'Transformer 5 MVA', type: 'transformer', dimensions: { width: 2500, height: 3000, depth: 2000 }, color: '#f59e0b', description: '33kV/400V - Pour 2 containers HD5 S23 (4.232 MW)' },
+        { id: 'transformer-2.5mva', name: 'Transformer 2.5 MVA', type: 'transformer', dimensions: { width: 2200, height: 2800, depth: 1800 }, color: '#f59e0b', description: '33kV/400V - Pour 1 container HD5' },
         { id: 'transformer-2mw', name: 'Transformer 2MW', type: 'transformer', dimensions: { width: 2000, height: 2500, depth: 1500 }, color: '#f59e0b', description: '2MW power transformer' },
         { id: 'transformer-1mw', name: 'Transformer 1MW', type: 'transformer', dimensions: { width: 1500, height: 2000, depth: 1200 }, color: '#f59e0b', description: '1MW power transformer' },
         { id: 'rmu-33kv', name: 'RMU 33kV ABB SafeRing', type: 'transformer', dimensions: { width: 1200, height: 1800, depth: 800 }, color: '#1f2937', description: 'Ring Main Unit 33kV SF6 3-way' },
@@ -440,6 +440,35 @@ export const objectsApi = {
       ],
       modules: [],
       powerblocks: [],
+      cabletrays: [
+        // Chemins de câbles échelle (Ladder tray)
+        { id: 'cabletray-ladder-300', name: 'Chemin Échelle 300mm', type: 'cable-tray-ladder', dimensions: { width: 300, height: 100, depth: 3000 }, color: '#71717a', description: 'Chemin de câbles échelle galva - 300×100mm - Section 3m' },
+        { id: 'cabletray-ladder-450', name: 'Chemin Échelle 450mm', type: 'cable-tray-ladder', dimensions: { width: 450, height: 100, depth: 3000 }, color: '#71717a', description: 'Chemin de câbles échelle galva - 450×100mm - Section 3m' },
+        { id: 'cabletray-ladder-600', name: 'Chemin Échelle 600mm', type: 'cable-tray-ladder', dimensions: { width: 600, height: 100, depth: 3000 }, color: '#71717a', description: 'Chemin de câbles échelle galva - 600×100mm - Section 3m' },
+        // Chemins de câbles treillis (Wire mesh)
+        { id: 'cabletray-mesh-200', name: 'Chemin Treillis 200mm', type: 'cable-tray-mesh', dimensions: { width: 200, height: 60, depth: 3000 }, color: '#a1a1aa', description: 'Chemin de câbles treillis - 200×60mm - Section 3m' },
+        { id: 'cabletray-mesh-300', name: 'Chemin Treillis 300mm', type: 'cable-tray-mesh', dimensions: { width: 300, height: 60, depth: 3000 }, color: '#a1a1aa', description: 'Chemin de câbles treillis - 300×60mm - Section 3m' },
+        { id: 'cabletray-mesh-500', name: 'Chemin Treillis 500mm', type: 'cable-tray-mesh', dimensions: { width: 500, height: 100, depth: 3000 }, color: '#a1a1aa', description: 'Chemin de câbles treillis - 500×100mm - Section 3m' },
+        // Conduits / Tubes
+        { id: 'cabletray-conduit-50', name: 'Conduit Ø50mm', type: 'cable-conduit', dimensions: { width: 50, height: 50, depth: 3000 }, color: '#52525b', description: 'Tube acier galvanisé Ø50mm - Section 3m' },
+        { id: 'cabletray-conduit-100', name: 'Conduit Ø100mm', type: 'cable-conduit', dimensions: { width: 100, height: 100, depth: 3000 }, color: '#52525b', description: 'Tube acier galvanisé Ø100mm - Section 3m' },
+        { id: 'cabletray-conduit-150', name: 'Conduit Ø150mm', type: 'cable-conduit', dimensions: { width: 150, height: 150, depth: 3000 }, color: '#52525b', description: 'Tube acier galvanisé Ø150mm - Section 3m' },
+        // Goulottes / Busbar
+        { id: 'cabletray-busbar-800a', name: 'Busbar 800A', type: 'cable-busbar', dimensions: { width: 200, height: 100, depth: 3000 }, color: '#f59e0b', description: 'Canalisation préfabriquée 800A - Section 3m' },
+        { id: 'cabletray-busbar-1600a', name: 'Busbar 1600A', type: 'cable-busbar', dimensions: { width: 250, height: 120, depth: 3000 }, color: '#f59e0b', description: 'Canalisation préfabriquée 1600A - Section 3m' },
+        { id: 'cabletray-busbar-3200a', name: 'Busbar 3200A', type: 'cable-busbar', dimensions: { width: 300, height: 150, depth: 3000 }, color: '#f59e0b', description: 'Canalisation préfabriquée 3200A - Section 3m' },
+        // Accessoires
+        { id: 'cabletray-junction-box', name: 'Boîte de Jonction IP65', type: 'junction-box', dimensions: { width: 300, height: 200, depth: 150 }, color: '#374151', description: 'Boîte de jonction polyester IP65 - 300×200×150' },
+        { id: 'cabletray-junction-box-xl', name: 'Boîte de Jonction XL IP65', type: 'junction-box', dimensions: { width: 500, height: 400, depth: 200 }, color: '#374151', description: 'Boîte de jonction polyester IP65 - 500×400×200' },
+        // Supports
+        { id: 'cabletray-support-wall', name: 'Console Murale 300mm', type: 'cable-support', dimensions: { width: 300, height: 50, depth: 100 }, color: '#71717a', description: 'Console murale galvanisée - charge 100kg' },
+        { id: 'cabletray-support-ceiling', name: 'Suspension Plafond', type: 'cable-support', dimensions: { width: 100, height: 500, depth: 100 }, color: '#71717a', description: 'Tige filetée + étrier suspension' },
+      ],
+      infrastructure: [
+        { id: 'infra-concrete-slab', name: 'Dalle Béton', type: 'concrete-slab', dimensions: { width: 10000, height: 400, depth: 10000 }, color: '#d1d5db', description: 'Dalle béton armé 400mm - 10m×10m' },
+        { id: 'infra-road-section', name: 'Voie de Circulation', type: 'road', dimensions: { width: 6000, height: 100, depth: 20000 }, color: '#374151', description: 'Voie 6m large - enrobé - Section 20m' },
+        { id: 'infra-parking', name: 'Zone Parking', type: 'parking', dimensions: { width: 5000, height: 50, depth: 2500 }, color: '#6b7280', description: 'Place parking - 5m×2.5m' },
+      ],
     };
 
     try {
@@ -455,7 +484,8 @@ export const objectsApi = {
       // Group templates by category for library display
       const grouped: { [key: string]: InfraObject[] } = {
         racks: [], pdu: [], cooling: [], networking: [],
-        containers: [], transformers: [], powerblocks: [], modules: [], solar: [], security: []
+        containers: [], transformers: [], powerblocks: [], modules: [], solar: [], security: [],
+        cabletrays: [], infrastructure: []
       };
       
       for (const template of response.data || []) {

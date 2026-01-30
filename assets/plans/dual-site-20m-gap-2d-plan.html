@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual Site - 20m Gap | Plan 2D Précis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0a0a0f;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #111118 0%, #1a1a24 100%);
+            border-radius: 16px;
+            border: 1px solid #333;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            color: #8AFD81;
+            margin-bottom: 10px;
+        }
+        
+        .header .subtitle {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        
+        .specs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .spec-card {
+            background: #111118;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 15px;
+        }
+        
+        .spec-card h3 {
+            color: #8AFD81;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .spec-card .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .spec-card .unit {
+            color: #64748b;
+            font-size: 12px;
+        }
+        
+        .plan-container {
+            background: #111118;
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 20px;
+            overflow: auto;
+        }
+        
+        .plan-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .plan-title h2 {
+            font-size: 18px;
+        }
+        
+        .scale-info {
+            background: #1e293b;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        
+        .plan-wrapper {
+            overflow: auto;
+            padding: 20px;
+        }
+        
+        .plan {
+            position: relative;
+            /* Total width: Site A (46m) + Gap (20m) + Site B (46m) = 112m */
+            /* Scale: 1m = 8px (for reasonable display) */
+            width: 896px;  /* 112m * 8px */
+            height: 224px; /* 28m * 8px */
+            margin: 0 auto;
+            background: #1a1a24;
+            border: 2px solid #333;
+        }
+        
+        /* Grid overlay */
+        .plan::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 80px 80px; /* 10m grid */
+            pointer-events: none;
+        }
+        
+        /* Elements */
+        .element {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 6px;
+            font-weight: 600;
+            text-align: center;
+            border: 1px solid rgba(0,0,0,0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .element:hover {
+            z-index: 100;
+            transform: scale(1.5);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        .element .tooltip {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0a0a0f;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 10px;
+            white-space: nowrap;
+            z-index: 1000;
+            border: 1px solid #8AFD81;
+        }
+        
+        .element:hover .tooltip {
+            display: block;
+        }
+        
+        /* Concrete slabs */
+        .slab {
+            background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+            border: 2px solid #6b7280;
+        }
+        
+        /* Containers */
+        .container {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            border: 1px solid #9ca3af;
+            color: #1f2937;
+        }
+        
+        /* Cooling units */
+        .cooling {
+            background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+            border: 1px solid #3b82f6;
+            color: #60a5fa;
+        }
+        
+        /* Transformers */
+        .transformer {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border: 1px solid #92400e;
+            color: #1f2937;
+        }
+        
+        /* PDUs */
+        .pdu {
+            background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+            border: 1px solid #6b7280;
+            color: #d1d5db;
+        }
+        
+        /* Solar canopy outline */
+        .canopy {
+            background: transparent;
+            border: 2px dashed #8AFD81;
+            color: #8AFD81;
+        }
+        
+        /* Dimension lines */
+        .dimension {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #f97316;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        .dimension-line {
+            position: absolute;
+            background: #f97316;
+        }
+        
+        .dimension-h {
+            height: 1px;
+        }
+        
+        .dimension-v {
+            width: 1px;
+        }
+        
+        /* Site labels */
+        .site-label {
+            position: absolute;
+            font-size: 14px;
+            font-weight: bold;
+            color: #8AFD81;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        /* Gap indicator */
+        .gap-indicator {
+            position: absolute;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 4px,
+                rgba(138, 253, 129, 0.2) 4px,
+                rgba(138, 253, 129, 0.2) 8px
+            );
+            border-left: 2px dashed #8AFD81;
+            border-right: 2px dashed #8AFD81;
+        }
+        
+        /* Legend */
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+            padding: 15px;
+            background: #1a1a24;
+            border-radius: 12px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        
+        /* Dimensions table */
+        .dimensions-table {
+            margin-top: 30px;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .dimensions-table th,
+        .dimensions-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        
+        .dimensions-table th {
+            background: #1a1a24;
+            color: #8AFD81;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        .dimensions-table tr:hover td {
+            background: #1a1a24;
+        }
+        
+        .coord {
+            font-family: 'JetBrains Mono', monospace;
+            color: #f97316;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏭 Dual Site - 20m Gap</h1>
+        <p class="subtitle">Plan 2D précis au centimètre • Bitcoin Mining Farm Infrastructure</p>
+    </div>
+    
+    <div class="specs-grid">
+        <div class="spec-card">
+            <h3>Dimensions Totales</h3>
+            <div class="value">112m × 28m</div>
+            <div class="unit">11 200 cm × 2 800 cm</div>
+        </div>
+        <div class="spec-card">
+            <h3>Gap Entre Sites</h3>
+            <div class="value">20m</div>
+            <div class="unit">2 000 cm</div>
+        </div>
+        <div class="spec-card">
+            <h3>Containers</h3>
+            <div class="value">16</div>
+            <div class="unit">ANTSPACE HD5 (12,192m × 2,438m)</div>
+        </div>
+        <div class="spec-card">
+            <h3>Transformateurs</h3>
+            <div class="value">8</div>
+            <div class="unit">5 MVA (2,5m × 2,0m)</div>
+        </div>
+        <div class="spec-card">
+            <h3>Surface Dalle</h3>
+            <div class="value">2 576 m²</div>
+            <div class="unit">2 × (46m × 28m)</div>
+        </div>
+        <div class="spec-card">
+            <h3>Échelle Plan</h3>
+            <div class="value">1:125</div>
+            <div class="unit">1 cm écran = 1,25 m réel</div>
+        </div>
+    </div>
+    
+    <div class="plan-container">
+        <div class="plan-title">
+            <h2>Vue en Plan (Top View)</h2>
+            <span class="scale-info">Grille: 10m × 10m | Échelle: 8px = 1m</span>
+        </div>
+        
+        <div class="plan-wrapper">
+            <div class="plan" id="plan">
+                <!-- Plan elements will be generated by JavaScript -->
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);"></div>
+                <span>Dalle Béton (46m × 28m)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);"></div>
+                <span>Container ANTSPACE HD5</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);"></div>
+                <span>Cooling EC2-DT</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);"></div>
+                <span>Transformateur 5 MVA</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #374151 0%, #1f2937 100%);"></div>
+                <span>PDU</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: transparent; border: 2px dashed #8AFD81;"></div>
+                <span>Canopy Solaire (42m × 24m)</span>
+            </div>
+        </div>
+    </div>
+    
+    <h2 style="margin: 30px 0 15px; font-size: 18px;">📐 Tableau des Coordonnées (en cm)</h2>
+    
+    <table class="dimensions-table" id="coordsTable">
+        <thead>
+            <tr>
+                <th>Élément</th>
+                <th>Type</th>
+                <th>X (cm)</th>
+                <th>Z (cm)</th>
+                <th>Largeur (cm)</th>
+                <th>Profondeur (cm)</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════════════════════
+        // CONFIGURATION - Dimensions exactes en millimètres (source: designer)
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        const CONFIG = {
+            // Scale: pixels per meter
+            SCALE: 8,
+            
+            // Scene layout
+            sceneWidth: 42,      // 42m per site (canopy width)
+            gap: 20,             // 20m between sites
+            
+            // Site centers (X position in meters)
+            siteACenterX: -31,   // -(42/2 + 20/2) = -31m
+            siteBCenterX: 31,    // +(42/2 + 20/2) = +31m
+            
+            // Slab dimensions (mm)
+            slabWidth: 46000,    // 46m
+            slabDepth: 28000,    // 28m
+            
+            // Canopy dimensions (mm)
+            canopyWidth: 42000,  // 42m
+            canopyDepth: 24000,  // 24m
+            
+            // Container dimensions (mm) - ANTSPACE HD5
+            containerWidth: 12192,  // 12.192m (40ft ISO container)
+            containerDepth: 2438,   // 2.438m (8ft standard)
+            
+            // Cooling dimensions (mm) - EC2-DT (same as container in this config)
+            coolingWidth: 12192,
+            coolingDepth: 2438,
+            
+            // Transformer dimensions (mm)
+            transformerWidth: 2500,  // 2.5m
+            transformerDepth: 2000,  // 2.0m
+            
+            // PDU dimensions (mm)
+            pduWidth: 2400,      // 2.4m
+            pduDepth: 800,       // 0.8m
+            
+            // Layout parameters
+            faceToFaceGap: 15,        // 15m between container rows (face to face)
+            gapBetweenContainers: 4,  // 4m between containers in same row
+            containersPerRow: 4,
+            
+            // Security distances
+            securityDistPduContainer: 3.0,  // 3m PDU to container
+            securityDistTrfPdu: 3.0,        // 3m transformer to PDU
+        };
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // CALCULATIONS
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        const containerWidthM = CONFIG.containerWidth / 1000;
+        const containerDepthM = CONFIG.containerDepth / 1000;
+        const pduDepthM = CONFIG.pduDepth / 1000;
+        const transformerWidthM = CONFIG.transformerWidth / 1000;
+        
+        // Z positions (vertical in plan)
+        const containerSpacing = containerDepthM + CONFIG.gapBetweenContainers; // 6.438m
+        const totalZSpan = (CONFIG.containersPerRow - 1) * containerSpacing;    // 19.314m
+        const centerOffsetZ = -totalZSpan / 2;                                   // -9.657m
+        
+        // X positions relative to site center
+        const row1X = -(CONFIG.faceToFaceGap / 2) - (containerWidthM / 2);  // -13.596m
+        const row2X = (CONFIG.faceToFaceGap / 2) + (containerWidthM / 2);   // +13.596m
+        
+        // Inner edges of containers (facing the central corridor)
+        const containerInnerEdgeLeft = row1X + (containerWidthM / 2);   // -7.5m
+        const containerInnerEdgeRight = row2X - (containerWidthM / 2);  // +7.5m
+        
+        // PDU positions
+        const pduRow1X = containerInnerEdgeLeft + CONFIG.securityDistPduContainer + (pduDepthM / 2);
+        const pduRow2X = containerInnerEdgeRight - CONFIG.securityDistPduContainer - (pduDepthM / 2);
+        
+        // Transformer positions
+        const trfXFromCenter = containerInnerEdgeLeft + CONFIG.securityDistPduContainer + pduDepthM + CONFIG.securityDistTrfPdu + (transformerWidthM / 2);
+        
+        // Z positions for transformers/PDUs (between container pairs)
+        const containerStep = containerDepthM + CONFIG.gapBetweenContainers;
+        const zTop = centerOffsetZ + containerStep / 2;      // Top pair
+        const zBottom = centerOffsetZ + totalZSpan - containerStep / 2;  // Bottom pair
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // GENERATE ELEMENTS
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        const elements = [];
+        const sites = [
+            { id: 'A', offsetX: CONFIG.siteACenterX, label: 'Site A' },
+            { id: 'B', offsetX: CONFIG.siteBCenterX, label: 'Site B' }
+        ];
+        
+        sites.forEach(site => {
+            const xOffset = site.offsetX;
+            
+            // Concrete Slab
+            elements.push({
+                id: `${site.id}-slab`,
+                name: `${site.label} - Dalle Béton`,
+                type: 'slab',
+                x: xOffset,
+                z: 0,
+                width: CONFIG.slabWidth / 1000,
+                depth: CONFIG.slabDepth / 1000,
+            });
+            
+            // Solar Canopy (outline only)
+            elements.push({
+                id: `${site.id}-canopy`,
+                name: `${site.label} - Canopy Solaire`,
+                type: 'canopy',
+                x: xOffset,
+                z: 0,
+                width: CONFIG.canopyWidth / 1000,
+                depth: CONFIG.canopyDepth / 1000,
+            });
+            
+            // Row 1: 4 Containers (left side)
+            for (let i = 0; i < CONFIG.containersPerRow; i++) {
+                const zPos = centerOffsetZ + i * containerSpacing;
+                elements.push({
+                    id: `${site.id}-container-${i + 1}`,
+                    name: `${site.label} - Container #${i + 1}`,
+                    type: 'container',
+                    x: row1X + xOffset,
+                    z: zPos,
+                    width: containerWidthM,
+                    depth: containerDepthM,
+                });
+                
+                // Cooling on top (offset slightly for visibility in 2D)
+                elements.push({
+                    id: `${site.id}-cooling-${i + 1}`,
+                    name: `${site.label} - Cooling #${i + 1}`,
+                    type: 'cooling',
+                    x: row1X + xOffset - 0.3, // Slight offset for visibility
+                    z: zPos,
+                    width: containerWidthM,
+                    depth: containerDepthM * 0.3, // Shown smaller in 2D
+                });
+            }
+            
+            // Row 2: 4 Containers (right side)
+            for (let i = 0; i < CONFIG.containersPerRow; i++) {
+                const zPos = centerOffsetZ + i * containerSpacing;
+                elements.push({
+                    id: `${site.id}-container-${i + 5}`,
+                    name: `${site.label} - Container #${i + 5}`,
+                    type: 'container',
+                    x: row2X + xOffset,
+                    z: zPos,
+                    width: containerWidthM,
+                    depth: containerDepthM,
+                });
+                
+                // Cooling on top
+                elements.push({
+                    id: `${site.id}-cooling-${i + 5}`,
+                    name: `${site.label} - Cooling #${i + 5}`,
+                    type: 'cooling',
+                    x: row2X + xOffset + 0.3,
+                    z: zPos,
+                    width: containerWidthM,
+                    depth: containerDepthM * 0.3,
+                });
+            }
+            
+            // 4 Transformers
+            const transformerPositions = [
+                { x: -trfXFromCenter + xOffset, z: zTop },
+                { x: trfXFromCenter + xOffset, z: zTop },
+                { x: -trfXFromCenter + xOffset, z: zBottom },
+                { x: trfXFromCenter + xOffset, z: zBottom },
+            ];
+            transformerPositions.forEach((pos, i) => {
+                elements.push({
+                    id: `${site.id}-transformer-${i + 1}`,
+                    name: `${site.label} - Transformer #${i + 1}`,
+                    type: 'transformer',
+                    x: pos.x,
+                    z: pos.z,
+                    width: CONFIG.transformerWidth / 1000,
+                    depth: CONFIG.transformerDepth / 1000,
+                });
+            });
+            
+            // 4 PDUs (rotated 90°, so width/depth are swapped in display)
+            const pduPositions = [
+                { x: pduRow1X + xOffset, z: zTop },
+                { x: pduRow1X + xOffset, z: zBottom },
+                { x: pduRow2X + xOffset, z: zTop },
+                { x: pduRow2X + xOffset, z: zBottom },
+            ];
+            pduPositions.forEach((pos, i) => {
+                elements.push({
+                    id: `${site.id}-pdu-${i + 1}`,
+                    name: `${site.label} - PDU #${i + 1}`,
+                    type: 'pdu',
+                    x: pos.x,
+                    z: pos.z,
+                    width: CONFIG.pduDepth / 1000,  // Rotated
+                    depth: CONFIG.pduWidth / 1000,  // Rotated
+                });
+            });
+        });
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // RENDER PLAN
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        const planEl = document.getElementById('plan');
+        const tableBody = document.querySelector('#coordsTable tbody');
+        
+        // Plan center (in pixels)
+        const planWidth = 896;  // 112m * 8px
+        const planHeight = 224; // 28m * 8px
+        const centerX = planWidth / 2;
+        const centerY = planHeight / 2;
+        
+        // Convert meters to pixels
+        function mToPixels(m) {
+            return m * CONFIG.SCALE;
+        }
+        
+        // Convert position to screen coordinates
+        function toScreen(x, z, width, depth) {
+            const pixelX = centerX + mToPixels(x) - mToPixels(width) / 2;
+            const pixelY = centerY + mToPixels(z) - mToPixels(depth) / 2;
+            return {
+                left: pixelX,
+                top: pixelY,
+                width: mToPixels(width),
+                height: mToPixels(depth),
+            };
+        }
+        
+        // Sort elements by layer (slabs first, then containers, etc.)
+        const layerOrder = ['slab', 'canopy', 'container', 'cooling', 'transformer', 'pdu'];
+        elements.sort((a, b) => layerOrder.indexOf(a.type) - layerOrder.indexOf(b.type));
+        
+        // Render each element
+        elements.forEach(el => {
+            const screen = toScreen(el.x, el.z, el.width, el.depth);
+            
+            const div = document.createElement('div');
+            div.className = `element ${el.type}`;
+            div.style.left = `${screen.left}px`;
+            div.style.top = `${screen.top}px`;
+            div.style.width = `${screen.width}px`;
+            div.style.height = `${screen.height}px`;
+            
+            // Label (only for larger elements)
+            if (el.type !== 'cooling' && screen.width > 20) {
+                const shortName = el.type === 'slab' ? '' : 
+                                  el.type === 'canopy' ? '' :
+                                  el.type === 'container' ? el.id.split('-')[2] :
+                                  el.type === 'transformer' ? 'T' + el.id.split('-')[2] :
+                                  el.type === 'pdu' ? 'P' + el.id.split('-')[2] : '';
+                div.textContent = shortName;
+            }
+            
+            // Tooltip
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            tooltip.innerHTML = `
+                <strong>${el.name}</strong><br>
+                X: ${(el.x * 100).toFixed(0)} cm | Z: ${(el.z * 100).toFixed(0)} cm<br>
+                ${(el.width * 100).toFixed(0)} × ${(el.depth * 100).toFixed(0)} cm
+            `;
+            div.appendChild(tooltip);
+            
+            planEl.appendChild(div);
+            
+            // Add to coordinates table (skip cooling and canopy for clarity)
+            if (el.type !== 'cooling' && el.type !== 'canopy') {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${el.name}</td>
+                    <td>${el.type}</td>
+                    <td class="coord">${(el.x * 100).toFixed(0)}</td>
+                    <td class="coord">${(el.z * 100).toFixed(0)}</td>
+                    <td class="coord">${(el.width * 100).toFixed(0)}</td>
+                    <td class="coord">${(el.depth * 100).toFixed(0)}</td>
+                `;
+                tableBody.appendChild(row);
+            }
+        });
+        
+        // Add gap indicator
+        const gapIndicator = document.createElement('div');
+        gapIndicator.className = 'gap-indicator';
+        const gapScreen = toScreen(0, 0, CONFIG.gap, CONFIG.slabDepth / 1000);
+        gapIndicator.style.left = `${gapScreen.left}px`;
+        gapIndicator.style.top = `${gapScreen.top}px`;
+        gapIndicator.style.width = `${gapScreen.width}px`;
+        gapIndicator.style.height = `${gapScreen.height}px`;
+        planEl.appendChild(gapIndicator);
+        
+        // Add site labels
+        sites.forEach(site => {
+            const label = document.createElement('div');
+            label.className = 'site-label';
+            label.textContent = site.label;
+            const labelScreen = toScreen(site.offsetX, -12, 0, 0);
+            label.style.left = `${labelScreen.left}px`;
+            label.style.top = `${labelScreen.top - 20}px`;
+            planEl.appendChild(label);
+        });
+        
+        // Add 20m gap dimension label
+        const gapLabel = document.createElement('div');
+        gapLabel.className = 'dimension';
+        gapLabel.textContent = '20m GAP';
+        gapLabel.style.left = `${centerX - 25}px`;
+        gapLabel.style.top = `${centerY - 5}px`;
+        gapLabel.style.width = '50px';
+        gapLabel.style.color = '#8AFD81';
+        planEl.appendChild(gapLabel);
+    </script>
+</body>
+</html>

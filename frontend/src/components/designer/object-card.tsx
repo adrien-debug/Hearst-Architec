@@ -294,7 +294,7 @@ export default function ObjectCard({ object, onAdd, onEdit }: ObjectCardProps) {
           {onEdit && (
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
               title="Edit object"
             >
               <Edit3 className="w-4 h-4" />
@@ -324,7 +324,7 @@ export default function ObjectCard({ object, onAdd, onEdit }: ObjectCardProps) {
         {/* Add button */}
         <button
           onClick={onAdd}
-          className="w-full mt-3 py-2 bg-slate-100 hover:bg-hearst-green text-slate-700 hover:text-slate-900 text-sm font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+          className="w-full mt-3 py-2 bg-slate-100 hover:bg-hearst-green text-slate-700 hover:text-slate-900 text-sm font-medium rounded-full transition-colors flex items-center justify-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Add to Scene

@@ -69,75 +69,49 @@ export const EQUIPMENT_SNAP_CONFIGS: Record<string, EquipmentSnapConfig> = {
     objectType: 'iso-container-40ft',
     displayName: 'Container ISO 40ft',
     snapPoints: [
-      // Points sur le toit (4 points pour les chemins de câbles)
+      // Entrée électrique principale - côté gauche (panneau électrique), niveau bas
       {
-        localPosition: new THREE.Vector3(-4, 1.45, 0),  // Gauche centre
+        localPosition: new THREE.Vector3(-6.1, -0.8, 0),
         connectionType: 'power-bt',
-        direction: new THREE.Vector3(0, 1, 0),
-        label: 'Toit Gauche',
-        cableWidth: 600,
-        maxCables: 12,
+        direction: new THREE.Vector3(-1, 0, 0),
+        label: 'Entrée Élec',
+        cableWidth: 300,
+        maxCables: 6,
         priority: 1,
       },
+      // Entrée électrique avant - pour câbles venant de devant
       {
-        localPosition: new THREE.Vector3(4, 1.45, 0),   // Droite centre
+        localPosition: new THREE.Vector3(-4, -0.8, -1.2),
         connectionType: 'power-bt',
-        direction: new THREE.Vector3(0, 1, 0),
-        label: 'Toit Droit',
-        cableWidth: 600,
-        maxCables: 12,
+        direction: new THREE.Vector3(0, 0, -1),
+        label: 'Entrée Avant',
+        cableWidth: 300,
+        maxCables: 6,
         priority: 1,
       },
+      // Entrée data/réseau - côté gauche, plus haut
       {
-        localPosition: new THREE.Vector3(0, 1.45, 0.8),  // Centre arrière
+        localPosition: new THREE.Vector3(-6.1, 0.3, 0.5),
         connectionType: 'data',
-        direction: new THREE.Vector3(0, 1, 0),
-        label: 'Toit Data',
-        cableWidth: 200,
-        maxCables: 24,
-        priority: 2,
-      },
-      {
-        localPosition: new THREE.Vector3(0, 1.45, -0.8), // Centre avant
-        connectionType: 'control',
-        direction: new THREE.Vector3(0, 1, 0),
-        label: 'Toit Contrôle',
+        direction: new THREE.Vector3(-1, 0, 0),
+        label: 'Data',
         cableWidth: 100,
-        maxCables: 8,
+        maxCables: 12,
         priority: 2,
       },
-      // Points latéraux (panneaux d'entrée câbles)
+      // Mise à terre - au sol, coin gauche
       {
-        localPosition: new THREE.Vector3(-6.1, 0, 0),   // Côté gauche (mur)
-        connectionType: 'power-bt',
-        direction: new THREE.Vector3(-1, 0, 0),
-        label: 'Panneau Latéral Gauche',
-        cableWidth: 300,
-        maxCables: 6,
-        priority: 1,
-      },
-      {
-        localPosition: new THREE.Vector3(6.1, 0, 0),    // Côté droit (portes)
-        connectionType: 'power-bt',
-        direction: new THREE.Vector3(1, 0, 0),
-        label: 'Panneau Latéral Droit',
-        cableWidth: 300,
-        maxCables: 6,
-        priority: 2,
-      },
-      // Mise à terre
-      {
-        localPosition: new THREE.Vector3(-6.1, -1.2, -1),
+        localPosition: new THREE.Vector3(-6.1, -1.4, -1),
         connectionType: 'earth',
-        direction: new THREE.Vector3(-1, 0, 0),
-        label: 'Terre Container',
+        direction: new THREE.Vector3(0, -1, 0),
+        label: 'Terre',
         cableWidth: 50,
         maxCables: 1,
         priority: 1,
       },
     ],
     forbiddenZones: [
-      // Zone portes arrière (accès maintenance)
+      // Zone portes arrière (accès maintenance) - côté droit
       {
         type: 'box',
         localPosition: new THREE.Vector3(7, 0, 0),
@@ -220,61 +194,61 @@ export const EQUIPMENT_SNAP_CONFIGS: Record<string, EquipmentSnapConfig> = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────
-  // TRANSFORMATEUR HUILE
+  // TRANSFORMATEUR HUILE - Connexions sur les CÔTÉS (pas le toit)
   // ─────────────────────────────────────────────────────────────────────────
   'oil-transformer': {
     objectType: 'oil-transformer',
     displayName: 'Transformateur',
     snapPoints: [
-      // Sortie Haute Tension
+      // Sortie Haute Tension - côté arrière, niveau bas
       {
-        localPosition: new THREE.Vector3(0, 1.8, -1.3),
+        localPosition: new THREE.Vector3(0, -0.5, -1.3),
         connectionType: 'power-ht',
-        direction: new THREE.Vector3(0, 1, -1).normalize(),
-        label: 'Sortie HT',
+        direction: new THREE.Vector3(0, 0, -1),
+        label: 'Entrée HT',
         cableWidth: 150,
         maxCables: 3,
         priority: 1,
       },
-      // Sortie Basse Tension
+      // Sortie Basse Tension - côté avant, niveau bas (vers PDU)
       {
-        localPosition: new THREE.Vector3(0, 1.6, 1.3),
+        localPosition: new THREE.Vector3(0, -0.5, 1.3),
         connectionType: 'power-bt',
-        direction: new THREE.Vector3(0, 1, 1).normalize(),
+        direction: new THREE.Vector3(0, 0, 1),
         label: 'Sortie BT',
         cableWidth: 600,
         maxCables: 6,
         priority: 1,
       },
-      // Mise à terre principale
+      // Sortie BT droite - pour câbles vers containers
       {
-        localPosition: new THREE.Vector3(-1.75, -1.2, 0),
-        connectionType: 'earth',
-        direction: new THREE.Vector3(-1, -0.5, 0).normalize(),
-        label: 'Terre Principale',
-        cableWidth: 70,
-        maxCables: 1,
-        priority: 1,
-      },
-      // Neutre
-      {
-        localPosition: new THREE.Vector3(1.75, -1.2, 0),
-        connectionType: 'earth',
-        direction: new THREE.Vector3(1, -0.5, 0).normalize(),
-        label: 'Neutre',
-        cableWidth: 70,
-        maxCables: 1,
-        priority: 1,
-      },
-      // Contrôle / Monitoring
-      {
-        localPosition: new THREE.Vector3(-1.75, 0.5, 1),
-        connectionType: 'control',
-        direction: new THREE.Vector3(-1, 0, 0),
-        label: 'Armoire Contrôle',
-        cableWidth: 50,
+        localPosition: new THREE.Vector3(1.3, -0.5, 0),
+        connectionType: 'power-bt',
+        direction: new THREE.Vector3(1, 0, 0),
+        label: 'Sortie BT Droite',
+        cableWidth: 300,
         maxCables: 4,
-        priority: 2,
+        priority: 1,
+      },
+      // Sortie BT gauche - pour câbles vers containers
+      {
+        localPosition: new THREE.Vector3(-1.3, -0.5, 0),
+        connectionType: 'power-bt',
+        direction: new THREE.Vector3(-1, 0, 0),
+        label: 'Sortie BT Gauche',
+        cableWidth: 300,
+        maxCables: 4,
+        priority: 1,
+      },
+      // Mise à terre principale - au sol
+      {
+        localPosition: new THREE.Vector3(-1.2, -1.4, -1),
+        connectionType: 'earth',
+        direction: new THREE.Vector3(0, -1, 0),
+        label: 'Terre',
+        cableWidth: 70,
+        maxCables: 1,
+        priority: 1,
       },
     ],
     forbiddenZones: [
@@ -302,79 +276,61 @@ export const EQUIPMENT_SNAP_CONFIGS: Record<string, EquipmentSnapConfig> = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────
-  // PDU - Power Distribution Unit
+  // PDU - Power Distribution Unit - Connexions sur les CÔTÉS
   // ─────────────────────────────────────────────────────────────────────────
   'pdu': {
     objectType: 'pdu',
     displayName: 'PDU',
     snapPoints: [
-      // Entrée principale
+      // Entrée depuis transformateur - côté arrière, niveau bas
       {
-        localPosition: new THREE.Vector3(0, 0.8, -0.35),
+        localPosition: new THREE.Vector3(0, -0.3, -0.45),
         connectionType: 'power-input',
         direction: new THREE.Vector3(0, 0, -1),
-        label: 'Entrée Principale',
+        label: 'Entrée',
         cableWidth: 300,
         maxCables: 4,
         priority: 1,
       },
-      // Sorties circuits (multiples)
+      // Sortie vers container 1 - côté gauche
       {
-        localPosition: new THREE.Vector3(-0.3, 0.2, 0.35),
+        localPosition: new THREE.Vector3(-0.45, -0.3, 0),
         connectionType: 'power-output',
-        direction: new THREE.Vector3(0, 0, 1),
-        label: 'Sortie Circuit 1',
-        cableWidth: 100,
-        maxCables: 3,
+        direction: new THREE.Vector3(-1, 0, 0),
+        label: 'Sortie C1',
+        cableWidth: 200,
+        maxCables: 6,
         priority: 1,
       },
+      // Sortie vers container 2 - côté droit
       {
-        localPosition: new THREE.Vector3(0, 0.2, 0.35),
+        localPosition: new THREE.Vector3(0.45, -0.3, 0),
         connectionType: 'power-output',
-        direction: new THREE.Vector3(0, 0, 1),
-        label: 'Sortie Circuit 2',
-        cableWidth: 100,
-        maxCables: 3,
+        direction: new THREE.Vector3(1, 0, 0),
+        label: 'Sortie C2',
+        cableWidth: 200,
+        maxCables: 6,
         priority: 1,
       },
+      // Sortie avant - vers containers en face
       {
-        localPosition: new THREE.Vector3(0.3, 0.2, 0.35),
+        localPosition: new THREE.Vector3(0, -0.3, 0.45),
         connectionType: 'power-output',
         direction: new THREE.Vector3(0, 0, 1),
-        label: 'Sortie Circuit 3',
-        cableWidth: 100,
-        maxCables: 3,
-        priority: 1,
-      },
-      // Sortie haut (vers chemin de câbles)
-      {
-        localPosition: new THREE.Vector3(0, 1.1, 0),
-        connectionType: 'power-output',
-        direction: new THREE.Vector3(0, 1, 0),
-        label: 'Sortie Toit',
+        label: 'Sortie Avant',
         cableWidth: 300,
         maxCables: 8,
-        priority: 2,
+        priority: 1,
       },
-      // Terre
+      // Terre - au sol
       {
-        localPosition: new THREE.Vector3(-0.4, -1, 0),
+        localPosition: new THREE.Vector3(-0.35, -1.0, -0.3),
         connectionType: 'earth',
-        direction: new THREE.Vector3(-1, -0.5, 0).normalize(),
-        label: 'Terre PDU',
+        direction: new THREE.Vector3(0, -1, 0),
+        label: 'Terre',
         cableWidth: 35,
         maxCables: 1,
         priority: 1,
-      },
-      // Monitoring
-      {
-        localPosition: new THREE.Vector3(0.4, 0.8, 0.35),
-        connectionType: 'data',
-        direction: new THREE.Vector3(0, 0, 1),
-        label: 'Bus Monitoring',
-        cableWidth: 25,
-        maxCables: 2,
-        priority: 2,
       },
     ],
     forbiddenZones: [
@@ -575,6 +531,45 @@ export interface WorldSnapPoint {
   currentCables: number;         // Nombre de câbles déjà connectés
 }
 
+// Type alias mapping - permet de matcher les types d'objets aux configs
+const TYPE_ALIAS_MAP: Record<string, string> = {
+  'container': 'iso-container-40ft',
+  'iso-container': 'iso-container-40ft',
+  'antspace': 'iso-container-40ft',
+  'hd5': 'iso-container-40ft',
+  'transformer': 'oil-transformer',
+  'transfo': 'oil-transformer',
+  'cooling': 'bitmain-cooling-ec2-dt',
+  'ec2-dt': 'bitmain-cooling-ec2-dt',
+  'dry-cooler': 'bitmain-cooling-ec2-dt',
+  'pdu': 'pdu',
+  'distribution': 'pdu',
+  'skid': 'pdu',
+  'rmu': 'switchgear',
+  'switchgear': 'switchgear',
+  'generator': 'generator',
+  'genset': 'generator',
+};
+
+/**
+ * Résout le type d'objet vers la config appropriée
+ */
+function resolveObjectType(objectType: string): string {
+  const typeLC = objectType.toLowerCase();
+  
+  // Check direct match first
+  if (EQUIPMENT_SNAP_CONFIGS[typeLC]) return typeLC;
+  
+  // Check aliases
+  for (const [alias, configType] of Object.entries(TYPE_ALIAS_MAP)) {
+    if (typeLC.includes(alias)) {
+      return configType;
+    }
+  }
+  
+  return objectType; // Return original if no match
+}
+
 /**
  * Génère les snap points en coordonnées monde pour un objet
  */
@@ -586,7 +581,8 @@ export function generateSnapPointsForObject(
   rotation: THREE.Euler,
   dimensions: { width: number; height: number; depth: number }
 ): WorldSnapPoint[] {
-  const config = EQUIPMENT_SNAP_CONFIGS[objectType];
+  const resolvedType = resolveObjectType(objectType);
+  const config = EQUIPMENT_SNAP_CONFIGS[resolvedType];
   if (!config) {
     // Type inconnu: générer des snap points génériques
     return generateGenericSnapPoints(objectId, objectName, objectType, position, rotation, dimensions);
@@ -596,7 +592,7 @@ export function generateSnapPointsForObject(
   const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(rotation);
   
   // Facteur d'échelle basé sur dimensions réelles vs dimensions de référence
-  const refDims = EQUIPMENT_DIMENSIONS[objectType as keyof typeof EQUIPMENT_DIMENSIONS];
+  const refDims = EQUIPMENT_DIMENSIONS[resolvedType as keyof typeof EQUIPMENT_DIMENSIONS];
   const scaleX = refDims ? dimensions.width / refDims.width : 1;
   const scaleY = refDims ? dimensions.height / refDims.height : 1;
   const scaleZ = refDims ? dimensions.depth / refDims.depth : 1;

@@ -208,7 +208,7 @@ function EditableObject({
       {/* Dimensions display */}
       {(hovered || isSelected) && showDimensions && (
         <Html position={[object.position.x, object.position.y + scale[1]/2 + 0.3, object.position.z]} center>
-          <div className="bg-slate-900/90 text-white text-xs px-3 py-2 rounded-lg whitespace-nowrap shadow-lg">
+          <div className="bg-slate-900/90 text-white text-xs px-3 py-2 rounded-2xl whitespace-nowrap shadow-lg">
             <div className="font-bold mb-1">{object.name}</div>
             <div className="text-slate-300">
               {object.dimensions.width} × {object.dimensions.height} × {object.dimensions.depth} mm
@@ -381,7 +381,7 @@ function ToolbarButton({
   disabled?: boolean;
   variant?: 'default' | 'danger' | 'success';
 }) {
-  const baseClasses = "p-2 rounded-lg transition-all flex items-center justify-center";
+  const baseClasses = "p-2 rounded-full transition-all flex items-center justify-center";
   const variantClasses = {
     default: active 
       ? "bg-hearst-green text-slate-900" 
@@ -422,10 +422,10 @@ function ColorPicker({
   ];
 
   return (
-    <div className="absolute left-full ml-2 top-0 bg-white rounded-xl shadow-2xl p-4 z-20 border border-slate-200">
+    <div className="absolute left-full ml-2 top-0 bg-white rounded-2xl shadow-2xl p-4 z-20 border border-slate-200">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-slate-700">Color</span>
-        <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
+        <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -434,7 +434,7 @@ function ColorPicker({
           <button
             key={c}
             onClick={() => onChange(c)}
-            className={`w-8 h-8 rounded-lg border-2 transition-all ${
+            className={`w-8 h-8 rounded-full border-2 transition-all ${
               color === c ? 'border-slate-900 scale-110' : 'border-transparent hover:scale-105'
             }`}
             style={{ backgroundColor: c }}
@@ -445,7 +445,7 @@ function ColorPicker({
         type="color"
         value={color}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-10 rounded-lg cursor-pointer"
+        className="w-full h-10 rounded-full cursor-pointer"
       />
     </div>
   );
@@ -714,7 +714,7 @@ export default function Object3DEditor({
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
         <div className="flex items-center gap-1 bg-white/95 backdrop-blur-xl rounded-2xl p-1.5 shadow-xl border border-slate-200">
           {/* Transform Tools Group */}
-          <div className="flex items-center bg-slate-50 rounded-xl p-1 gap-0.5">
+          <div className="flex items-center bg-slate-50 rounded-2xl p-1 gap-0.5">
             <ToolbarButton 
               icon={MousePointer} 
               label="Select (V)" 
@@ -744,7 +744,7 @@ export default function Object3DEditor({
           <div className="w-px h-8 bg-slate-300 mx-1" />
 
           {/* Tools Group */}
-          <div className="flex items-center bg-slate-50 rounded-xl p-1 gap-0.5">
+          <div className="flex items-center bg-slate-50 rounded-2xl p-1 gap-0.5">
             <ToolbarButton 
               icon={Ruler} 
               label="Measure (M)" 
@@ -775,7 +775,7 @@ export default function Object3DEditor({
           <div className="w-px h-8 bg-slate-300 mx-1" />
 
           {/* View Group */}
-          <div className="flex items-center bg-slate-50 rounded-xl p-1 gap-0.5">
+          <div className="flex items-center bg-slate-50 rounded-2xl p-1 gap-0.5">
             <ToolbarButton 
               icon={Home} 
               label="Reset View" 
@@ -806,7 +806,7 @@ export default function Object3DEditor({
           <div className="w-px h-8 bg-slate-300 mx-1" />
 
           {/* Display Group */}
-          <div className="flex items-center bg-slate-50 rounded-xl p-1 gap-0.5">
+          <div className="flex items-center bg-slate-50 rounded-2xl p-1 gap-0.5">
             <ToolbarButton 
               icon={Grid3X3} 
               label="Toggle Grid" 
@@ -889,7 +889,7 @@ export default function Object3DEditor({
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {selectedIds.length === 0 && objects.length > 0 && (
         <div className="absolute top-4 right-4 z-10">
-          <div className="bg-white/90 backdrop-blur rounded-xl px-4 py-2 shadow-lg border border-slate-200 text-xs">
+          <div className="bg-white/90 backdrop-blur rounded-2xl px-4 py-2 shadow-lg border border-slate-200 text-xs">
             <div className="flex items-center gap-4">
               <div className="text-slate-600">
                 <span className="font-bold text-slate-900">{objects.length}</span> objects
@@ -924,14 +924,14 @@ export default function Object3DEditor({
                 <div className="flex items-center gap-2 mt-1">
                   <button
                     onClick={() => moveSelected(0, -0.5, 0)}
-                    className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium text-xs flex items-center justify-center gap-1"
+                    className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-700 font-medium text-xs flex items-center justify-center gap-1"
                     disabled={selectedObject.locked}
                   >
                     <Minus className="w-3 h-3" /> Down
                   </button>
                   <button
                     onClick={() => moveSelected(0, 0.5, 0)}
-                    className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium text-xs flex items-center justify-center gap-1"
+                    className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-700 font-medium text-xs flex items-center justify-center gap-1"
                     disabled={selectedObject.locked}
                   >
                     <Plus className="w-3 h-3" /> Up
@@ -958,7 +958,7 @@ export default function Object3DEditor({
               <div>
                 <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Position (m)</label>
                 <div className="grid grid-cols-3 gap-1 mt-1">
-                  <div className="bg-red-50 rounded-lg p-1 border border-red-100">
+                  <div className="bg-red-50 rounded-2xl p-1 border border-red-100">
                     <span className="text-[9px] text-red-400 block text-center">X</span>
                     <input
                       type="number"
@@ -974,7 +974,7 @@ export default function Object3DEditor({
                       disabled={selectedObject.locked}
                     />
                   </div>
-                  <div className="bg-green-50 rounded-lg p-1 border border-green-100">
+                  <div className="bg-green-50 rounded-2xl p-1 border border-green-100">
                     <span className="text-[9px] text-green-400 block text-center">Y</span>
                     <input
                       type="number"
@@ -991,7 +991,7 @@ export default function Object3DEditor({
                       disabled={selectedObject.locked}
                     />
                   </div>
-                  <div className="bg-blue-50 rounded-lg p-1 border border-blue-100">
+                  <div className="bg-blue-50 rounded-2xl p-1 border border-blue-100">
                     <span className="text-[9px] text-blue-400 block text-center">Z</span>
                     <input
                       type="number"
@@ -1014,15 +1014,15 @@ export default function Object3DEditor({
               <div>
                 <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Dimensions (mm)</label>
                 <div className="grid grid-cols-3 gap-1 mt-1">
-                  <div className="bg-slate-50 rounded-lg p-1 text-center border border-slate-100">
+                  <div className="bg-slate-50 rounded-2xl p-1 text-center border border-slate-100">
                     <span className="text-[9px] text-slate-400 block">W</span>
                     <p className="font-mono text-xs font-bold text-slate-900">{selectedObject.dimensions?.width || 0}</p>
                   </div>
-                  <div className="bg-slate-50 rounded-lg p-1 text-center border border-slate-100">
+                  <div className="bg-slate-50 rounded-2xl p-1 text-center border border-slate-100">
                     <span className="text-[9px] text-slate-400 block">H</span>
                     <p className="font-mono text-xs font-bold text-slate-900">{selectedObject.dimensions?.height || 0}</p>
                   </div>
-                  <div className="bg-slate-50 rounded-lg p-1 text-center border border-slate-100">
+                  <div className="bg-slate-50 rounded-2xl p-1 text-center border border-slate-100">
                     <span className="text-[9px] text-slate-400 block">D</span>
                     <p className="font-mono text-xs font-bold text-slate-900">{selectedObject.dimensions?.depth || 0}</p>
                   </div>
@@ -1034,7 +1034,7 @@ export default function Object3DEditor({
                 <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Color</label>
                 <div className="flex items-center gap-2 mt-1">
                   <div 
-                    className="w-8 h-8 rounded-lg border-2 border-white shadow-md cursor-pointer"
+                    className="w-8 h-8 rounded-full border-2 border-white shadow-md cursor-pointer"
                     style={{ backgroundColor: selectedObject.color }}
                     onClick={() => setShowColorPicker(!showColorPicker)}
                   />
@@ -1042,7 +1042,7 @@ export default function Object3DEditor({
                     type="text"
                     value={selectedObject.color}
                     onChange={(e) => handleColorChange(e.target.value)}
-                    className="flex-1 font-mono text-xs bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-200"
+                    className="flex-1 font-mono text-xs bg-slate-50 rounded-full px-2 py-1.5 border border-slate-200"
                   />
                 </div>
               </div>
@@ -1068,11 +1068,11 @@ export default function Object3DEditor({
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       <div className="absolute top-4 left-4 z-10">
         <details className="group">
-          <summary className="bg-white/90 backdrop-blur rounded-lg px-3 py-2 text-xs font-medium text-slate-600 cursor-pointer hover:bg-white shadow-lg border border-slate-200 list-none flex items-center gap-2">
+          <summary className="bg-white/90 backdrop-blur rounded-full px-3 py-2 text-xs font-medium text-slate-600 cursor-pointer hover:bg-white shadow-lg border border-slate-200 list-none flex items-center gap-2">
             <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded font-mono">?</span>
             Shortcuts
           </summary>
-          <div className="mt-2 bg-white/95 backdrop-blur-xl rounded-xl p-3 shadow-xl border border-slate-200 w-56 text-xs">
+          <div className="mt-2 bg-white/95 backdrop-blur-xl rounded-2xl p-3 shadow-xl border border-slate-200 w-56 text-xs">
             <div className="space-y-2">
               <div className="font-semibold text-slate-900 pb-1 border-b border-slate-100">Navigation</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-600">

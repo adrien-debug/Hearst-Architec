@@ -1,0 +1,25 @@
+# Compilation/Rebuild systématique après changements majeurs
+
+## Contexte
+
+Toute modification structurante (gros refacto, modif node_modules, structure dossier, nouveau package, migration DB, changements d’API, génération de code automatique, etc.) requiert systématiquement :
+
+- Un rebuild complet du frontend **et** backend
+- Un restart des serveurs de dev (Node/Next.js, etc.)
+- (Recommandé) Redémarrage de l’éditeur/couche IA s’il y a persistance de soucis/casse de typage/caches
+
+## Procédure Obligatoire
+
+**Après tout changement majeur :**
+1. `cd frontend && npm run build`
+2. `cd backend && npm run build` (ou `npm install` + relance server si pas de build script)
+3. Redémarrer **tous** les serveurs de développement
+4. (Optionnel/conseillé) Fermer/réouvrir le projet dans votre IDE si anomalies persistantes (autocomplétion HS, erreurs shadow, typage Next.js/TS foireux…)
+
+❗ Ceci est une règle d’équipe ET un rappel automatique pour l’IA du projet.
+
+## Exceptions
+- Commit ultra-locaux sans impact structurel
+- MàJ typo/docs statiques
+
+> **En cas de doute, rebuild.**

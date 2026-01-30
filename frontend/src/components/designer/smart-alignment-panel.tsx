@@ -66,7 +66,7 @@ function SuggestionCard({
 
   return (
     <div 
-      className={`rounded-xl border-2 p-3 transition-all ${priorityColors[suggestion.priority]} ${isPreview ? 'ring-2 ring-hearst-green scale-[1.02]' : ''}`}
+      className={`rounded-2xl border-2 p-3 transition-all ${priorityColors[suggestion.priority]} ${isPreview ? 'ring-2 ring-hearst-green scale-[1.02]' : ''}`}
       onMouseEnter={onPreview}
     >
       <div className="flex items-start gap-3">
@@ -99,7 +99,7 @@ function SuggestionCard({
         {suggestion.suggestedPosition && (
           <button
             onClick={onApply}
-            className="p-2 bg-hearst-green hover:bg-hearst-green/80 text-slate-900 rounded-lg transition-colors"
+            className="p-2 bg-hearst-green hover:bg-hearst-green/80 text-slate-900 rounded-full transition-colors"
             title="Appliquer"
           >
             <Play className="w-4 h-4" />
@@ -150,7 +150,7 @@ export default function SmartAlignmentPanel({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-purple-50 to-blue-50">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-purple-500 rounded-lg">
+          <div className="p-1.5 bg-purple-500 rounded-full">
             <Wand2 className="w-4 h-4 text-white" />
           </div>
           <div>
@@ -160,7 +160,7 @@ export default function SmartAlignmentPanel({
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+          className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"
         >
           <X className="w-4 h-4 text-slate-500" />
         </button>
@@ -172,7 +172,7 @@ export default function SmartAlignmentPanel({
           <button
             onClick={handleApplyAll}
             disabled={autoApplicable.length === 0}
-            className="flex-1 py-2 px-3 bg-hearst-green hover:bg-hearst-green/80 disabled:bg-slate-200 disabled:text-slate-400 text-slate-900 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+            className="flex-1 py-2 px-3 bg-hearst-green hover:bg-hearst-green/80 disabled:bg-slate-200 disabled:text-slate-400 text-slate-900 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors"
           >
             <Sparkles className="w-4 h-4" />
             Tout aligner ({autoApplicable.length})
@@ -180,7 +180,7 @@ export default function SmartAlignmentPanel({
           
           <button
             onClick={() => setShowRules(!showRules)}
-            className="p-2 hover:bg-slate-200 rounded-xl transition-colors"
+            className="p-2 hover:bg-slate-200 rounded-full transition-colors"
             title="Voir les règles"
           >
             {showRules ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}

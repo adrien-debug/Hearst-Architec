@@ -98,7 +98,7 @@ export default function CalculatorPage() {
 
       {/* Live Network Stats */}
       {networkStats && (
-        <Card className="mb-8 bg-slate-900 border-slate-800">
+        <Card className="mb-8 bg-[#0a0a0f] border-slate-800">
           <div className="flex flex-wrap items-center justify-center gap-8 text-white">
             <div className="text-center">
               <div className="text-sm text-slate-400">BTC Price</div>
@@ -395,13 +395,13 @@ export default function CalculatorPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-4 bg-slate-50 rounded-xl">
+                      <div className="text-center p-4 bg-slate-50 rounded-2xl">
                         <div className="text-sm text-slate-600">Energy Efficiency</div>
                         <div className="text-xl font-bold text-slate-900">
                           {result.efficiency.joulesPerTH} J/TH
                         </div>
                       </div>
-                      <div className="text-center p-4 bg-slate-50 rounded-xl">
+                      <div className="text-center p-4 bg-slate-50 rounded-2xl">
                         <div className="text-sm text-slate-600">Revenue per TH/s</div>
                         <div className="text-xl font-bold text-slate-900">
                           {formatCurrency(result.efficiency.revenuePerTH)}/day

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Package, Wind, Zap, Server, Network, Box, Layers, Search, Plus, RefreshCw, Sun, Shield, Route } from 'lucide-react';
+import { X, Package, Wind, Zap, Server, Network, Box, Layers, Search, Plus, RefreshCw, Sun, Shield, Route, Cable } from 'lucide-react';
 import { objectsApi, InfraObject } from '@/lib/api';
 import ObjectCard from './object-card';
 
@@ -12,7 +12,7 @@ interface LibraryDrawerProps {
   onEditObject?: (object: InfraObject) => void;
 }
 
-type ObjectCategory = 'containers' | 'cooling' | 'transformers' | 'pdu' | 'racks' | 'networking' | 'modules' | 'solar' | 'security' | 'infrastructure';
+type ObjectCategory = 'containers' | 'cooling' | 'transformers' | 'pdu' | 'racks' | 'networking' | 'modules' | 'solar' | 'security' | 'infrastructure' | 'cabletrays';
 
 const categories: { id: ObjectCategory; label: string; icon: React.ReactNode; color: string }[] = [
   { id: 'containers', label: 'Containers', icon: <Package className="w-5 h-5" />, color: 'bg-slate-100 text-slate-700' },
@@ -22,6 +22,7 @@ const categories: { id: ObjectCategory; label: string; icon: React.ReactNode; co
   { id: 'security', label: 'Sécurité', icon: <Shield className="w-5 h-5" />, color: 'bg-red-100 text-red-700' },
   { id: 'solar', label: 'Solaire', icon: <Sun className="w-5 h-5" />, color: 'bg-yellow-100 text-yellow-700' },
   { id: 'infrastructure', label: 'Voirie', icon: <Route className="w-5 h-5" />, color: 'bg-gray-100 text-gray-700' },
+  { id: 'cabletrays', label: 'Chemins Câbles', icon: <Cable className="w-5 h-5" />, color: 'bg-orange-100 text-orange-700' },
   { id: 'racks', label: 'Racks', icon: <Server className="w-5 h-5" />, color: 'bg-green-100 text-green-700' },
   { id: 'networking', label: 'Networking', icon: <Network className="w-5 h-5" />, color: 'bg-cyan-100 text-cyan-700' },
   { id: 'modules', label: 'Modules', icon: <Layers className="w-5 h-5" />, color: 'bg-emerald-100 text-emerald-700' },
@@ -86,14 +87,14 @@ export default function LibraryDrawer({ isOpen, onClose, onAddObject, onEditObje
           <div className="flex items-center gap-2">
             <button
               onClick={loadObjects}
-              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors"
               title="Refresh"
             >
               <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -109,7 +110,7 @@ export default function LibraryDrawer({ isOpen, onClose, onAddObject, onEditObje
               placeholder="Search objects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-0 rounded-xl text-sm focus:ring-2 focus:ring-hearst-green focus:bg-white transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-0 rounded-full text-sm focus:ring-2 focus:ring-hearst-green focus:bg-white transition-all"
             />
           </div>
         </div>

@@ -4,8 +4,11 @@
   "description": "Bitcoin Mining Farm Architect",
   "scripts": {
     "start": "cd backend && npm start",
-    "install": "cd backend && npm install",
-    "build": "echo 'No build step required'"
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "dev": "./dev.sh",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build"
   },
   "engines": {
     "node": ">=18.0.0"

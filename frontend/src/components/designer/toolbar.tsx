@@ -15,7 +15,9 @@ import {
   ArrowUp,
   Wand2,
   Cable,
-  Ruler
+  Ruler,
+  Zap,
+  FileBox
 } from 'lucide-react';
 
 export type Tool = 'select' | 'move' | 'rotate' | 'scale';
@@ -44,6 +46,9 @@ interface ToolbarProps {
   alignmentSuggestions?: number;
   onCableRouting?: () => void;
   cableRoutingActive?: boolean;
+  lowQuality?: boolean;
+  onToggleLowQuality?: () => void;
+  onExportStep?: () => void;
 }
 
 function ToolButton({ 
@@ -63,7 +68,7 @@ function ToolButton({
   badge?: number;
   variant?: 'default' | 'primary' | 'accent';
 }) {
-  const baseClasses = "relative p-2.5 rounded-xl transition-all flex items-center justify-center";
+  const baseClasses = "relative p-2.5 rounded-full transition-all flex items-center justify-center";
   const variantClasses = {
     default: active 
       ? "bg-hearst-green text-slate-900 shadow-sm" 
@@ -116,6 +121,9 @@ export default function Toolbar({
   alignmentSuggestions,
   onCableRouting,
   cableRoutingActive,
+  lowQuality,
+  onToggleLowQuality,
+  onExportStep,
 }: ToolbarProps) {
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
@@ -185,7 +193,7 @@ export default function Toolbar({
         {/* Distance measurements by axis */}
         <button
           onClick={onToggleDistanceX}
-          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold transition-all ${
+          className={`flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-bold transition-all ${
             showDistanceX 
               ? 'bg-red-500 text-white shadow-md' 
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -196,7 +204,7 @@ export default function Toolbar({
         </button>
         <button
           onClick={onToggleDistanceZ}
-          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold transition-all ${
+          className={`flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-bold transition-all ${
             showDistanceZ 
               ? 'bg-blue-500 text-white shadow-md' 
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -205,11 +213,35 @@ export default function Toolbar({
         >
           <span className="text-[10px]">📏</span> Z
         </button>
+        
+        {/* Low Quality Mode for Performance */}
+        {onToggleLowQuality && (
+          <button
+            onClick={onToggleLowQuality}
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-bold transition-all ${
+              lowQuality 
+                ? 'bg-amber-500 text-white shadow-md' 
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+            title="Low Quality Mode (Performance)"
+          >
+            <Zap className="w-3.5 h-3.5" /> LQ
+          </button>
+        )}
 
         <Divider />
 
         {/* Export */}
-        <ToolButton icon={Download} label="Export" onClick={onExport} />
+        <ToolButton icon={Download} label="Export JSON" onClick={onExport} />
+        {onExportStep && (
+          <button
+            onClick={onExportStep}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all"
+            title="Export STEP (CAD Format)"
+          >
+            <FileBox className="w-3.5 h-3.5" /> STEP
+          </button>
+        )}
       </div>
     </div>
   );

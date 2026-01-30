@@ -10,25 +10,25 @@ const { supabase } = require('../config/supabase');
 const logger = require('../utils/logger');
 
 // Categories disponibles (pour validation)
-const VALID_CATEGORIES = ['racks', 'pdu', 'cooling', 'networking', 'containers', 'transformers', 'powerblocks', 'modules', 'security', 'solar', 'infrastructure'];
+const VALID_CATEGORIES = ['racks', 'pdu', 'cooling', 'networking', 'containers', 'transformers', 'powerblocks', 'modules', 'security', 'solar', 'infrastructure', 'cabletrays'];
 
 // Object subtypes with default properties
 const OBJECT_SUBTYPES = {
   containers: {
       'ANTSPACE-HD5': {
-      description: 'Bitmain ANTSPACE HD5 - 308 Slot Hydro Container',
+      description: 'Bitmain ANTSPACE HD5 - 355 Slot Hydro Container (S23)',
       manufacturer: 'Bitmain',
       model: 'ANTSPACE HD5',
       containerType: '40ft ISO',
       // Dimensions in mm
       dimensions: { width: 12192, height: 2896, depth: 2438 },
-      // Capacity
-      machineSlots: 308,
-      slotDistribution: { sidesCount: 2, slotsPerSide: [140, 154] },
-      // Power specifications
-      powerCapacityMW: 1.765,
-      normalPowerKW: 1512,
-      maxPowerKW: 1765,
+      // Capacity - Updated 2026-01: 355 S23 slots per container
+      machineSlots: 355,
+      slotDistribution: { sidesCount: 2, slotsPerSide: [169, 186] },
+      // Power specifications - S23 Hydro @ 5.736 kW/unit = 2.036 MW + 80kW EC2-DT = 2.116 MW total
+      powerCapacityMW: 2.116,  // Including EC2-DT cooling
+      normalPowerKW: 2036,     // ASICs only
+      maxPowerKW: 2116,        // ASICs + EC2-DT cooling (80kW)
       inputVoltage: '400V ±5%',
       frequency: '50/60Hz',
       mainSwitchAmps: 1200,
@@ -36,6 +36,9 @@ const OBJECT_SUBTYPES = {
       ratedCurrentAmps: 700,
       ratedCurrentCount: 4,
       currentPerSlotAmps: 10,
+      // ASIC specs (S23 Hydro)
+      asicModel: 'Antminer S23 Hydro',
+      asicPowerW: 5736,  // W per S23 unit
       // Weight
       shippingWeightTons: 11,
       operatingWeightTons: 17.2,
@@ -58,8 +61,8 @@ const OBJECT_SUBTYPES = {
         N: { spec: '400kcMil (185mm²)', count: 4 },
         PE: { spec: '400kcMil (185mm²)', count: 4 }
       },
-      // Infrastructure requirements
-      transformerKVA: 3750,
+      // Infrastructure requirements - Updated for 355 S23 slots (2.116 MW/container)
+      transformerKVA: 5000,  // 5 MVA for 2 containers (4.232 MW)
       unitsPerTransformer: 2,
       groundLoadCapacityTons: 32,
       groundLevelTolerance: '±1 degree',
@@ -264,11 +267,15 @@ const OBJECT_SUBTYPES = {
       weight: 5000
     },
     'transformer-5mva': {
-      description: 'Transformer 5 MVA',
+      description: 'Transformer 5 MVA (HD5 S23 Compatible)',
       dimensions: { width: 2500, height: 3000, depth: 2000 },
       capacityMVA: 5.0,
+      capacityKVA: 5000,
       inputVoltage: 33000,
-      outputVoltage: 480,
+      outputVoltage: 400,
+      supportsContainers: 2,
+      compatibleContainers: ['ANTSPACE-HD5'],
+      note: 'One transformer powers 2x ANTSPACE HD5 containers (355 S23 @ 2.116 MW each = 4.232 MW)',
       weight: 8000
     },
     'transformer-10mva': {
@@ -289,17 +296,17 @@ const OBJECT_SUBTYPES = {
       dimensions: { width: 25000, height: 4000, depth: 15000 },
       // Power specifications
       totalCapacityMVA: 30,
-      totalCapacityMW: 28.24,
+      totalCapacityMW: 33.86,  // 16 × 2.116 MW
       inputVoltageHV: 33000, // 33kV primary
       outputVoltageLV: 400, // 400V secondary
       frequency: '50/60Hz',
       // Container support
       maxContainers: 16,
       containerType: 'ANTSPACE-HD5',
-      powerPerContainer: 1.765, // MW
+      powerPerContainer: 2.116, // MW (355 S23 + EC2-DT cooling)
       // Transformer configuration
       transformerConfig: {
-        type: 'transformer-3.75mva',
+        type: 'transformer-5mva',
         count: 8,
         arrangement: '2x4 grid',
         containersPerTransformer: 2
@@ -362,15 +369,15 @@ const OBJECT_SUBTYPES = {
       model: 'PB-8-HD5',
       dimensions: { width: 15000, height: 4000, depth: 12000 },
       totalCapacityMVA: 15,
-      totalCapacityMW: 14.12,
+      totalCapacityMW: 16.93,  // 8 × 2.116 MW
       inputVoltageHV: 33000,
       outputVoltageLV: 400,
       frequency: '50/60Hz',
       maxContainers: 8,
       containerType: 'ANTSPACE-HD5',
-      powerPerContainer: 1.765,
+      powerPerContainer: 2.116, // MW (355 S23 + EC2-DT cooling)
       transformerConfig: {
-        type: 'transformer-3.75mva',
+        type: 'transformer-5mva',
         count: 4,
         arrangement: '2x2 grid',
         containersPerTransformer: 2
@@ -399,15 +406,15 @@ const OBJECT_SUBTYPES = {
       model: 'PB-32-HD5',
       dimensions: { width: 40000, height: 4000, depth: 20000 },
       totalCapacityMVA: 60,
-      totalCapacityMW: 56.48,
+      totalCapacityMW: 67.71,  // 32 × 2.116 MW
       inputVoltageHV: 132000, // 132kV for large installations
       outputVoltageLV: 400,
       frequency: '50/60Hz',
       maxContainers: 32,
       containerType: 'ANTSPACE-HD5',
-      powerPerContainer: 1.765,
+      powerPerContainer: 2.116, // MW (355 S23 + EC2-DT cooling)
       transformerConfig: {
-        type: 'transformer-3.75mva',
+        type: 'transformer-5mva',
         count: 16,
         arrangement: '4x4 grid',
         containersPerTransformer: 2,
@@ -763,6 +770,206 @@ const OBJECT_SUBTYPES = {
       type: 'curb',
       color: '#d1d5db',
       norme: 'NF EN 1340'
+    }
+  },
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CHEMINS DE CÂBLES (Cable Trays)
+  // ═══════════════════════════════════════════════════════════════════════════
+  cabletrays: {
+    'cable-tray-ladder-600': {
+      description: 'Chemin de câbles échelle 600mm - Galvanisé',
+      manufacturer: 'Legrand',
+      dimensions: { width: 600, height: 100, depth: 3000 },
+      type: 'cable-tray-ladder',
+      trayType: 'ladder',
+      color: '#71717a',
+      material: 'Acier galvanisé à chaud',
+      loadCapacity: '150 kg/m',
+      cableCapacity: 24,
+      norme: 'IEC 61537',
+      usage: 'Distribution principale HT/BT'
+    },
+    'cable-tray-ladder-450': {
+      description: 'Chemin de câbles échelle 450mm - Galvanisé',
+      manufacturer: 'Legrand',
+      dimensions: { width: 450, height: 100, depth: 3000 },
+      type: 'cable-tray-ladder',
+      trayType: 'ladder',
+      color: '#71717a',
+      material: 'Acier galvanisé à chaud',
+      loadCapacity: '120 kg/m',
+      cableCapacity: 18,
+      norme: 'IEC 61537',
+      usage: 'Distribution secondaire'
+    },
+    'cable-tray-ladder-300': {
+      description: 'Chemin de câbles échelle 300mm - Galvanisé',
+      manufacturer: 'Legrand',
+      dimensions: { width: 300, height: 100, depth: 3000 },
+      type: 'cable-tray-ladder',
+      trayType: 'ladder',
+      color: '#71717a',
+      material: 'Acier galvanisé à chaud',
+      loadCapacity: '80 kg/m',
+      cableCapacity: 12,
+      norme: 'IEC 61537',
+      usage: 'Dérivations'
+    },
+    'cable-tray-mesh-400': {
+      description: 'Chemin de câbles fil 400mm - Inox',
+      manufacturer: 'Cablofil',
+      dimensions: { width: 400, height: 60, depth: 3000 },
+      type: 'cable-tray-mesh',
+      trayType: 'wire-mesh',
+      color: '#a1a1aa',
+      material: 'Acier inoxydable 316L',
+      loadCapacity: '50 kg/m',
+      cableCapacity: 16,
+      norme: 'IEC 61537',
+      usage: 'Data centers, environnements propres'
+    },
+    'cable-tray-mesh-200': {
+      description: 'Chemin de câbles fil 200mm - Inox',
+      manufacturer: 'Cablofil',
+      dimensions: { width: 200, height: 60, depth: 3000 },
+      type: 'cable-tray-mesh',
+      trayType: 'wire-mesh',
+      color: '#a1a1aa',
+      material: 'Acier inoxydable 316L',
+      loadCapacity: '30 kg/m',
+      cableCapacity: 8,
+      norme: 'IEC 61537',
+      usage: 'Câblage data léger'
+    },
+    'conduit-rigid-50': {
+      description: 'Tube conduit rigide Ø50mm',
+      manufacturer: 'Schneider',
+      dimensions: { width: 50, height: 50, depth: 3000 },
+      type: 'conduit',
+      trayType: 'conduit',
+      color: '#f59e0b',
+      material: 'Acier galvanisé',
+      cableCapacity: 3,
+      norme: 'IEC 61386',
+      usage: 'Câbles de contrôle, instrumentation'
+    },
+    'conduit-rigid-32': {
+      description: 'Tube conduit rigide Ø32mm',
+      manufacturer: 'Schneider',
+      dimensions: { width: 32, height: 32, depth: 3000 },
+      type: 'conduit',
+      trayType: 'conduit',
+      color: '#f59e0b',
+      material: 'Acier galvanisé',
+      cableCapacity: 2,
+      norme: 'IEC 61386',
+      usage: 'Signaux, fibres optiques'
+    },
+    'busbar-800a': {
+      description: 'Busbar 800A - Cuivre',
+      manufacturer: 'ABB',
+      dimensions: { width: 150, height: 200, depth: 3000 },
+      type: 'busbar',
+      trayType: 'busbar',
+      color: '#b45309',
+      material: 'Cuivre électrolytique',
+      currentRating: '800A',
+      voltage: '690V',
+      norme: 'IEC 61439-6',
+      usage: 'Distribution HT transformateur-PDU'
+    },
+    'busbar-1600a': {
+      description: 'Busbar 1600A - Cuivre',
+      manufacturer: 'ABB',
+      dimensions: { width: 200, height: 250, depth: 3000 },
+      type: 'busbar',
+      trayType: 'busbar',
+      color: '#b45309',
+      material: 'Cuivre électrolytique',
+      currentRating: '1600A',
+      voltage: '690V',
+      norme: 'IEC 61439-6',
+      usage: 'Distribution principale haute puissance'
+    },
+    'busbar-3200a': {
+      description: 'Busbar 3200A - Cuivre',
+      manufacturer: 'ABB',
+      dimensions: { width: 300, height: 350, depth: 3000 },
+      type: 'busbar',
+      trayType: 'busbar',
+      color: '#b45309',
+      material: 'Cuivre électrolytique',
+      currentRating: '3200A',
+      voltage: '690V',
+      norme: 'IEC 61439-6',
+      usage: 'Alimentation principale site'
+    },
+    'cable-support-3m': {
+      description: 'Support chemin de câbles 3m',
+      manufacturer: 'Hilti',
+      dimensions: { width: 100, height: 3000, depth: 100 },
+      type: 'cable-support',
+      color: '#52525b',
+      material: 'Acier galvanisé',
+      loadCapacity: '500 kg',
+      norme: 'EN 1993-1',
+      usage: 'Support vertical chemins de câbles'
+    },
+    'cable-bracket-wall': {
+      description: 'Console murale chemin de câbles',
+      manufacturer: 'Hilti',
+      dimensions: { width: 600, height: 100, depth: 400 },
+      type: 'cable-bracket',
+      color: '#52525b',
+      material: 'Acier galvanisé',
+      loadCapacity: '200 kg',
+      norme: 'EN 1993-1',
+      usage: 'Fixation murale'
+    },
+    'cable-elbow-90': {
+      description: 'Coude 90° chemin de câbles 600mm',
+      manufacturer: 'Legrand',
+      dimensions: { width: 600, height: 100, depth: 600 },
+      type: 'cable-fitting',
+      fittingType: 'elbow-90',
+      color: '#71717a',
+      material: 'Acier galvanisé',
+      norme: 'IEC 61537',
+      usage: 'Changement de direction horizontal'
+    },
+    'cable-tee': {
+      description: 'Té chemin de câbles 600mm',
+      manufacturer: 'Legrand',
+      dimensions: { width: 600, height: 100, depth: 600 },
+      type: 'cable-fitting',
+      fittingType: 'tee',
+      color: '#71717a',
+      material: 'Acier galvanisé',
+      norme: 'IEC 61537',
+      usage: 'Dérivation en T'
+    },
+    'cable-cross': {
+      description: 'Croix chemin de câbles 600mm',
+      manufacturer: 'Legrand',
+      dimensions: { width: 600, height: 100, depth: 600 },
+      type: 'cable-fitting',
+      fittingType: 'cross',
+      color: '#71717a',
+      material: 'Acier galvanisé',
+      norme: 'IEC 61537',
+      usage: 'Intersection 4 voies'
+    },
+    'cable-reducer-600-300': {
+      description: 'Réducteur 600mm → 300mm',
+      manufacturer: 'Legrand',
+      dimensions: { width: 600, height: 100, depth: 500 },
+      type: 'cable-fitting',
+      fittingType: 'reducer',
+      color: '#71717a',
+      material: 'Acier galvanisé',
+      norme: 'IEC 61537',
+      usage: 'Transition largeur'
     }
   }
 };

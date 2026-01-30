@@ -1,0 +1,308 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('ANTSPACE HD5 Container - Bitmain Mining Container 40ft ISO','Hearst Mining Architect CAD Model'),'2;1');
+FILE_NAME('ANTSPACE-HD5.step','2026-01-29T12:00:00',('Hearst Mining'),('Hearst Control'),'','Hearst Mining Architect','');
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));
+ENDSEC;
+DATA;
+/* ========================================= */
+/* ANTSPACE HD5 - 40ft Mining Container     */
+/* Dimensions: 12196 x 2438 x 2896 mm       */
+/* Origin: Bottom-Left-Front corner         */
+/* ========================================= */
+
+/* Application context */
+#1=APPLICATION_CONTEXT('automotive design');
+#2=APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2010,#1);
+#3=PRODUCT_CONTEXT('',#1,'mechanical');
+#4=PRODUCT_DEFINITION_CONTEXT('part definition',#1,'design');
+
+/* Product definition */
+#10=PRODUCT('ANTSPACE-HD5','ANTSPACE HD5 Container','Bitmain 40ft Hydro Mining Container - 355 S23 Slots',(#3));
+#11=PRODUCT_DEFINITION_FORMATION('','',#10);
+#12=PRODUCT_DEFINITION('design','',#11,#4);
+#13=PRODUCT_DEFINITION_SHAPE('','Shape of ANTSPACE HD5',#12);
+
+/* Geometric context - millimeters */
+#20=(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#24))GLOBAL_UNIT_ASSIGNED_CONTEXT((#21,#22,#23))REPRESENTATION_CONTEXT('Context #1','3D Context with MILLIMETRES'));
+#21=(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.));
+#22=(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.));
+#23=(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT());
+#24=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-06),#21,'distance_accuracy_value','edge curve and target precision');
+
+/* Axis placement - Origin at (0,0,0) */
+#30=CARTESIAN_POINT('Origin',(0.,0.,0.));
+#31=DIRECTION('Z Axis',(0.,0.,1.));
+#32=DIRECTION('X Axis',(1.,0.,0.));
+#33=AXIS2_PLACEMENT_3D('Placement',#30,#31,#32);
+
+/* ========================================= */
+/* CONTAINER BOX VERTICES                   */
+/* L=12196mm, W=2438mm, H=2896mm            */
+/* ========================================= */
+
+/* Bottom face vertices (Z=0) */
+#100=CARTESIAN_POINT('V1',(0.,0.,0.));
+#101=CARTESIAN_POINT('V2',(12196.,0.,0.));
+#102=CARTESIAN_POINT('V3',(12196.,2438.,0.));
+#103=CARTESIAN_POINT('V4',(0.,2438.,0.));
+
+/* Top face vertices (Z=2896) */
+#104=CARTESIAN_POINT('V5',(0.,0.,2896.));
+#105=CARTESIAN_POINT('V6',(12196.,0.,2896.));
+#106=CARTESIAN_POINT('V7',(12196.,2438.,2896.));
+#107=CARTESIAN_POINT('V8',(0.,2438.,2896.));
+
+/* Vertex points */
+#110=VERTEX_POINT('VP1',#100);
+#111=VERTEX_POINT('VP2',#101);
+#112=VERTEX_POINT('VP3',#102);
+#113=VERTEX_POINT('VP4',#103);
+#114=VERTEX_POINT('VP5',#104);
+#115=VERTEX_POINT('VP6',#105);
+#116=VERTEX_POINT('VP7',#106);
+#117=VERTEX_POINT('VP8',#107);
+
+/* ========================================= */
+/* EDGE DIRECTIONS                          */
+/* ========================================= */
+#130=DIRECTION('DirX+',(1.,0.,0.));
+#131=DIRECTION('DirX-',(-1.,0.,0.));
+#132=DIRECTION('DirY+',(0.,1.,0.));
+#133=DIRECTION('DirY-',(0.,-1.,0.));
+#134=DIRECTION('DirZ+',(0.,0.,1.));
+#135=DIRECTION('DirZ-',(0.,0.,-1.));
+
+/* ========================================= */
+/* EDGE LINES - Bottom Face                 */
+/* ========================================= */
+#140=LINE('E1',#100,#150);
+#141=LINE('E2',#101,#151);
+#142=LINE('E3',#102,#152);
+#143=LINE('E4',#103,#153);
+
+#150=VECTOR('VE1',#130,12196.);
+#151=VECTOR('VE2',#132,2438.);
+#152=VECTOR('VE3',#131,12196.);
+#153=VECTOR('VE4',#133,2438.);
+
+/* Edge curves - Bottom */
+#160=EDGE_CURVE('EC1',#110,#111,#140,.T.);
+#161=EDGE_CURVE('EC2',#111,#112,#141,.T.);
+#162=EDGE_CURVE('EC3',#112,#113,#142,.T.);
+#163=EDGE_CURVE('EC4',#113,#110,#143,.T.);
+
+/* ========================================= */
+/* EDGE LINES - Top Face                    */
+/* ========================================= */
+#170=LINE('E5',#104,#180);
+#171=LINE('E6',#105,#181);
+#172=LINE('E7',#106,#182);
+#173=LINE('E8',#107,#183);
+
+#180=VECTOR('VE5',#130,12196.);
+#181=VECTOR('VE6',#132,2438.);
+#182=VECTOR('VE7',#131,12196.);
+#183=VECTOR('VE8',#133,2438.);
+
+/* Edge curves - Top */
+#190=EDGE_CURVE('EC5',#114,#115,#170,.T.);
+#191=EDGE_CURVE('EC6',#115,#116,#171,.T.);
+#192=EDGE_CURVE('EC7',#116,#117,#172,.T.);
+#193=EDGE_CURVE('EC8',#117,#114,#173,.T.);
+
+/* ========================================= */
+/* EDGE LINES - Vertical Edges              */
+/* ========================================= */
+#200=LINE('E9',#100,#210);
+#201=LINE('E10',#101,#211);
+#202=LINE('E11',#102,#212);
+#203=LINE('E12',#103,#213);
+
+#210=VECTOR('VE9',#134,2896.);
+#211=VECTOR('VE10',#134,2896.);
+#212=VECTOR('VE11',#134,2896.);
+#213=VECTOR('VE12',#134,2896.);
+
+/* Edge curves - Vertical */
+#220=EDGE_CURVE('EC9',#110,#114,#200,.T.);
+#221=EDGE_CURVE('EC10',#111,#115,#201,.T.);
+#222=EDGE_CURVE('EC11',#112,#116,#202,.T.);
+#223=EDGE_CURVE('EC12',#113,#117,#203,.T.);
+
+/* ========================================= */
+/* ORIENTED EDGES                           */
+/* ========================================= */
+
+/* Bottom face loop */
+#300=ORIENTED_EDGE('OE1',*,*,#160,.T.);
+#301=ORIENTED_EDGE('OE2',*,*,#161,.T.);
+#302=ORIENTED_EDGE('OE3',*,*,#162,.T.);
+#303=ORIENTED_EDGE('OE4',*,*,#163,.T.);
+
+/* Top face loop */
+#310=ORIENTED_EDGE('OE5',*,*,#190,.F.);
+#311=ORIENTED_EDGE('OE6',*,*,#193,.F.);
+#312=ORIENTED_EDGE('OE7',*,*,#192,.F.);
+#313=ORIENTED_EDGE('OE8',*,*,#191,.F.);
+
+/* Front face loop (Y=0) */
+#320=ORIENTED_EDGE('OE9',*,*,#160,.T.);
+#321=ORIENTED_EDGE('OE10',*,*,#221,.T.);
+#322=ORIENTED_EDGE('OE11',*,*,#190,.F.);
+#323=ORIENTED_EDGE('OE12',*,*,#220,.F.);
+
+/* Right face loop (X=12196) */
+#330=ORIENTED_EDGE('OE13',*,*,#161,.T.);
+#331=ORIENTED_EDGE('OE14',*,*,#222,.T.);
+#332=ORIENTED_EDGE('OE15',*,*,#191,.F.);
+#333=ORIENTED_EDGE('OE16',*,*,#221,.F.);
+
+/* Back face loop (Y=2438) */
+#340=ORIENTED_EDGE('OE17',*,*,#162,.T.);
+#341=ORIENTED_EDGE('OE18',*,*,#223,.T.);
+#342=ORIENTED_EDGE('OE19',*,*,#192,.F.);
+#343=ORIENTED_EDGE('OE20',*,*,#222,.F.);
+
+/* Left face loop (X=0) */
+#350=ORIENTED_EDGE('OE21',*,*,#163,.T.);
+#351=ORIENTED_EDGE('OE22',*,*,#220,.T.);
+#352=ORIENTED_EDGE('OE23',*,*,#193,.F.);
+#353=ORIENTED_EDGE('OE24',*,*,#223,.F.);
+
+/* ========================================= */
+/* EDGE LOOPS                               */
+/* ========================================= */
+#400=EDGE_LOOP('Bottom',(#300,#301,#302,#303));
+#401=EDGE_LOOP('Top',(#310,#311,#312,#313));
+#402=EDGE_LOOP('Front',(#320,#321,#322,#323));
+#403=EDGE_LOOP('Right',(#330,#331,#332,#333));
+#404=EDGE_LOOP('Back',(#340,#341,#342,#343));
+#405=EDGE_LOOP('Left',(#350,#351,#352,#353));
+
+/* ========================================= */
+/* FACE BOUNDS                              */
+/* ========================================= */
+#410=FACE_OUTER_BOUND('FB-Bottom',#400,.T.);
+#411=FACE_OUTER_BOUND('FB-Top',#401,.T.);
+#412=FACE_OUTER_BOUND('FB-Front',#402,.T.);
+#413=FACE_OUTER_BOUND('FB-Right',#403,.T.);
+#414=FACE_OUTER_BOUND('FB-Back',#404,.T.);
+#415=FACE_OUTER_BOUND('FB-Left',#405,.T.);
+
+/* ========================================= */
+/* PLANES FOR FACES                         */
+/* ========================================= */
+
+/* Bottom plane (Z=0, normal -Z) */
+#420=CARTESIAN_POINT('P-Bottom',(0.,0.,0.));
+#421=AXIS2_PLACEMENT_3D('A-Bottom',#420,#135,#130);
+#422=PLANE('Plane-Bottom',#421);
+
+/* Top plane (Z=2896, normal +Z) */
+#423=CARTESIAN_POINT('P-Top',(0.,0.,2896.));
+#424=AXIS2_PLACEMENT_3D('A-Top',#423,#134,#130);
+#425=PLANE('Plane-Top',#424);
+
+/* Front plane (Y=0, normal -Y) */
+#426=CARTESIAN_POINT('P-Front',(0.,0.,0.));
+#427=AXIS2_PLACEMENT_3D('A-Front',#426,#133,#130);
+#428=PLANE('Plane-Front',#427);
+
+/* Right plane (X=12196, normal +X) */
+#429=CARTESIAN_POINT('P-Right',(12196.,0.,0.));
+#430=AXIS2_PLACEMENT_3D('A-Right',#429,#130,#132);
+#431=PLANE('Plane-Right',#430);
+
+/* Back plane (Y=2438, normal +Y) */
+#432=CARTESIAN_POINT('P-Back',(0.,2438.,0.));
+#433=AXIS2_PLACEMENT_3D('A-Back',#432,#132,#130);
+#434=PLANE('Plane-Back',#433);
+
+/* Left plane (X=0, normal -X) */
+#435=CARTESIAN_POINT('P-Left',(0.,0.,0.));
+#436=AXIS2_PLACEMENT_3D('A-Left',#435,#131,#132);
+#437=PLANE('Plane-Left',#436);
+
+/* ========================================= */
+/* ADVANCED FACES                           */
+/* ========================================= */
+#450=ADVANCED_FACE('Face-Bottom',(#410),#422,.F.);
+#451=ADVANCED_FACE('Face-Top',(#411),#425,.T.);
+#452=ADVANCED_FACE('Face-Front',(#412),#428,.F.);
+#453=ADVANCED_FACE('Face-Right',(#413),#431,.T.);
+#454=ADVANCED_FACE('Face-Back',(#414),#434,.T.);
+#455=ADVANCED_FACE('Face-Left',(#415),#437,.F.);
+
+/* ========================================= */
+/* CLOSED SHELL & MANIFOLD SOLID            */
+/* ========================================= */
+#500=CLOSED_SHELL('Container Shell',(#450,#451,#452,#453,#454,#455));
+#501=MANIFOLD_SOLID_BREP('ANTSPACE HD5',#500);
+
+/* ========================================= */
+/* SHAPE REPRESENTATION                     */
+/* ========================================= */
+#600=ADVANCED_BREP_SHAPE_REPRESENTATION('Container Geometry',(#33,#501),#20);
+#601=SHAPE_DEFINITION_REPRESENTATION(#13,#600);
+
+/* ========================================= */
+/* MECHANICAL DESIGN CONTEXT                */
+/* ========================================= */
+#700=MECHANICAL_CONTEXT('',#1,'mechanical');
+
+/* ========================================= */
+/* PRODUCT PROPERTIES                       */
+/* ========================================= */
+
+/* Property: Container Type */
+#800=DESCRIPTIVE_REPRESENTATION_ITEM('Container Type','40ft ISO');
+#801=PROPERTY_DEFINITION('Container Type','ISO Container Type',#12);
+#802=PROPERTY_DEFINITION_REPRESENTATION(#801,#810);
+
+/* Property: Manufacturer */
+#803=DESCRIPTIVE_REPRESENTATION_ITEM('Manufacturer','Bitmain');
+#804=PROPERTY_DEFINITION('Manufacturer','Equipment Manufacturer',#12);
+#805=PROPERTY_DEFINITION_REPRESENTATION(#804,#811);
+
+/* Property: Model */
+#806=DESCRIPTIVE_REPRESENTATION_ITEM('Model','ANTSPACE HD5');
+#807=PROPERTY_DEFINITION('Model','Equipment Model',#12);
+#808=PROPERTY_DEFINITION_REPRESENTATION(#807,#812);
+
+/* Property: Application */
+#809=DESCRIPTIVE_REPRESENTATION_ITEM('Application','Hydro Bitcoin Mining Container - 355 S23 Slots');
+
+/* Representations for properties */
+#810=REPRESENTATION('Container Type Rep',(#800),#20);
+#811=REPRESENTATION('Manufacturer Rep',(#803),#20);
+#812=REPRESENTATION('Model Rep',(#806),#20);
+
+/* ========================================= */
+/* DIMENSIONAL PROPERTIES (mm)              */
+/* Length: 12196, Width: 2438, Height: 2896 */
+/* ========================================= */
+
+/* Length dimension */
+#900=LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(12196.),#21);
+#901=MEASURE_REPRESENTATION_ITEM('Length',#900);
+
+/* Width dimension */
+#902=LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(2438.),#21);
+#903=MEASURE_REPRESENTATION_ITEM('Width',#902);
+
+/* Height dimension */
+#904=LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(2896.),#21);
+#905=MEASURE_REPRESENTATION_ITEM('Height',#904);
+
+/* Volume */
+#906=VOLUME_MEASURE_WITH_UNIT(VOLUME_MEASURE(86100000000.),#21);
+#907=MEASURE_REPRESENTATION_ITEM('Volume',#906);
+
+/* Dimensions representation */
+#910=REPRESENTATION('Dimensions',(#901,#903,#905,#907),#20);
+#911=PROPERTY_DEFINITION('Dimensions','Container Dimensions',#12);
+#912=PROPERTY_DEFINITION_REPRESENTATION(#911,#910);
+
+ENDSEC;
+END-ISO-10303-21;

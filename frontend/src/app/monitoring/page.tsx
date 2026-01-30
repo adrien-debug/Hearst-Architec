@@ -268,7 +268,7 @@ export default function MonitoringPage() {
                 {demoAlerts.map((alert) => (
                   <div 
                     key={alert.id}
-                    className={`p-3 rounded-xl ${
+                    className={`p-3 rounded-2xl ${
                       alert.type === 'critical' ? 'bg-red-50 border border-red-200' :
                       alert.type === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
                       'bg-blue-50 border border-blue-200'
@@ -299,7 +299,7 @@ export default function MonitoringPage() {
 
           {/* Network Info */}
           {networkStats && (
-            <Card className="bg-slate-900 text-white">
+            <Card className="bg-[#0a0a0f] text-white">
               <CardHeader>
                 <CardTitle className="text-white text-sm">Bitcoin Network</CardTitle>
               </CardHeader>

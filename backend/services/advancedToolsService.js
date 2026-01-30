@@ -21,6 +21,23 @@ const logger = require('../utils/logger');
 const EQUIPMENT_DATABASE = {
   // === ASIC MINERS ===
   asics: {
+    'antminer-s23-hydro': {
+      manufacturer: 'Bitmain',
+      model: 'Antminer S23 Hydro',
+      hashrateTH: 458,
+      powerWatts: 5736,
+      efficiency: 12.5, // J/TH
+      cooling: 'hydro',
+      algorithm: 'SHA-256',
+      releaseYear: 2025,
+      dimensions: { width: 400, height: 195, depth: 290 },
+      weight: 16.5,
+      inletTemp: { min: 5, max: 45 },
+      waterFlow: 7.5, // L/min
+      msrpUSD: 13300,  // Unit price ($4,907,905 per equipped container / 355 = $13,826 incl. install)
+      availability: 'in_stock',
+      sources: ['https://shop.bitmain.com']
+    },
     'antminer-s21-xp-hydro': {
       manufacturer: 'Bitmain',
       model: 'Antminer S21 XP Hydro',
@@ -137,12 +154,13 @@ const EQUIPMENT_DATABASE = {
       type: 'container',
       cooling: 'hydro',
       dimensions: { width: 12196, height: 2896, depth: 2438 },
-      machineSlots: 308,
-      maxPowerKW: 1765,
+      machineSlots: 355,  // S23 slots
+      maxPowerKW: 2116,   // Including EC2-DT cooling (80kW)
       weight: 8000,
       waterFlowM3h: 150,
       features: ['Hydro cooling integrated', 'CDU compatible', 'Fire suppression'],
-      msrpUSD: 180000,
+      msrpUSD: 180000,           // Container shell only
+      equippedPriceUSD: 4907905, // With 355× S23 Hydro installed ($13,826/unit)
       sources: ['https://shop.bitmain.com']
     },
     'antspace-hd3': {
@@ -203,16 +221,17 @@ const EQUIPMENT_DATABASE = {
 
   // === TRANSFORMERS ===
   transformers: {
-    '3750kva': {
+    '5000kva': {
       type: 'transformer',
-      rating: '3750 kVA',
-      powerCapacityKW: 3000,
-      primaryVoltage: 20000,
+      rating: '5000 kVA (5 MVA)',
+      powerCapacityKW: 4232,  // 2 × HD5 containers @ 2.116 MW
+      primaryVoltage: 33000,
       secondaryVoltage: 400,
-      dimensions: { width: 3200, height: 2300, depth: 2000 },
-      weight: 10000,
-      losses: 32,
-      msrpUSD: 85000
+      dimensions: { width: 3200, height: 2500, depth: 2200 },
+      weight: 12000,
+      losses: 40,
+      supportsContainers: 2,
+      msrpUSD: 95000
     },
     '2500kva': {
       type: 'transformer',
@@ -499,7 +518,7 @@ exports.calculateElectrical = (params) => {
   const transformerSizeKVA = calculateTransformerSize(apparentPowerKVA * safetyMargin);
 
   // Nombre de transformateurs
-  const transformersNeeded = Math.ceil(transformerSizeKVA / 3750);
+  const transformersNeeded = Math.ceil(transformerSizeKVA / 5000);
 
   // Section câble (règle simplifiée)
   const cableSection = calculateCableSection(nominalCurrentA);
@@ -532,7 +551,7 @@ exports.calculateElectrical = (params) => {
     transformer: {
       totalSizeKVA: transformerSizeKVA,
       count: transformersNeeded,
-      unitSizeKVA: 3750,
+      unitSizeKVA: 5000,
       estimatedLossesKW: Math.round(transformersNeeded * 32)
     },
     distribution: {
@@ -563,8 +582,8 @@ exports.calculateElectrical = (params) => {
 };
 
 function calculateTransformerSize(requiredKVA) {
-  const standardSizes = [500, 1000, 1600, 2000, 2500, 3150, 3750];
-  return standardSizes.find(s => s >= requiredKVA) || Math.ceil(requiredKVA / 3750) * 3750;
+  const standardSizes = [500, 1000, 1600, 2000, 2500, 3150, 4000, 5000];
+  return standardSizes.find(s => s >= requiredKVA) || Math.ceil(requiredKVA / 5000) * 5000;
 }
 
 function calculateCableSection(currentA) {
@@ -790,7 +809,7 @@ exports.generateRecommendations = (layoutData) => {
     warnings.push({
       type: 'critical',
       message: `Transformateurs insuffisants: ${transformerCount}/${requiredTransformers}`,
-      action: `Ajoutez ${requiredTransformers - transformerCount} transformateur(s) 3.75 MVA`
+      action: `Ajoutez ${requiredTransformers - transformerCount} transformateur(s) 5 MVA`
     });
   }
 

@@ -152,7 +152,7 @@ export default function PropertiesPanel({
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -165,7 +165,7 @@ export default function PropertiesPanel({
           <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
             Object
           </label>
-          <div className="bg-slate-50 rounded-xl p-3">
+          <div className="bg-slate-50 rounded-2xl p-3">
             <p className="font-semibold text-slate-900">{object.name}</p>
             <p className="text-xs text-slate-500 mt-0.5 capitalize">{object.type}</p>
           </div>
@@ -182,7 +182,7 @@ export default function PropertiesPanel({
               { label: 'H', value: object.dimensions.height },
               { label: 'D', value: object.dimensions.depth },
             ].map(({ label, value }) => (
-              <div key={label} className="bg-slate-50 rounded-xl p-2 text-center">
+              <div key={label} className="bg-slate-50 rounded-2xl p-2 text-center">
                 <span className="text-[10px] text-slate-400 block">{label}</span>
                 <p className="font-mono font-semibold text-slate-900 text-sm">{value.toLocaleString()}</p>
               </div>
@@ -202,7 +202,7 @@ export default function PropertiesPanel({
               <button 
                 onClick={() => handlePositionChange('z', localPos.z - 1)}
                 disabled={object.locked}
-                className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-full transition-colors disabled:opacity-50"
                 title="Avant (↑)"
               >
                 <ChevronUp className="w-4 h-4 text-slate-600 mx-auto" />
@@ -211,18 +211,18 @@ export default function PropertiesPanel({
               <button 
                 onClick={() => handlePositionChange('x', localPos.x - 1)}
                 disabled={object.locked}
-                className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-full transition-colors disabled:opacity-50"
                 title="Gauche (←)"
               >
                 <ChevronLeft className="w-4 h-4 text-slate-600 mx-auto" />
               </button>
-              <div className="p-2 bg-slate-50 rounded-lg flex items-center justify-center">
+              <div className="p-2 bg-slate-50 rounded-full flex items-center justify-center">
                 <Move className="w-4 h-4 text-slate-300" />
               </div>
               <button 
                 onClick={() => handlePositionChange('x', localPos.x + 1)}
                 disabled={object.locked}
-                className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-full transition-colors disabled:opacity-50"
                 title="Droite (→)"
               >
                 <ChevronRight className="w-4 h-4 text-slate-600 mx-auto" />
@@ -231,7 +231,7 @@ export default function PropertiesPanel({
               <button 
                 onClick={() => handlePositionChange('z', localPos.z + 1)}
                 disabled={object.locked}
-                className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 bg-slate-100 hover:bg-hearst-green/30 rounded-full transition-colors disabled:opacity-50"
                 title="Arrière (↓)"
               >
                 <ChevronDown className="w-4 h-4 text-slate-600 mx-auto" />
@@ -244,7 +244,7 @@ export default function PropertiesPanel({
               <button 
                 onClick={() => handlePositionChange('y', localPos.y + 1)}
                 disabled={object.locked}
-                className="px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg text-xs text-blue-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                className="px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-full text-xs text-blue-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
                 title="Monter (A)"
               >
                 <ChevronUp className="w-3 h-3" /> Y+
@@ -252,7 +252,7 @@ export default function PropertiesPanel({
               <button 
                 onClick={() => handlePositionChange('y', Math.max(0, localPos.y - 1))}
                 disabled={object.locked}
-                className="px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg text-xs text-blue-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                className="px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-full text-xs text-blue-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
                 title="Descendre (Q)"
               >
                 <ChevronDown className="w-3 h-3" /> Y-
@@ -263,7 +263,7 @@ export default function PropertiesPanel({
               <button 
                 onClick={() => handleRotationChange('y', localRot.y + 90)}
                 disabled={object.locked}
-                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs text-amber-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 rounded-full text-xs text-amber-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
                 title="Rotation +90° (S)"
               >
                 <RotateCw className="w-3 h-3" /> +90°
@@ -271,7 +271,7 @@ export default function PropertiesPanel({
               <button 
                 onClick={() => handleRotationChange('y', localRot.y - 90)}
                 disabled={object.locked}
-                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs text-amber-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 rounded-full text-xs text-amber-600 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
                 title="Rotation -90° (E)"
               >
                 <RotateCcw className="w-3 h-3" /> -90°
@@ -300,7 +300,7 @@ export default function PropertiesPanel({
                     onChange={(e) => handlePositionInputChange(axis, e.target.value)}
                     onBlur={() => handlePositionBlur(axis)}
                     disabled={object.locked}
-                    className={`w-full px-2 py-1.5 rounded-lg border text-sm font-mono text-center focus:ring-2 focus:outline-none ${colors[axis]} ${object.locked ? 'opacity-50' : ''}`}
+                    className={`w-full px-2 py-1.5 rounded-full border text-sm font-mono text-center focus:ring-2 focus:outline-none ${colors[axis]} ${object.locked ? 'opacity-50' : ''}`}
                   />
                 </div>
               );
@@ -317,7 +317,7 @@ export default function PropertiesPanel({
             <button
               onClick={resetRotation}
               disabled={object.locked}
-              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors disabled:opacity-50"
+              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-50"
               title="Reset rotation"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -334,7 +334,7 @@ export default function PropertiesPanel({
                   onChange={(e) => handleRotationInputChange(axis, e.target.value)}
                   onBlur={() => handleRotationBlur(axis)}
                   disabled={object.locked}
-                  className={`w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-sm font-mono text-center focus:ring-2 focus:ring-hearst-green focus:outline-none ${object.locked ? 'opacity-50' : ''}`}
+                  className={`w-full px-2 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-sm font-mono text-center focus:ring-2 focus:ring-hearst-green focus:outline-none ${object.locked ? 'opacity-50' : ''}`}
                 />
               </div>
             ))}
@@ -348,7 +348,7 @@ export default function PropertiesPanel({
           </label>
           <div className="flex items-center gap-3 mb-2">
             <div 
-              className="w-10 h-10 rounded-xl border-2 border-white shadow-md flex-shrink-0"
+              className="w-10 h-10 rounded-2xl border-2 border-white shadow-md flex-shrink-0"
               style={{ backgroundColor: localColor }}
             />
             <input
@@ -356,7 +356,7 @@ export default function PropertiesPanel({
               value={localColor}
               onChange={(e) => handleColorChange(e.target.value)}
               disabled={object.locked}
-              className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm font-mono focus:ring-2 focus:ring-hearst-green focus:outline-none"
+              className="flex-1 px-3 py-2 rounded-full border border-slate-200 bg-slate-50 text-sm font-mono focus:ring-2 focus:ring-hearst-green focus:outline-none"
             />
           </div>
           <div className="grid grid-cols-6 gap-1.5">
@@ -365,7 +365,7 @@ export default function PropertiesPanel({
                 key={color}
                 onClick={() => handleColorChange(color)}
                 disabled={object.locked}
-                className={`w-full aspect-square rounded-lg border-2 transition-all hover:scale-110 ${
+                className={`w-full aspect-square rounded-full border-2 transition-all hover:scale-110 ${
                   localColor === color ? 'border-slate-900 scale-110' : 'border-transparent'
                 } ${object.locked ? 'opacity-50' : ''}`}
                 style={{ backgroundColor: color }}
@@ -382,7 +382,7 @@ export default function PropertiesPanel({
           <div className="flex gap-2">
             <button
               onClick={() => onUpdate({ locked: !object.locked })}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-full text-sm font-medium transition-colors ${
                 object.locked 
                   ? 'bg-amber-100 text-amber-700 border border-amber-200' 
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -393,7 +393,7 @@ export default function PropertiesPanel({
             </button>
             <button
               onClick={() => onUpdate({ visible: !object.visible })}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-full text-sm font-medium transition-colors ${
                 !object.visible 
                   ? 'bg-slate-300 text-slate-600' 
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -410,14 +410,14 @@ export default function PropertiesPanel({
       <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-2">
         <button
           onClick={onDuplicate}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-sm font-medium transition-colors"
         >
           <Copy className="w-4 h-4" />
           Duplicate
         </button>
         <button
           onClick={onDelete}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-xl text-sm font-medium transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full text-sm font-medium transition-colors"
         >
           <Trash2 className="w-4 h-4" />
           Delete

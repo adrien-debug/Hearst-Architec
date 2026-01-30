@@ -41,8 +41,11 @@ const CableSupport3D = memo(function CableSupport3D({
   trayWidth: number;  // Largeur du chemin en mètres
   type?: 'floor' | 'ceiling' | 'wall';
 }) {
+  // Protection: ne pas rendre si hauteur <= 0
+  if (height <= 0.1) return null;
+  
   const postRadius = 0.04;
-  const bracketWidth = trayWidth + 0.1;
+  const bracketWidth = Math.max(0.2, trayWidth + 0.1);
   
   return (
     <group position={position.toArray()}>
@@ -117,23 +120,28 @@ const CableTraySegment3D = memo(function CableTraySegment3D({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   
-  // Calculate segment properties
-  const { length, midPoint, rotation, direction, isInclined, inclineAngle } = useMemo(() => {
+  // Calculate segment properties using quaternion for correct orientation
+  const { length, midPoint, quaternion, isInclined, inclineAngle } = useMemo(() => {
     const dir = endPoint.clone().sub(startPoint);
     const len = dir.length();
     const mid = startPoint.clone().add(endPoint).multiplyScalar(0.5);
-    const horizontalAngle = Math.atan2(dir.z, dir.x);
     
     // Calcul de l'inclinaison (différence de hauteur)
     const heightDiff = endPoint.y - startPoint.y;
     const horizontalDist = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
     const verticalAngle = Math.atan2(heightDiff, horizontalDist);
     
+    // Utiliser quaternion pour orientation correcte
+    // Le segment est créé le long de l'axe X, donc on doit le faire pointer de start vers end
+    const quat = new THREE.Quaternion();
+    const defaultDir = new THREE.Vector3(1, 0, 0); // Le segment est créé le long de X
+    const targetDir = dir.clone().normalize();
+    quat.setFromUnitVectors(defaultDir, targetDir);
+    
     return {
       length: len,
       midPoint: mid,
-      rotation: new THREE.Euler(verticalAngle, -horizontalAngle, 0, 'YXZ'),
-      direction: dir.normalize(),
+      quaternion: quat,
       isInclined: Math.abs(heightDiff) > 0.1,
       inclineAngle: verticalAngle,
     };
@@ -187,7 +195,7 @@ const CableTraySegment3D = memo(function CableTraySegment3D({
     <group 
       ref={groupRef}
       position={midPoint.toArray()}
-      rotation={rotation}
+      quaternion={quaternion}
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
     >
       {/* LADDER TRAY TYPE */}
@@ -312,7 +320,7 @@ const CableTraySegment3D = memo(function CableTraySegment3D({
           center
           distanceFactor={10}
         >
-          <div className="bg-slate-900/90 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap">
+          <div className="bg-slate-900/90 text-white text-sm px-1.5 py-0.5 rounded whitespace-nowrap">
             {length.toFixed(2)}m {isInclined && `(${(Math.abs(inclineAngle) * 180 / Math.PI).toFixed(0)}°)`}
           </div>
         </Html>
@@ -408,7 +416,7 @@ const CablePoint3D = memo(function CablePoint3D({
           center
           distanceFactor={8}
         >
-          <div className="bg-slate-900/90 text-white text-[9px] px-1 py-0.5 rounded whitespace-nowrap">
+          <div className="bg-slate-900/90 text-white text-sm px-1 py-0.5 rounded whitespace-nowrap">
             {point.type.charAt(0).toUpperCase() + point.type.slice(1)}
           </div>
         </Html>
@@ -499,7 +507,7 @@ const SnapPointsVisualization = memo(function SnapPointsVisualization({
   snapPoints,
   activeSnapPoint,
 }: {
-  snapPoints: Array<{ position: THREE.Vector3; objectId: string; objectName: string; type: string }>;
+  snapPoints: WorldSnapPoint[];
   activeSnapPoint: THREE.Vector3 | null;
 }) {
   return (
@@ -659,7 +667,7 @@ const IntelligentSnapPoint3D = memo(function IntelligentSnapPoint3D({
           center
           distanceFactor={8}
         >
-          <div className="bg-slate-900/95 text-white text-[10px] px-3 py-2 rounded-lg shadow-lg whitespace-nowrap border border-slate-600">
+          <div className="bg-slate-900/95 text-white text-sm px-3 py-2 rounded-full shadow-lg whitespace-nowrap border border-slate-600">
             <div className="font-semibold text-[12px]">{snapPoint.objectName}</div>
             <div className="flex items-center gap-2 mt-1 text-slate-300">
               <span>Largeur: {snapPoint.cableWidth}mm</span>
@@ -749,7 +757,7 @@ const ForbiddenZoneVisualization = memo(function ForbiddenZoneVisualization({
       {/* Label */}
       {showLabel && zone.reason && (
         <Html position={[0, size.y / 2 + 0.2, 0]} center distanceFactor={12}>
-          <div className="bg-red-500/90 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap">
+          <div className="bg-red-500/90 text-white text-sm px-2 py-1 rounded whitespace-nowrap">
             ⚠️ {zone.reason}
           </div>
         </Html>
@@ -819,7 +827,7 @@ const HeightIndicator = memo(function HeightIndicator({
       
       {/* Label hauteur */}
       <Html position={[0.15, height / 2, 0]} center distanceFactor={10}>
-        <div className="bg-slate-800/90 text-white text-[10px] px-1.5 py-0.5 rounded">
+        <div className="bg-slate-800/90 text-white text-sm px-1.5 py-0.5 rounded">
           {height.toFixed(2)}m
         </div>
       </Html>
@@ -841,7 +849,7 @@ interface CableSceneProps {
   showLabels: boolean;
   drawingPoints: THREE.Vector3[];
   previewPoint: THREE.Vector3 | null;
-  snapPoints: Array<{ position: THREE.Vector3; objectId: string; objectName: string; type: string }>;
+  snapPoints: WorldSnapPoint[];
   activeSnapPoint: THREE.Vector3 | null;
   isDrawing: boolean;
   defaultWidth: number;
@@ -858,6 +866,8 @@ interface CableSceneProps {
   // Indicateur de hauteur
   showHeightIndicator?: boolean;
   currentHeight?: number;
+  // Mode câblage actif
+  showCableRouting?: boolean;
 }
 
 const CableScene = memo(function CableScene({
@@ -885,6 +895,7 @@ const CableScene = memo(function CableScene({
   showForbiddenZones = false,
   showHeightIndicator = false,
   currentHeight = 3.5,
+  showCableRouting = false,
 }: CableSceneProps) {
   // Build point lookup map
   const pointMap = useMemo(() => {
@@ -945,16 +956,16 @@ const CableScene = memo(function CableScene({
         />
       )}
       
-      {/* Legacy snap points (compatibilité) - Affichage permanent en mode câblage */}
-      {snapPoints.length > 0 && intelligentSnapPoints.length === 0 && (
+      {/* Legacy snap points - UNIQUEMENT si mode câblage actif */}
+      {showCableRouting && snapPoints.length > 0 && intelligentSnapPoints.length === 0 && (
         <SnapPointsVisualization
           snapPoints={snapPoints}
           activeSnapPoint={activeSnapPoint}
         />
       )}
       
-      {/* Intelligent snap points (nouveau système) - TOUJOURS VISIBLES en mode câblage */}
-      {intelligentSnapPoints.length > 0 && (
+      {/* Intelligent snap points - UNIQUEMENT si mode câblage actif */}
+      {showCableRouting && intelligentSnapPoints.length > 0 && (
         <IntelligentSnapPointsVisualization
           snapPoints={intelligentSnapPoints}
           activeSnapPointId={activeIntelligentSnapPointId}

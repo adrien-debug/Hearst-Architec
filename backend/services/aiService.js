@@ -52,7 +52,7 @@ Tu connais parfaitement les normes internationales (NEC, IEC, NFPA) et les meill
 
 CONTAINERS MINING (40ft / 12m standard):
 - ANTSPACE HK3 (Air-cooled): 12,192 × 2,438 × 2,896 mm, 210 slots, ~840 kW max
-- ANTSPACE HD5 (Hydro): 12,196 × 2,438 × 2,896 mm, 308 slots, 1,765 kW max
+- ANTSPACE HD5 (Hydro): 12,196 × 2,438 × 2,896 mm, 355 slots S23, 2,116 kW max (avec EC2-DT)
 - MicroBT Container: 12,192 × 2,438 × 2,591 mm, 200-250 slots
 - Whatsminer Container M50: 12,192 × 2,438 × 2,896 mm, 180 slots
 - Container 20ft: 6,058 × 2,438 × 2,591 mm, 50-100 slots (petites installations)
@@ -64,7 +64,7 @@ SYSTÈMES DE REFROIDISSEMENT:
 - CDU (Coolant Distribution Unit): central pour hydro, 1 par 4-6 containers
 
 TRANSFORMATEURS:
-- 3,750 kVA: alimente 2× containers HD5 (3.5 MW)
+- 5,000 kVA (5 MVA): alimente 2× containers HD5 S23 (4.232 MW = 2×2.116 MW)
 - 2,500 kVA: alimente 1× container HD5 + marge (2.5 MW)
 - 1,000 kVA: petites installations (1 MW)
 - 500 kVA: installations modulaires
@@ -90,8 +90,8 @@ ARCHITECTURE ÉLECTRIQUE TYPE:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  POSTE SOURCE HT (20kV/33kV)                                                │
 │  └── Cellule arrivée + Comptage + Protection générale                       │
-│      └── Cellule départ transfo 1 ──► TRANSFO 3750 kVA ──► TGBT 1          │
-│      └── Cellule départ transfo 2 ──► TRANSFO 3750 kVA ──► TGBT 2          │
+│      └── Cellule départ transfo 1 ──► TRANSFO 5000 kVA ──► TGBT 1          │
+│      └── Cellule départ transfo 2 ──► TRANSFO 5000 kVA ──► TGBT 2          │
 │      └── Cellule départ transfo N ──► TRANSFO XXXX kVA ──► TGBT N          │
 │                                                                              │
 │  TGBT (Tableau Général Basse Tension) - 400V triphasé                       │

@@ -19,7 +19,7 @@ import { InfraObject, aiApi, AIPlacement, AIImplantationResult, layoutsApi, Layo
 import LibraryDrawer from '@/components/designer/library-drawer';
 import PropertiesPanel, { Object3D } from '@/components/designer/properties-panel';
 import Toolbar, { Tool, TransformMode } from '@/components/designer/toolbar';
-import CableRoutingTool, { CableRoute, SnapPoint } from '@/components/designer/cable-routing-tool';
+import CableRoutingTool, { CableRoute } from '@/components/designer/cable-routing-tool';
 import CableScene from '@/components/designer/cable-3d-renderer';
 import { 
   generateSnapPointsForObject, 
@@ -71,7 +71,8 @@ import {
   Copy,
   BoxSelect,
   Lock,
-  Unlock
+  Unlock,
+  Shapes
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -166,6 +167,11 @@ function EditableObject({
   const isPDU = typeLC.includes('pdu') || typeLC.includes('distribution') || typeLC.includes('skid') || typeLC.includes('switchboard');
   const isRMU = typeLC.includes('rmu');
   const isCanopy = typeLC.includes('canopy') || typeLC.includes('solar');
+  const isRoad = typeLC.includes('road');
+  const isBuilding = typeLC.includes('building') || typeLC.includes('guardhouse');
+  const isLoading = typeLC.includes('loading');
+  const isParking = typeLC.includes('parking');
+  const isSlab = typeLC.includes('slab') || typeLC.includes('concrete') || typeLC.includes('dalle');
 
   // Color based on type
   let displayColor = object.color;
@@ -175,6 +181,11 @@ function EditableObject({
   else if (isPDU) displayColor = '#374151';
   else if (isRMU) displayColor = '#1f2937';
   else if (isCanopy) displayColor = '#1e3a5f';
+  else if (isRoad) displayColor = '#4b5563';
+  else if (isBuilding) displayColor = '#1f2937';
+  else if (isLoading) displayColor = '#fbbf24';
+  else if (isParking) displayColor = '#374151';
+  else if (isSlab) displayColor = '#e5e7eb';
 
   // Container realistic rendering - SAME STYLE as cooling
   const renderContainer = () => {
@@ -1269,6 +1280,157 @@ function EditableObject({
     );
   };
 
+  // Road rendering - flat asphalt surface with markings
+  const renderRoad = () => {
+    const [w, h, d] = scale;
+    return (
+      <group
+        ref={meshRef}
+        position={[object.position.x, object.position.y, object.position.z]}
+        rotation={[object.rotation.x, object.rotation.y, object.rotation.z]}
+        onClick={(e) => { e.stopPropagation(); if (!object.locked) onSelect(e.ctrlKey || e.metaKey || e.shiftKey); }}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        {/* Road surface - asphalt */}
+        <mesh receiveShadow>
+          <boxGeometry args={[w, h, d]} />
+          <meshStandardMaterial color="#4b5563" metalness={0.1} roughness={0.9} />
+        </mesh>
+        {/* Center line marking */}
+        <mesh position={[0, h / 2 + 0.01, 0]}>
+          <boxGeometry args={[w * 0.95, 0.01, 0.15]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        {/* Edge lines (yellow) */}
+        <mesh position={[0, h / 2 + 0.01, d / 2 - 0.2]}>
+          <boxGeometry args={[w * 0.98, 0.01, 0.1]} />
+          <meshStandardMaterial color="#fbbf24" />
+        </mesh>
+        <mesh position={[0, h / 2 + 0.01, -d / 2 + 0.2]}>
+          <boxGeometry args={[w * 0.98, 0.01, 0.1]} />
+          <meshStandardMaterial color="#fbbf24" />
+        </mesh>
+      </group>
+    );
+  };
+
+  // Building rendering - guardhouse with window and roof
+  const renderBuilding = () => {
+    const [w, h, d] = scale;
+    return (
+      <group
+        ref={meshRef}
+        position={[object.position.x, object.position.y, object.position.z]}
+        rotation={[object.rotation.x, object.rotation.y, object.rotation.z]}
+        onClick={(e) => { e.stopPropagation(); if (!object.locked) onSelect(e.ctrlKey || e.metaKey || e.shiftKey); }}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        {/* Main building body */}
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[w, h, d]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.4} roughness={0.6} />
+        </mesh>
+        {/* Roof */}
+        <mesh position={[0, h / 2 + 0.1, 0]} castShadow>
+          <boxGeometry args={[w * 1.1, 0.2, d * 1.1]} />
+          <meshStandardMaterial color="#374151" metalness={0.5} roughness={0.5} />
+        </mesh>
+        {/* Window - blue glass */}
+        <mesh position={[0, h * 0.2, d / 2 + 0.01]}>
+          <boxGeometry args={[w * 0.4, h * 0.3, 0.05]} />
+          <meshStandardMaterial color="#3b82f6" metalness={0.8} roughness={0.2} transparent opacity={0.7} />
+        </mesh>
+        {/* Door */}
+        <mesh position={[w * 0.25, -h * 0.15, d / 2 + 0.01]}>
+          <boxGeometry args={[w * 0.2, h * 0.5, 0.03]} />
+          <meshStandardMaterial color="#6b7280" metalness={0.3} roughness={0.7} />
+        </mesh>
+      </group>
+    );
+  };
+
+  // Loading zone - flat yellow area with stripes
+  const renderLoading = () => {
+    const [w, h, d] = scale;
+    return (
+      <group
+        ref={meshRef}
+        position={[object.position.x, object.position.y, object.position.z]}
+        rotation={[object.rotation.x, object.rotation.y, object.rotation.z]}
+        onClick={(e) => { e.stopPropagation(); if (!object.locked) onSelect(e.ctrlKey || e.metaKey || e.shiftKey); }}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        {/* Loading zone surface */}
+        <mesh receiveShadow>
+          <boxGeometry args={[w, h, d]} />
+          <meshStandardMaterial color="#fbbf24" metalness={0.1} roughness={0.8} transparent opacity={0.4} />
+        </mesh>
+        {/* Border */}
+        <mesh position={[0, h + 0.01, 0]}>
+          <boxGeometry args={[w + 0.2, 0.02, d + 0.2]} />
+          <meshStandardMaterial color="#f59e0b" />
+        </mesh>
+      </group>
+    );
+  };
+
+  // Parking zone - gray flat area
+  const renderParking = () => {
+    const [w, h, d] = scale;
+    return (
+      <group
+        ref={meshRef}
+        position={[object.position.x, object.position.y, object.position.z]}
+        rotation={[object.rotation.x, object.rotation.y, object.rotation.z]}
+        onClick={(e) => { e.stopPropagation(); if (!object.locked) onSelect(e.ctrlKey || e.metaKey || e.shiftKey); }}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        {/* Parking surface */}
+        <mesh receiveShadow>
+          <boxGeometry args={[w, h, d]} />
+          <meshStandardMaterial color="#374151" metalness={0.15} roughness={0.85} />
+        </mesh>
+        {/* Parking lines */}
+        {[...Array(5)].map((_, i) => (
+          <mesh key={i} position={[w * (-0.4 + i * 0.2), h / 2 + 0.01, 0]}>
+            <boxGeometry args={[0.1, 0.01, d * 0.8]} />
+            <meshStandardMaterial color="#ffffff" />
+          </mesh>
+        ))}
+      </group>
+    );
+  };
+
+  // Concrete Slab (Dalle Béton) rendering
+  const renderSlab = () => {
+    const [w, h, d] = scale;
+    return (
+      <group
+        ref={meshRef}
+        position={[object.position.x, object.position.y, object.position.z]}
+        rotation={[object.rotation.x, object.rotation.y, object.rotation.z]}
+        onClick={(e) => { e.stopPropagation(); if (!object.locked) onSelect(e.ctrlKey || e.metaKey || e.shiftKey); }}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        {/* Concrete slab - white/light gray with slight texture */}
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[w, h, d]} />
+          <meshStandardMaterial color="#f3f4f6" metalness={0.05} roughness={0.9} />
+        </mesh>
+        {/* Edge detail - slightly darker border */}
+        <mesh position={[0, h / 2 + 0.005, 0]}>
+          <boxGeometry args={[w - 0.1, 0.01, d - 0.1]} />
+          <meshStandardMaterial color="#e5e7eb" metalness={0.02} roughness={0.95} />
+        </mesh>
+      </group>
+    );
+  };
+
   // Standard object rendering
   const renderStandard = () => (
     <mesh
@@ -1308,7 +1470,18 @@ function EditableObject({
       )}
       
       {/* Render based on type */}
-      {isContainer ? renderContainer() : isCooling ? renderCooling() : isTransformer ? renderTransformer() : isPDU ? renderPDU() : isRMU ? renderRMU() : isCanopy ? renderCanopy() : renderStandard()}
+      {isContainer ? renderContainer() : 
+       isCooling ? renderCooling() : 
+       isTransformer ? renderTransformer() : 
+       isPDU ? renderPDU() : 
+       isRMU ? renderRMU() : 
+       isCanopy ? renderCanopy() : 
+       isRoad ? renderRoad() : 
+       isBuilding ? renderBuilding() : 
+       isLoading ? renderLoading() : 
+       isParking ? renderParking() : 
+       isSlab ? renderSlab() :
+       renderStandard()}
       
       {/* Selection outline */}
       {isSelected && (
@@ -1428,7 +1601,7 @@ function Scene({
   showCableLabels?: boolean;
   cableDrawingPoints?: THREE.Vector3[];
   cablePreviewPoint?: THREE.Vector3 | null;
-  cableSnapPoints?: SnapPoint[];
+  cableSnapPoints?: WorldSnapPoint[];
   cableActiveSnapPoint?: THREE.Vector3 | null;
   cableIsDrawing?: boolean;
   cableDefaultWidth?: number;
@@ -1446,12 +1619,17 @@ function Scene({
   showHeightIndicator?: boolean;
   currentCableHeight?: number;
 }) {
+  const { invalidate } = useThree();
+  
+  // Force re-render when objects change
+  useEffect(() => {
+    invalidate();
+  }, [objects, selectedIds, cableRoutes, cableDrawingPoints, invalidate]);
+
   const handleFloorClick = (e: any) => {
-    console.log('🖱️ Floor click - showCableRouting:', showCableRouting, 'point:', e.point);
     // If cable routing mode is active, capture the click point
     if (showCableRouting && onFloorClick && e.point) {
       e.stopPropagation();
-      console.log('📍 Forwarding to cable handler');
       onFloorClick(e.point.clone());
       return;
     }
@@ -1493,21 +1671,25 @@ function Scene({
         rotation={[-Math.PI / 2, 0, 0]} 
         position={[0, -0.01, 0]}
         receiveShadow
+        onClick={handleFloorClick}
       >
-        <planeGeometry args={[200, 200]} />
+        <planeGeometry args={[400, 400]} />
         <meshStandardMaterial color="#6b7280" metalness={0} roughness={1} />
       </mesh>
       
       {/* Concrete slab - 40cm thick, centered at origin, tight fit */}
-      <mesh 
-        position={[0, 0.2, 0]} 
-        receiveShadow
-        castShadow
-        onClick={handleFloorClick}
-      >
-        <boxGeometry args={[45, 0.4, 30]} />
-        <meshStandardMaterial color="#d1d5db" metalness={0.1} roughness={0.9} />
-      </mesh>
+      {/* Only show if no custom slabs exist in objects */}
+      {!objects.some(obj => obj.type.toLowerCase().includes('slab') || obj.type.toLowerCase().includes('concrete') || obj.type.toLowerCase().includes('dalle')) && (
+        <mesh 
+          position={[0, 0.2, 0]} 
+          receiveShadow
+          castShadow
+          onClick={handleFloorClick}
+        >
+          <boxGeometry args={[45, 0.4, 30]} />
+          <meshStandardMaterial color="#d1d5db" metalness={0.1} roughness={0.9} />
+        </mesh>
+      )}
       
       {/* Grid */}
       {showGrid && (
@@ -1753,11 +1935,675 @@ function Scene({
           showForbiddenZones={showForbiddenZones}
           showHeightIndicator={showHeightIndicator}
           currentHeight={currentCableHeight}
+          showCableRouting={showCableRouting}
         />
       )}
 
     </>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QATAR 100MW 8 ZONES PRESET GENERATOR
+// ═══════════════════════════════════════════════════════════════════════════
+
+function generateQatar100MW8Zones(): Object3D[] {
+  const objects: Object3D[] = [];
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EXACT REPRODUCTION FROM qatar-100mw-8zones.html
+  // Site: 300m x 200m (centered at origin)
+  // HTML coordinate system: X=0-300 (left to right), Y=0-200 (top to bottom)
+  // 3D coordinate system: X (left-right centered at 0), Z (top-bottom centered at 0)
+  // Conversion: 3D_X = HTML_X - 150, 3D_Z = HTML_Y - 100
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  // Dimensions (real world in mm)
+  const containerDims = { width: 12192, height: 2896, depth: 2438 }; // 40ft ISO: 12.192m x 2.896m x 2.438m
+  const containerWidthM = containerDims.width / 1000;  // 12.192m (length)
+  const containerDepthM = containerDims.depth / 1000;  // 2.438m (width)
+  const containerHeightM = containerDims.height / 1000; // 2.896m
+  
+  const coolingDims = { width: 12192, height: 1200, depth: 2438 };
+  const coolingHeightM = coolingDims.height / 1000; // 1.2m
+  
+  const transformerDims = { width: 6000, height: 3000, depth: 4000 }; // 6m x 4m x 3m
+  const transformerHeightM = transformerDims.height / 1000;
+  
+  const pduDims = { width: 2000, height: 2200, depth: 5000 }; // 2m x 5m x 2.2m
+  const pduHeightM = pduDims.height / 1000;
+  
+  const loadingDims = { width: 20000, height: 100, depth: 15000 }; // 20m x 15m flat area
+  const parkingDims = { width: 25000, height: 100, depth: 12000 }; // 25m x 12m flat area
+  
+  const slabHeight = 0.4;
+  
+  // Zone colors (matching HTML)
+  const zoneColors = [
+    '#ef4444', // Z1 Red
+    '#f97316', // Z2 Orange
+    '#eab308', // Z3 Yellow
+    '#22c55e', // Z4 Green
+    '#14b8a6', // Z5 Cyan
+    '#3b82f6', // Z6 Blue
+    '#8b5cf6', // Z7 Purple
+    '#ec4899', // Z8 Pink
+  ];
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ZONE DEFINITIONS - Exact positions from HTML
+  // HTML uses: translate(X, Y) where X,Y are SVG coordinates
+  // Container size in HTML: 24 x 5 units (scaled to real dimensions)
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  // Zone 1-4 (Top row: HTML Y = 5 to 90)
+  // Zone 5-8 (Bottom row: HTML Y = 110 to 195)
+  // Road: HTML Y = 95 to 105
+  
+  const zones = [
+    // Zone 1: x=5-65, y=5-90 (Top-Left)
+    { id: 1, htmlX: 35, htmlY: 47.5, color: zoneColors[0],
+      containers: [
+        // Row 1 (left column): translate(8, 15), (8, 22), (8, 29), (8, 36)
+        { htmlX: 8 + 12, htmlY: 15 + 2.5 }, // C1 center
+        { htmlX: 8 + 12, htmlY: 22 + 2.5 }, // C2
+        { htmlX: 8 + 12, htmlY: 29 + 2.5 }, // C3
+        { htmlX: 8 + 12, htmlY: 36 + 2.5 }, // C4
+        // Row 2 (right column): translate(38, 15), (38, 22), (38, 29), (38, 36)
+        { htmlX: 38 + 12, htmlY: 15 + 2.5 }, // C5
+        { htmlX: 38 + 12, htmlY: 22 + 2.5 }, // C6
+        { htmlX: 38 + 12, htmlY: 29 + 2.5 }, // C7
+        { htmlX: 38 + 12, htmlY: 36 + 2.5 }, // C8
+      ],
+      transformers: [
+        { htmlX: 35, htmlY: 47 },  // T1 at (32, 45)
+        { htmlX: 35, htmlY: 53 },  // T2 at (32, 51)
+      ],
+      pdus: [
+        { htmlX: 26, htmlY: 47.5 },  // at (25, 45)
+        { htmlX: 26, htmlY: 54.5 },  // at (25, 52)
+        { htmlX: 44, htmlY: 47.5 },  // at (43, 45)
+        { htmlX: 44, htmlY: 54.5 },  // at (43, 52)
+      ],
+      loading: { htmlX: 20, htmlY: 72.5 },   // at (10, 65)
+      parking: { htmlX: 47.5, htmlY: 71 },   // at (35, 65)
+    },
+    // Zone 2: x=83-143, y=5-90 (Top-Center-Left)
+    { id: 2, htmlX: 113, htmlY: 47.5, color: zoneColors[1],
+      containers: [
+        { htmlX: 86 + 12, htmlY: 15 + 2.5 },
+        { htmlX: 86 + 12, htmlY: 22 + 2.5 },
+        { htmlX: 86 + 12, htmlY: 29 + 2.5 },
+        { htmlX: 86 + 12, htmlY: 36 + 2.5 },
+        { htmlX: 116 + 12, htmlY: 15 + 2.5 },
+        { htmlX: 116 + 12, htmlY: 22 + 2.5 },
+        { htmlX: 116 + 12, htmlY: 29 + 2.5 },
+        { htmlX: 116 + 12, htmlY: 36 + 2.5 },
+      ],
+      transformers: [
+        { htmlX: 113, htmlY: 47 },
+        { htmlX: 113, htmlY: 53 },
+      ],
+      pdus: [
+        { htmlX: 104, htmlY: 47.5 },
+        { htmlX: 104, htmlY: 54.5 },
+        { htmlX: 122, htmlY: 47.5 },
+        { htmlX: 122, htmlY: 54.5 },
+      ],
+      loading: { htmlX: 98, htmlY: 72.5 },
+      parking: { htmlX: 125.5, htmlY: 71 },
+    },
+    // Zone 3: x=161-221, y=5-90 (Top-Center-Right)
+    { id: 3, htmlX: 191, htmlY: 47.5, color: zoneColors[2],
+      containers: [
+        { htmlX: 164 + 12, htmlY: 15 + 2.5 },
+        { htmlX: 164 + 12, htmlY: 22 + 2.5 },
+        { htmlX: 164 + 12, htmlY: 29 + 2.5 },
+        { htmlX: 164 + 12, htmlY: 36 + 2.5 },
+        { htmlX: 194 + 12, htmlY: 15 + 2.5 },
+        { htmlX: 194 + 12, htmlY: 22 + 2.5 },
+        { htmlX: 194 + 12, htmlY: 29 + 2.5 },
+        { htmlX: 194 + 12, htmlY: 36 + 2.5 },
+      ],
+      transformers: [
+        { htmlX: 191, htmlY: 47 },
+        { htmlX: 191, htmlY: 53 },
+      ],
+      pdus: [
+        { htmlX: 182, htmlY: 47.5 },
+        { htmlX: 182, htmlY: 54.5 },
+        { htmlX: 200, htmlY: 47.5 },
+        { htmlX: 200, htmlY: 54.5 },
+      ],
+      loading: { htmlX: 176, htmlY: 72.5 },
+      parking: { htmlX: 203.5, htmlY: 71 },
+    },
+    // Zone 4: x=239-295, y=5-90 (Top-Right)
+    { id: 4, htmlX: 267, htmlY: 47.5, color: zoneColors[3],
+      containers: [
+        { htmlX: 242 + 12, htmlY: 15 + 2.5 },
+        { htmlX: 242 + 12, htmlY: 22 + 2.5 },
+        { htmlX: 242 + 12, htmlY: 29 + 2.5 },
+        { htmlX: 242 + 12, htmlY: 36 + 2.5 },
+        { htmlX: 268 + 12, htmlY: 15 + 2.5 },
+        { htmlX: 268 + 12, htmlY: 22 + 2.5 },
+        { htmlX: 268 + 12, htmlY: 29 + 2.5 },
+        { htmlX: 268 + 12, htmlY: 36 + 2.5 },
+      ],
+      transformers: [
+        { htmlX: 267, htmlY: 47 },
+        { htmlX: 267, htmlY: 53 },
+      ],
+      pdus: [
+        { htmlX: 258, htmlY: 47.5 },
+        { htmlX: 258, htmlY: 54.5 },
+        { htmlX: 276, htmlY: 47.5 },
+        { htmlX: 276, htmlY: 54.5 },
+      ],
+      loading: { htmlX: 254, htmlY: 72.5 },
+      parking: { htmlX: 280, htmlY: 71 },
+    },
+    // Zone 5: x=5-65, y=110-195 (Bottom-Left)
+    { id: 5, htmlX: 35, htmlY: 152.5, color: zoneColors[4],
+      containers: [
+        { htmlX: 8 + 12, htmlY: 120 + 2.5 },
+        { htmlX: 8 + 12, htmlY: 127 + 2.5 },
+        { htmlX: 8 + 12, htmlY: 134 + 2.5 },
+        { htmlX: 8 + 12, htmlY: 141 + 2.5 },
+        { htmlX: 38 + 12, htmlY: 120 + 2.5 },
+        { htmlX: 38 + 12, htmlY: 127 + 2.5 },
+        { htmlX: 38 + 12, htmlY: 134 + 2.5 },
+        { htmlX: 38 + 12, htmlY: 141 + 2.5 },
+      ],
+      transformers: [
+        { htmlX: 35, htmlY: 152 },
+        { htmlX: 35, htmlY: 158 },
+      ],
+      pdus: [
+        { htmlX: 26, htmlY: 152.5 },
+        { htmlX: 26, htmlY: 159.5 },
+        { htmlX: 44, htmlY: 152.5 },
+        { htmlX: 44, htmlY: 159.5 },
+      ],
+      loading: { htmlX: 20, htmlY: 177.5 },
+      parking: { htmlX: 47.5, htmlY: 176 },
+    },
+    // Zone 6: x=83-143, y=110-195 (Bottom-Center-Left)
+    { id: 6, htmlX: 113, htmlY: 152.5, color: zoneColors[5],
+      containers: [
+        { htmlX: 86 + 12, htmlY: 120 + 2.5 },
+        { htmlX: 86 + 12, htmlY: 127 + 2.5 },
+        { htmlX: 86 + 12, htmlY: 134 + 2.5 },
+        { htmlX: 86 + 12, htmlY: 141 + 2.5 },
+        { htmlX: 116 + 12, htmlY: 120 + 2.5 },
+        { htmlX: 116 + 12, htmlY: 127 + 2.5 },
+        { htmlX: 116 + 12, htmlY: 134 + 2.5 },
+        { htmlX: 116 + 12, htmlY: 141 + 2.5 },
+      ],
+      transformers: [
+        { htmlX: 113, htmlY: 152 },
+        { htmlX: 113, htmlY: 158 },
+      ],
+      pdus: [
+        { htmlX: 104, htmlY: 152.5 },
+        { htmlX: 104, htmlY: 159.5 },
+        { htmlX: 122, htmlY: 152.5 },
+        { htmlX: 122, htmlY: 159.5 },
+      ],
+      loading: { htmlX: 98, htmlY: 177.5 },
+      parking: { htmlX: 125.5, htmlY: 176 },
+    },
+    // Zone 7: x=161-221, y=110-195 (Bottom-Center-Right)
+    { id: 7, htmlX: 191, htmlY: 152.5, color: zoneColors[6],
+      containers: [
+        { htmlX: 164 + 12, htmlY: 120 + 2.5 },
+        { htmlX: 164 + 12, htmlY: 127 + 2.5 },
+        { htmlX: 164 + 12, htmlY: 134 + 2.5 },
+        { htmlX: 164 + 12, htmlY: 141 + 2.5 },
+        { htmlX: 194 + 12, htmlY: 120 + 2.5 },
+        { htmlX: 194 + 12, htmlY: 127 + 2.5 },
+        { htmlX: 194 + 12, htmlY: 134 + 2.5 },
+        { htmlX: 194 + 12, htmlY: 141 + 2.5 },
+      ],
+      transformers: [
+        { htmlX: 191, htmlY: 152 },
+        { htmlX: 191, htmlY: 158 },
+      ],
+      pdus: [
+        { htmlX: 182, htmlY: 152.5 },
+        { htmlX: 182, htmlY: 159.5 },
+        { htmlX: 200, htmlY: 152.5 },
+        { htmlX: 200, htmlY: 159.5 },
+      ],
+      loading: { htmlX: 176, htmlY: 177.5 },
+      parking: { htmlX: 203.5, htmlY: 176 },
+    },
+    // Zone 8: x=239-295, y=110-195 (Bottom-Right)
+    { id: 8, htmlX: 267, htmlY: 152.5, color: zoneColors[7],
+      containers: [
+        { htmlX: 242 + 12, htmlY: 120 + 2.5 },
+        { htmlX: 242 + 12, htmlY: 127 + 2.5 },
+        { htmlX: 242 + 12, htmlY: 134 + 2.5 },
+        { htmlX: 242 + 12, htmlY: 141 + 2.5 },
+        { htmlX: 268 + 12, htmlY: 120 + 2.5 },
+        { htmlX: 268 + 12, htmlY: 127 + 2.5 },
+        { htmlX: 268 + 12, htmlY: 134 + 2.5 },
+        { htmlX: 268 + 12, htmlY: 141 + 2.5 },
+      ],
+      transformers: [
+        { htmlX: 267, htmlY: 152 },
+        { htmlX: 267, htmlY: 158 },
+      ],
+      pdus: [
+        { htmlX: 258, htmlY: 152.5 },
+        { htmlX: 258, htmlY: 159.5 },
+        { htmlX: 276, htmlY: 152.5 },
+        { htmlX: 276, htmlY: 159.5 },
+      ],
+      loading: { htmlX: 254, htmlY: 177.5 },
+      parking: { htmlX: 280, htmlY: 176 },
+    },
+  ];
+  
+  // Convert HTML coords to 3D coords
+  const toX = (htmlX: number) => htmlX - 150; // Center at 0
+  const toZ = (htmlY: number) => htmlY - 100; // Center at 0
+  
+  // Generate all zones
+  zones.forEach(zone => {
+    // Containers + Cooling
+    zone.containers.forEach((c, idx) => {
+      const x3d = toX(c.htmlX);
+      const z3d = toZ(c.htmlY);
+      
+      // Container
+      objects.push({
+        id: `z${zone.id}-container-${idx + 1}`,
+        name: `Z${zone.id} Container C${idx + 1}`,
+        type: 'container',
+        position: { x: x3d, y: slabHeight + containerHeightM / 2, z: z3d },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#e8e8e8',
+        dimensions: containerDims,
+        locked: false,
+        visible: true
+      });
+      
+      // Cooling on top
+      objects.push({
+        id: `z${zone.id}-cooling-${idx + 1}`,
+        name: `Z${zone.id} Cooling #${idx + 1}`,
+        type: 'cooling',
+        position: { x: x3d, y: slabHeight + containerHeightM + coolingHeightM / 2, z: z3d },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#1e3a5f',
+        dimensions: coolingDims,
+        locked: false,
+        visible: true
+      });
+    });
+    
+    // Transformers
+    zone.transformers.forEach((t, idx) => {
+      objects.push({
+        id: `z${zone.id}-transformer-${idx + 1}`,
+        name: `Z${zone.id} Transformer T${idx + 1}`,
+        type: 'transformer',
+        position: { x: toX(t.htmlX), y: slabHeight + transformerHeightM / 2, z: toZ(t.htmlY) },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#f59e0b',
+        dimensions: transformerDims,
+        locked: false,
+        visible: true
+      });
+    });
+    
+    // PDUs
+    zone.pdus.forEach((p, idx) => {
+      objects.push({
+        id: `z${zone.id}-pdu-${idx + 1}`,
+        name: `Z${zone.id} PDU #${idx + 1}`,
+        type: 'pdu',
+        position: { x: toX(p.htmlX), y: slabHeight + pduHeightM / 2, z: toZ(p.htmlY) },
+        rotation: { x: 0, y: Math.PI / 2, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#374151',
+        dimensions: pduDims,
+        locked: false,
+        visible: true
+      });
+    });
+    
+    // Loading Zone
+    objects.push({
+      id: `z${zone.id}-loading`,
+      name: `Z${zone.id} Loading Zone`,
+      type: 'loading',
+      position: { x: toX(zone.loading.htmlX), y: 0.05, z: toZ(zone.loading.htmlY) },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#fbbf24',
+      dimensions: loadingDims,
+      locked: true,
+      visible: true
+    });
+    
+    // Parking
+    objects.push({
+      id: `z${zone.id}-parking`,
+      name: `Z${zone.id} Parking`,
+      type: 'parking',
+      position: { x: toX(zone.parking.htmlX), y: 0.05, z: toZ(zone.parking.htmlY) },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#374151',
+      dimensions: parkingDims,
+      locked: true,
+      visible: true
+    });
+  });
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ROADS - From HTML
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  // Central horizontal road: y=95 to y=105 (10m wide)
+  objects.push({
+    id: 'road-central',
+    name: 'Central Access Road',
+    type: 'road',
+    position: { x: 0, y: 0.05, z: 0 }, // Centered
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    color: '#4b5563',
+    dimensions: { width: 300000, height: 100, depth: 10000 }, // 300m x 10m
+    locked: true,
+    visible: true
+  });
+  
+  // Vertical service roads (3 pairs) - at x=70, 148, 226
+  const verticalRoadPositions = [
+    { htmlX: 74, name: 'Service Road 1' },  // Between Z1-Z2 and Z5-Z6
+    { htmlX: 152, name: 'Service Road 2' }, // Between Z2-Z3 and Z6-Z7
+    { htmlX: 230, name: 'Service Road 3' }, // Between Z3-Z4 and Z7-Z8
+  ];
+  
+  verticalRoadPositions.forEach((road, idx) => {
+    // Top section (y=0 to y=95)
+    objects.push({
+      id: `road-vertical-${idx + 1}-top`,
+      name: `${road.name} (Top)`,
+      type: 'road',
+      position: { x: toX(road.htmlX), y: 0.05, z: -52.5 },
+      rotation: { x: 0, y: Math.PI / 2, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#4b5563',
+      dimensions: { width: 95000, height: 100, depth: 8000 }, // 95m x 8m
+      locked: true,
+      visible: true
+    });
+    
+    // Bottom section (y=105 to y=200)
+    objects.push({
+      id: `road-vertical-${idx + 1}-bottom`,
+      name: `${road.name} (Bottom)`,
+      type: 'road',
+      position: { x: toX(road.htmlX), y: 0.05, z: 52.5 },
+      rotation: { x: 0, y: Math.PI / 2, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#4b5563',
+      dimensions: { width: 95000, height: 100, depth: 8000 }, // 95m x 8m
+      locked: true,
+      visible: true
+    });
+  });
+  
+  // Entry road (left side)
+  objects.push({
+    id: 'road-entry',
+    name: 'Entry Road',
+    type: 'road',
+    position: { x: -155, y: 0.05, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    color: '#6b7280',
+    dimensions: { width: 15000, height: 100, depth: 16000 },
+    locked: true,
+    visible: true
+  });
+  
+  // Security Guardhouse
+  objects.push({
+    id: 'guardhouse',
+    name: 'Security Guardhouse',
+    type: 'building',
+    position: { x: -160, y: slabHeight + 1.5, z: -15 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    color: '#1f2937',
+    dimensions: { width: 6000, height: 3000, depth: 8000 },
+    locked: true,
+    visible: true
+  });
+  
+  return objects;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DUPLICATED SCENE GENERATOR - 2 IDENTICAL SITES WITH 20M GAP
+// ═══════════════════════════════════════════════════════════════════════════
+
+function generateDuplicatedScene(): Object3D[] {
+  const objects: Object3D[] = [];
+  
+  // Scene dimensions (based on initial scene)
+  const sceneWidth = 42; // 42m wide (canopy width)
+  const gap = 20; // 20m separation between sites
+  // Center both sites around X=0: Site A at -31m, Site B at +31m
+  const siteACenterX = -(sceneWidth / 2 + gap / 2); // -31m
+  const siteBCenterX = +(sceneWidth / 2 + gap / 2); // +31m
+  
+  // Dimensions (same as initialObjects)
+  const containerDims = { width: 12192, height: 2896, depth: 2438 };
+  const containerWidthM = containerDims.width / 1000;
+  const containerDepthM = containerDims.depth / 1000;
+  const containerHeightM = containerDims.height / 1000;
+  
+  // Cooling - SAME size as container (not reduced EC2-DT)
+  const coolingDims = { width: 12192, height: 2896, depth: 2438 }; // Same as container
+  const coolingHeightM = coolingDims.height / 1000; // 2.896m
+  
+  const transformerDims = { width: 2500, height: 3000, depth: 2000 };
+  const transformerHeightM = transformerDims.height / 1000;
+  const transformerWidthM = transformerDims.width / 1000;
+  
+  const pduDims = { width: 2400, height: 2200, depth: 800 };
+  const pduHeightM = pduDims.height / 1000;
+  const pduDepthAfterRotation = pduDims.depth / 1000;
+  
+  const slabHeight = 0.4;
+  const gapBetweenRows = 4;
+  const faceToFaceGap = 15;
+  const containersPerRow = 4;
+  
+  const totalZSpan = (containersPerRow - 1) * (containerDepthM + gapBetweenRows);
+  const centerOffsetZ = -totalZSpan / 2;
+  const row1X = -(faceToFaceGap / 2) - (containerWidthM / 2);
+  const row2X = (faceToFaceGap / 2) + (containerWidthM / 2);
+  
+  // Security distances
+  const SECURITY_DIST_TRF_PDU = 3.0;
+  const SECURITY_DIST_PDU_CONTAINER = 3.0;
+  
+  const containerInnerEdgeLeft = row1X + (containerWidthM / 2);
+  const containerInnerEdgeRight = row2X - (containerWidthM / 2);
+  
+  const containerStep = containerDepthM + gapBetweenRows;
+  const zTop = centerOffsetZ + containerStep / 2;
+  const zBottom = centerOffsetZ + totalZSpan - containerStep / 2;
+  
+  const trfXFromCenter = containerInnerEdgeLeft + SECURITY_DIST_PDU_CONTAINER + pduDepthAfterRotation + SECURITY_DIST_TRF_PDU + (transformerWidthM / 2);
+  
+  const pduRow1X = containerInnerEdgeLeft + SECURITY_DIST_PDU_CONTAINER + (pduDepthAfterRotation / 2);
+  const pduRow2X = containerInnerEdgeRight - SECURITY_DIST_PDU_CONTAINER - (pduDepthAfterRotation / 2);
+  const containerSpacingZ = containerDepthM + gapBetweenRows;
+  const pduZTop = centerOffsetZ + containerSpacingZ / 2;
+  const pduZBottom = centerOffsetZ + totalZSpan - containerSpacingZ / 2;
+  
+  // Canopy dimensions
+  const canopyWidth = 42000;
+  const canopyDepth = 24000;
+  const canopyStructureHeight = 2000;
+  const canopyY = slabHeight + 10;
+  
+  // Slab dimensions - slightly larger than canopy to include feet (2m margin each side)
+  const slabWidth = 46000;  // 46m (canopy 42m + 2m margin each side)
+  const slabDepth = 28000;  // 28m (canopy 24m + 2m margin each side)
+  
+  // Generate both sites - centered around X=0 with 20m gap
+  const sites = [
+    { id: 'A', offsetX: siteACenterX, label: 'Site A' },
+    { id: 'B', offsetX: siteBCenterX, label: 'Site B' }
+  ];
+  
+  sites.forEach(site => {
+    const xOffset = site.offsetX;
+    
+    // Row 1: 4 containers + cooling
+    for (let i = 0; i < containersPerRow; i++) {
+      const zPos = centerOffsetZ + i * (containerDepthM + gapBetweenRows);
+      objects.push({
+        id: `${site.id}-container-${i + 1}`,
+        name: `${site.label} ANTSPACE HD5 #${i + 1}`,
+        type: 'container',
+        position: { x: row1X + xOffset, y: slabHeight + containerHeightM / 2, z: zPos },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#e8e8e8',
+        dimensions: containerDims,
+        locked: false,
+        visible: true
+      });
+      objects.push({
+        id: `${site.id}-cooling-${i + 1}`,
+        name: `${site.label} EC2-DT #${i + 1}`,
+        type: 'cooling',
+        position: { x: row1X + xOffset, y: slabHeight + containerHeightM + coolingHeightM / 2, z: zPos },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#1e3a5f',
+        dimensions: coolingDims,
+        locked: false,
+        visible: true
+      });
+    }
+    
+    // Row 2: 4 containers + cooling (rotated)
+    for (let i = 0; i < containersPerRow; i++) {
+      const zPos = centerOffsetZ + i * (containerDepthM + gapBetweenRows);
+      objects.push({
+        id: `${site.id}-container-${i + 5}`,
+        name: `${site.label} ANTSPACE HD5 #${i + 5}`,
+        type: 'container',
+        position: { x: row2X + xOffset, y: slabHeight + containerHeightM / 2, z: zPos },
+        rotation: { x: 0, y: Math.PI, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#e8e8e8',
+        dimensions: containerDims,
+        locked: false,
+        visible: true
+      });
+      objects.push({
+        id: `${site.id}-cooling-${i + 5}`,
+        name: `${site.label} EC2-DT #${i + 5}`,
+        type: 'cooling',
+        position: { x: row2X + xOffset, y: slabHeight + containerHeightM + coolingHeightM / 2, z: zPos },
+        rotation: { x: 0, y: Math.PI, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#1e3a5f',
+        dimensions: coolingDims,
+        locked: false,
+        visible: true
+      });
+    }
+    
+    // 4 Transformers
+    const transformerPositions = [
+      { x: -trfXFromCenter + xOffset, z: zTop },
+      { x: trfXFromCenter + xOffset, z: zTop },
+      { x: -trfXFromCenter + xOffset, z: zBottom },
+      { x: trfXFromCenter + xOffset, z: zBottom },
+    ];
+    transformerPositions.forEach((pos, i) => {
+      objects.push({
+        id: `${site.id}-transformer-${i + 1}`,
+        name: `${site.label} Transformer 5MVA #${i + 1}`,
+        type: 'transformer',
+        position: { x: pos.x, y: slabHeight + transformerHeightM / 2, z: pos.z },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#f59e0b',
+        dimensions: transformerDims,
+        locked: false,
+        visible: true
+      });
+    });
+    
+    // 4 PDUs
+    const pduPositions = [
+      { x: pduRow1X + xOffset, z: pduZTop, rot: Math.PI / 2, name: `${site.label} PDU Row1-A` },
+      { x: pduRow1X + xOffset, z: pduZBottom, rot: Math.PI / 2, name: `${site.label} PDU Row1-B` },
+      { x: pduRow2X + xOffset, z: pduZTop, rot: -Math.PI / 2, name: `${site.label} PDU Row2-A` },
+      { x: pduRow2X + xOffset, z: pduZBottom, rot: -Math.PI / 2, name: `${site.label} PDU Row2-B` },
+    ];
+    pduPositions.forEach((pos, i) => {
+      objects.push({
+        id: `${site.id}-pdu-${i + 1}`,
+        name: pos.name,
+        type: 'pdu',
+        position: { x: pos.x, y: slabHeight + pduHeightM / 2, z: pos.z },
+        rotation: { x: 0, y: pos.rot, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        color: '#374151',
+        dimensions: pduDims,
+        locked: false,
+        visible: true
+      });
+    });
+    
+    // Concrete Slab (Dalle Béton) - 46m x 28m x 0.4m (covers canopy feet)
+    objects.push({
+      id: `${site.id}-concrete-slab`,
+      name: `${site.label} Dalle Béton`,
+      type: 'concrete-slab',
+      position: { x: xOffset, y: slabHeight / 2, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#e5e7eb',
+      dimensions: { width: slabWidth, height: 400, depth: slabDepth }, // 46m x 0.4m x 28m
+      locked: true,
+      visible: true
+    });
+    
+    // Solar Canopy
+    objects.push({
+      id: `${site.id}-solar-canopy`,
+      name: `${site.label} Canopy Solaire`,
+      type: 'solar-canopy',
+      position: { x: xOffset, y: canopyY, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#1e3a5f',
+      dimensions: { width: canopyWidth, height: canopyStructureHeight, depth: canopyDepth },
+      locked: false,
+      visible: true
+    });
+  });
+  
+  return objects;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1869,7 +2715,7 @@ export default function DesignerPage() {
   const pduHeightM = pduDims.height / 1000;
   const pduDepthAfterRotation = pduDims.depth / 1000;  // 0.8m (rotated 90°)
   
-  // 4 Transformers 4MW - positioned at corners
+  // 4 Transformers 5 MVA - positioned at corners (2 containers × 2.116 MW = 4.232 MW each)
   const transformerDims = { width: 2500, height: 3000, depth: 2000 }; // 2.5m x 3m x 2m
   const transformerHeightM = transformerDims.height / 1000;
   const transformerWidthM = transformerDims.width / 1000;
@@ -1904,7 +2750,7 @@ export default function DesignerPage() {
   transformerPositions.forEach((pos, i) => {
     initialObjects.push({
       id: `transformer-${i + 1}`,
-      name: `Transformer 4MW #${i + 1}`,
+      name: `Transformer 5MVA #${i + 1}`,
       type: 'transformer',
       position: { x: pos.x, y: slabHeight + transformerHeightM / 2, z: pos.z },
       rotation: { x: 0, y: pos.rot, z: 0 },
@@ -1997,6 +2843,11 @@ export default function DesignerPage() {
   const [objects, setObjects] = useState<Object3D[]>(initialObjects);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROJECT SELECTOR STATE - Show before 3D view
+  // ═══════════════════════════════════════════════════════════════════════════
+  const [isProjectSelectorVisible, setIsProjectSelectorVisible] = useState(true);
+  
   // Box selection state
   const [boxSelectMode, setBoxSelectMode] = useState(false); // Mode toggle
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
@@ -2077,6 +2928,7 @@ export default function DesignerPage() {
   const [showDistanceX, setShowDistanceX] = useState(false);
   const [showDistanceZ, setShowDistanceZ] = useState(false);
   const [viewDirection, setViewDirection] = useState<'front' | 'back' | 'left' | 'right' | 'top' | 'perspective' | null>(null);
+  const [lowQuality, setLowQuality] = useState(false); // Low quality mode for performance
   
   // UI state
   const [showLibrary, setShowLibrary] = useState(false);
@@ -2087,13 +2939,16 @@ export default function DesignerPage() {
   
   // Cable routing state
   const [cableRoutes, setCableRoutes] = useState<CableRoute[]>([]);
-  const [cableSnapPoints, setCableSnapPoints] = useState<SnapPoint[]>([]);
+  const [cableSnapPoints, setCableSnapPoints] = useState<WorldSnapPoint[]>([]);
   const [cableDrawingPoints, setCableDrawingPoints] = useState<THREE.Vector3[]>([]);
   const [cablePreviewPoint, setCablePreviewPoint] = useState<THREE.Vector3 | null>(null);
   const [cableIsDrawing, setCableIsDrawing] = useState(false);
   const [cableSelectedSegments, setCableSelectedSegments] = useState<string[]>([]);
   const [cableSelectedPoints, setCableSelectedPoints] = useState<string[]>([]);
   const [cableActiveRouteId, setCableActiveRouteId] = useState<string | null>(null);
+  // Style du chemin de câble
+  const [cableTrayStyle, setCableTrayStyle] = useState<'ladder' | 'wire-mesh' | 'conduit' | 'busbar'>('ladder');
+  const [cableTrayWidth, setCableTrayWidth] = useState(300); // mm
   
   // Intelligent snap points & zones state
   const [intelligentSnapPoints, setIntelligentSnapPoints] = useState<WorldSnapPoint[]>([]);
@@ -2118,17 +2973,24 @@ export default function DesignerPage() {
   }, [showCableRouting]);
   
   const handleCableFloorClick = useCallback((point: THREE.Vector3) => {
-    console.log('🔌 Cable floor click - showCableRouting:', showCableRouting, 'activeRouteId:', cableActiveRouteId);
+    // SNAP SOFT : suggestion optionnelle, tracé manuel libre
+    const snapRadius = 1.5; // m
+    const candidates = cableSnapPoints.filter(sp =>
+      sp.position.distanceTo(point) <= snapRadius
+    );
+    const snapPoint = candidates.length
+      ? candidates.sort((a, b) => a.position.distanceTo(point) - b.position.distanceTo(point))[0]
+      : null;
+    // Snap soft - pas de blocage, tracé manuel libre
+    const enforcedPoint = snapPoint ? snapPoint.position : point;
     
     if (!showCableRouting) {
-      console.log('❌ Cable routing not active');
       return;
     }
     
     // AUTO-CRÉER une route si aucune n'existe ou n'est sélectionnée
     let activeRouteIdToUse = cableActiveRouteId;
     if (!activeRouteIdToUse) {
-      console.log('🆕 Auto-création d\'une nouvelle route...');
       const newRouteId = `cable-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const newRoute: CableRoute = {
         id: newRouteId,
@@ -2144,7 +3006,6 @@ export default function DesignerPage() {
       setCableRoutes(prev => [...prev, newRoute]);
       setCableActiveRouteId(newRouteId);
       activeRouteIdToUse = newRouteId;
-      console.log('✅ Route auto-créée:', newRouteId);
     }
     
     // Calculer la hauteur optimale si auto-calcul activé
@@ -2152,19 +3013,18 @@ export default function DesignerPage() {
     if (autoCalculateHeight && cableZones.length > 0) {
       const lastPoint = cableDrawingPointsRef.current[cableDrawingPointsRef.current.length - 1];
       if (lastPoint) {
-        const result = calculateOptimalHeight(lastPoint, point, cableZones, DEFAULT_HEIGHT_CONFIG);
+        const result = calculateOptimalHeight(lastPoint, enforcedPoint, cableZones, DEFAULT_HEIGHT_CONFIG);
         height = result.height;
         // Mettre à jour la hauteur courante
         setCurrentCableHeight(height);
       }
     }
     
-    // Set cable height to calculated or manual height
-    const cablePoint = new THREE.Vector3(point.x, height, point.z);
+    // Point du câble = snap strict
+    const cablePoint = new THREE.Vector3(enforcedPoint.x, height, enforcedPoint.z);
     
     // Get current points from ref (synchronous)
     const currentPoints = [...cableDrawingPointsRef.current];
-    console.log('Cable click at:', cablePoint, 'currentPoints:', currentPoints.length);
     
     // Add new point to ref immediately (synchronous update)
     cableDrawingPointsRef.current = [...currentPoints, cablePoint];
@@ -2204,19 +3064,17 @@ export default function DesignerPage() {
           id: `seg-${timestamp}`,
           startPointId: actualStartPointId,
           endPointId,
-          type: 'ladder' as const,
-          width: 300,
-          height: 100,
+          type: cableTrayStyle,
+          width: cableTrayWidth,
+          height: cableTrayStyle === 'busbar' ? 150 : 100,
           cableCount: 6,
-          cableTypes: ['power', 'earth'] as ('power' | 'earth')[],
-          color: '#71717a',
+          cableTypes: (cableTrayStyle === 'wire-mesh' ? ['data'] : cableTrayStyle === 'conduit' ? ['control'] : ['power', 'earth']) as ('power' | 'data' | 'control' | 'earth')[],
+          color: cableTrayStyle === 'wire-mesh' ? '#3b82f6' : cableTrayStyle === 'conduit' ? '#f59e0b' : cableTrayStyle === 'busbar' ? '#b45309' : '#71717a',
           locked: false,
           visible: true,
         };
         
         const segmentLength = prevPoint.distanceTo(cablePoint);
-        
-        console.log('✅ Creating segment:', newSegment.id, 'length:', segmentLength.toFixed(2) + 'm');
         
         return {
           ...route,
@@ -2225,10 +3083,8 @@ export default function DesignerPage() {
           totalLength: route.totalLength + segmentLength,
         };
       }));
-    } else {
-      console.log('📍 First point placed - click again to create a segment');
     }
-  }, [showCableRouting, cableActiveRouteId, autoCalculateHeight, cableZones, currentCableHeight, cableRoutes.length]);
+  }, [showCableRouting, cableActiveRouteId, autoCalculateHeight, cableZones, currentCableHeight, cableRoutes.length, cableTrayStyle, cableTrayWidth, cableSnapPoints]);
   
   // Project state
   const [projectName, setProjectName] = useState('Untitled Project');
@@ -2291,7 +3147,7 @@ export default function DesignerPage() {
   // Generate snap points from objects for cable routing (legacy + intelligent)
   useEffect(() => {
     // Legacy snap points (pour compatibilité)
-    const snapPoints: SnapPoint[] = [];
+    const snapPoints: WorldSnapPoint[] = [];
     // Intelligent snap points (nouveau système)
     const intSnapPoints: WorldSnapPoint[] = [];
     
@@ -2302,10 +3158,18 @@ export default function DesignerPage() {
       
       // Legacy: Center point
       snapPoints.push({
+        id: `${obj.id}-center`,
         position: new THREE.Vector3(obj.position.x, obj.position.y + h, obj.position.z),
         objectId: obj.id,
         objectName: obj.name,
-        type: 'center',
+        objectType: obj.objectType || 'generic',
+        label: 'Center',
+        connectionType: 'power-bt', // adaptez selon usage
+        direction: new THREE.Vector3(0, 1, 0),
+        cableWidth: 300,
+        maxCables: 6,
+        priority: 2,
+        currentCables: 0,
       });
       
       // Legacy: Corner points (top of object)
@@ -2314,10 +3178,18 @@ export default function DesignerPage() {
       ];
       corners.forEach(([cx, cy, cz]) => {
         snapPoints.push({
+          id: `${obj.id}-corner-${cx}|${cy}|${cz}`,
           position: new THREE.Vector3(obj.position.x + cx, obj.position.y + cy, obj.position.z + cz),
           objectId: obj.id,
           objectName: obj.name,
-          type: 'corner',
+          objectType: obj.objectType || 'generic',
+          label: 'Corner',
+          connectionType: 'power-bt', // adaptez si besoin
+          direction: new THREE.Vector3(0, 1, 0),
+          cableWidth: 300,
+          maxCables: 6,
+          priority: 2,
+          currentCables: 0,
         });
       });
       
@@ -2327,10 +3199,18 @@ export default function DesignerPage() {
       ];
       edges.forEach(([ex, ey, ez]) => {
         snapPoints.push({
+          id: `${obj.id}-edge-${ex}|${ey}|${ez}`,
           position: new THREE.Vector3(obj.position.x + ex, obj.position.y + ey, obj.position.z + ez),
           objectId: obj.id,
           objectName: obj.name,
-          type: 'edge',
+          objectType: obj.objectType || 'generic',
+          label: 'Edge',
+          connectionType: 'power-bt',
+          direction: new THREE.Vector3(0, 1, 0),
+          cableWidth: 300,
+          maxCables: 6,
+          priority: 2,
+          currentCables: 0,
         });
       });
       
@@ -2346,7 +3226,7 @@ export default function DesignerPage() {
       intSnapPoints.push(...objSnapPoints);
     });
     
-    setCableSnapPoints(snapPoints);
+    setCableSnapPoints(intSnapPoints);
     setIntelligentSnapPoints(intSnapPoints);
     
     // Générer les zones de câblage
@@ -2496,8 +3376,6 @@ export default function DesignerPage() {
       // Force reload if version changed (to load new PDUs)
       const savedVersion = localStorage.getItem('hearst-designer-project-version');
       if (savedVersion !== PROJECT_VERSION) {
-        console.log(`🔄 Project version changed: ${savedVersion} → ${PROJECT_VERSION}`);
-        console.log('📦 Loading fresh initial objects with 4 PDUs');
         localStorage.setItem('hearst-designer-project-version', PROJECT_VERSION);
         localStorage.removeItem('hearst-designer-last-project');
         setDbLoading(false);
@@ -2531,9 +3409,7 @@ export default function DesignerPage() {
                 locked: obj.locked || false,
                 visible: obj.visible !== false,
               })));
-              console.log(`Loaded ${lastProject.objects.length} objects from project`);
             }
-            console.log(`Restored project: ${lastProject.name}`);
           }
         }
       } catch (error) {
@@ -2547,7 +3423,6 @@ export default function DesignerPage() {
       if (saved) {
         const localProjects: SavedProject[] = JSON.parse(saved);
         if (localProjects.length > 0) {
-          console.log(`Migrating ${localProjects.length} local projects to cloud...`);
           for (const project of localProjects) {
             try {
               await layoutsApi.create({
@@ -2557,7 +3432,6 @@ export default function DesignerPage() {
                 objects: project.objects as any,
                 groups: [],
               });
-              console.log(`Migrated: ${project.name}`);
             } catch (error) {
               console.error(`Failed to migrate ${project.name}:`, error);
             }
@@ -2586,7 +3460,6 @@ export default function DesignerPage() {
     try {
       const templates = await objectsApi.getTemplates();
       setAiAvailableObjects(templates);
-      console.log('AI Objects loaded:', Object.keys(templates).map(k => `${k}: ${templates[k].length}`));
     } catch (error) {
       console.error('Failed to load AI objects:', error);
     }
@@ -2682,7 +3555,6 @@ export default function DesignerPage() {
         visible: obj.visible !== false,
       }));
       setObjects(loadedObjects);
-      console.log(`Loaded ${loadedObjects.length} objects from "${layout.name}"`);
     } else {
       setObjects([]);
     }
@@ -2735,7 +3607,7 @@ export default function DesignerPage() {
       // Ctrl+O or Cmd+O = Open Projects
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
         e.preventDefault();
-        setShowProjects(true);
+        setIsProjectSelectorVisible(true);
       }
       
       // L = Open Library (only when no object selected, A is for Y+ movement)
@@ -2870,7 +3742,7 @@ export default function DesignerPage() {
     setSelectedId(null);
   }, [selectedId]);
 
-  // Export
+  // Export JSON
   const handleExport = useCallback(() => {
     const data = {
       name: projectName,
@@ -2882,6 +3754,107 @@ export default function DesignerPage() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `${projectName.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [projectName, objects]);
+
+  // Export STEP (ISO 10303-21)
+  const handleExportStep = useCallback(() => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${projectName.replace(/\s+/g, '_')}_${timestamp}`;
+    
+    // Generate STEP file content
+    let stepContent = `ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('Hearst Mining Architect Export'),'2;1');
+FILE_NAME('${filename}.step','${new Date().toISOString()}',('Hearst Mining'),('Hearst Control'),'Hearst Mining Architect','Hearst Mining Architect 1.0','');
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));
+ENDSEC;
+DATA;
+`;
+    
+    let entityId = 1;
+    const entities: string[] = [];
+    
+    // Helper to create unique IDs
+    const nextId = () => `#${entityId++}`;
+    
+    // Create CARTESIAN_POINT
+    const createPoint = (x: number, y: number, z: number) => {
+      const id = nextId();
+      entities.push(`${id}=CARTESIAN_POINT('',(${x.toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}));`);
+      return id;
+    };
+    
+    // Create DIRECTION
+    const createDirection = (x: number, y: number, z: number) => {
+      const id = nextId();
+      entities.push(`${id}=DIRECTION('',(${x.toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}));`);
+      return id;
+    };
+    
+    // Create AXIS2_PLACEMENT_3D
+    const createAxis2Placement = (origin: string, axis: string, refDir: string) => {
+      const id = nextId();
+      entities.push(`${id}=AXIS2_PLACEMENT_3D('',${origin},${axis},${refDir});`);
+      return id;
+    };
+    
+    // Create a box shape for each object
+    objects.forEach((obj, index) => {
+      if (!obj.visible) return;
+      
+      // Convert dimensions from mm to m
+      const width = obj.dimensions.width / 1000;
+      const height = obj.dimensions.height / 1000;
+      const depth = obj.dimensions.depth / 1000;
+      
+      // Position (center to corner offset)
+      const x = obj.position.x - width / 2;
+      const y = obj.position.y - height / 2;
+      const z = obj.position.z - depth / 2;
+      
+      // Create placement
+      const origin = createPoint(x, y, z);
+      const axisZ = createDirection(0, 0, 1);
+      const axisX = createDirection(1, 0, 0);
+      const placement = createAxis2Placement(origin, axisZ, axisX);
+      
+      // Create box
+      const boxId = nextId();
+      entities.push(`${boxId}=BLOCK('${obj.name}',${placement},${width.toFixed(3)},${depth.toFixed(3)},${height.toFixed(3)});`);
+      
+      // Create shape representation
+      const shapeRepId = nextId();
+      entities.push(`${shapeRepId}=SHAPE_REPRESENTATION('${obj.name}',(${boxId}),$);`);
+      
+      // Create product
+      const productId = nextId();
+      entities.push(`${productId}=PRODUCT('${obj.id}','${obj.name}','${obj.type}',$);`);
+      
+      // Create product definition
+      const prodDefId = nextId();
+      entities.push(`${prodDefId}=PRODUCT_DEFINITION('${obj.name}','',${productId},$);`);
+      
+      // Link shape to product
+      const shapeDefId = nextId();
+      entities.push(`${shapeDefId}=PRODUCT_DEFINITION_SHAPE('','',${prodDefId});`);
+      
+      const shapeDefRepId = nextId();
+      entities.push(`${shapeDefRepId}=SHAPE_DEFINITION_REPRESENTATION(${shapeDefId},${shapeRepId});`);
+    });
+    
+    stepContent += entities.join('\n');
+    stepContent += '\nENDSEC;\nEND-ISO-10303-21;\n';
+    
+    // Download file
+    const blob = new Blob([stepContent], { type: 'application/step' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.step`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -3196,6 +4169,194 @@ export default function DesignerPage() {
     }));
   };
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROJECT SELECTOR SCREEN
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (isProjectSelectorVisible) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-4xl">
+          {/* Header */}
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-hearst-green to-emerald-400 rounded-3xl shadow-2xl shadow-hearst-green/30 mb-6">
+              <span className="text-4xl font-black text-slate-900">H</span>
+            </div>
+            <h1 className="text-4xl font-bold text-white mb-2">Mining Architect</h1>
+            <p className="text-slate-400 text-lg">Design your mining infrastructure in 3D</p>
+          </div>
+
+          {/* Project Options Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* New Empty Project */}
+            <button
+              onClick={() => {
+                setObjects([]);
+                setProjectName('Untitled Project');
+                setCurrentLayoutId(null);
+                setIsProjectSelectorVisible(false);
+              }}
+              className="group p-8 bg-white/5 backdrop-blur-sm border-2 border-white/10 rounded-3xl hover:border-hearst-green/50 hover:bg-white/10 transition-all duration-300 text-left"
+            >
+              <div className="flex items-start gap-5">
+                <div className="w-16 h-16 bg-hearst-green/20 rounded-2xl flex items-center justify-center group-hover:bg-hearst-green/30 transition-colors">
+                  <Zap className="w-8 h-8 text-hearst-green" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white mb-2">New Project</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    Start with an empty canvas and build your infrastructure from scratch
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* Qatar 100MW Preset */}
+            <button
+              onClick={() => {
+                const qatar100MWObjects = generateQatar100MW8Zones();
+                setObjects(qatar100MWObjects);
+                setProjectName('Qatar 100MW - 8 Zones');
+                setCurrentLayoutId(null);
+                setIsProjectSelectorVisible(false);
+              }}
+              className="group p-8 bg-gradient-to-br from-amber-500/10 to-orange-500/10 backdrop-blur-sm border-2 border-amber-500/30 rounded-3xl hover:border-amber-400 hover:from-amber-500/20 hover:to-orange-500/20 transition-all duration-300 text-left"
+            >
+              <div className="flex items-start gap-5">
+                <div className="w-16 h-16 bg-amber-500/30 rounded-2xl flex items-center justify-center group-hover:bg-amber-500/40 transition-colors">
+                  <span className="text-3xl">🏗️</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xl font-bold text-white">Qatar 100MW - 8 Zones</h3>
+                    <span className="text-xs bg-amber-500/30 text-amber-300 px-2 py-1 rounded-full font-semibold">PRESET</span>
+                  </div>
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    112.96 MW • 64 containers • 16 transformers • Full infrastructure
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* Duplicated Scene - 2 Sites with 20m Gap */}
+            <button
+              onClick={() => {
+                const duplicatedObjects = generateDuplicatedScene();
+                setObjects(duplicatedObjects);
+                setProjectName('Dual Site - 20m Gap');
+                setCurrentLayoutId(null);
+                setIsProjectSelectorVisible(false);
+              }}
+              className="group p-8 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 backdrop-blur-sm border-2 border-emerald-500/30 rounded-3xl hover:border-emerald-400 hover:from-emerald-500/20 hover:to-teal-500/20 transition-all duration-300 text-left"
+            >
+              <div className="flex items-start gap-5">
+                <div className="w-16 h-16 bg-emerald-500/30 rounded-2xl flex items-center justify-center group-hover:bg-emerald-500/40 transition-colors">
+                  <Copy className="w-8 h-8 text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xl font-bold text-white">Dual Site - 20m Gap</h3>
+                    <span className="text-xs bg-emerald-500/30 text-emerald-300 px-2 py-1 rounded-full font-semibold">PRESET</span>
+                  </div>
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    2 sites identiques • 16 containers • 8 transformers • 20m separation
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* 3D Piece Designer */}
+            <Link
+              href="/designer/piece-editor"
+              className="group p-8 bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-sm border-2 border-purple-500/30 rounded-3xl hover:border-purple-400 hover:from-purple-500/20 hover:to-pink-500/20 transition-all duration-300 text-left"
+            >
+              <div className="flex items-start gap-5">
+                <div className="w-16 h-16 bg-purple-500/30 rounded-2xl flex items-center justify-center group-hover:bg-purple-500/40 transition-colors">
+                  <Shapes className="w-8 h-8 text-purple-400" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xl font-bold text-white">3D Piece Designer</h3>
+                    <span className="text-xs bg-purple-500/30 text-purple-300 px-2 py-1 rounded-full font-semibold">NEW</span>
+                  </div>
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    Créez et modifiez des pièces 3D • Primitives • Import/Export • Bibliothèque
+                  </p>
+                </div>
+              </div>
+            </Link>
+          </div>
+
+          {/* Cloud Projects Section */}
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Database className="w-5 h-5 text-blue-400" />
+                <h3 className="text-lg font-semibold text-white">Cloud Projects</h3>
+                <span className="text-sm text-slate-500">({dbLayouts.length})</span>
+              </div>
+              <button
+                onClick={loadDbLayouts}
+                disabled={dbLoading}
+                className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+              >
+                <RefreshCw className={`w-5 h-5 ${dbLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {dbLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+                <span className="ml-3 text-slate-400">Loading projects...</span>
+              </div>
+            ) : dbLayouts.length === 0 ? (
+              <div className="text-center py-12">
+                <Cloud className="w-16 h-16 mx-auto text-slate-600 mb-3" />
+                <p className="text-slate-500">No projects saved yet</p>
+                <p className="text-sm text-slate-600 mt-1">Create a new project and save it to the cloud</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2">
+                {dbLayouts.map(layout => (
+                  <button
+                    key={layout.id}
+                    onClick={() => {
+                      loadFromDatabase(layout);
+                      setIsProjectSelectorVisible(false);
+                    }}
+                    className="flex items-center gap-4 p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-2xl transition-all text-left group"
+                  >
+                    <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center">
+                      <Database className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-white truncate group-hover:text-blue-300 transition-colors">
+                        {layout.name}
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        {layout.objects?.length || 0} objects • {new Date(layout.updated_at || layout.created_at || '').toLocaleDateString()}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-blue-400 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <Link href="/" className="text-slate-500 hover:text-white transition-colors text-sm">
+              ← Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN 3D DESIGNER VIEW
+  // ═══════════════════════════════════════════════════════════════════════════
   return (
     <div className="fixed inset-0 bg-slate-200 flex flex-col">
       {/* Designer Header - Full width */}
@@ -3204,7 +4365,7 @@ export default function DesignerPage() {
           {/* Left: Logo + Project Name */}
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <div className="w-10 h-10 bg-hearst-green rounded-xl flex items-center justify-center shadow-md">
+              <div className="w-10 h-10 bg-hearst-green rounded-2xl flex items-center justify-center shadow-md">
                 <span className="text-xl font-bold text-slate-900">H</span>
               </div>
             </Link>
@@ -3232,7 +4393,7 @@ export default function DesignerPage() {
               <button
                 onClick={undo}
                 disabled={historyIndex <= 0}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Undo (Ctrl+Z)"
               >
                 <RotateCcw className="w-4 h-4 text-slate-600" />
@@ -3240,7 +4401,7 @@ export default function DesignerPage() {
               <button
                 onClick={redo}
                 disabled={historyIndex >= history.length - 1}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Redo (Ctrl+Shift+Z)"
               >
                 <RotateCw className="w-4 h-4 text-slate-600" />
@@ -3251,7 +4412,7 @@ export default function DesignerPage() {
             <button
               onClick={() => saveToDatabase(false)}
               disabled={dbSaving}
-              className="flex items-center gap-2 px-4 py-2 bg-hearst-green hover:bg-hearst-green/80 text-slate-900 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-hearst-green hover:bg-hearst-green/80 text-slate-900 rounded-full text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm"
               title="Save to Supabase (Ctrl+S)"
             >
               {dbSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -3260,7 +4421,7 @@ export default function DesignerPage() {
             
             {/* Save Message Toast */}
             {saveMessage && (
-              <div className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+              <div className={`px-3 py-1.5 rounded-full text-sm font-medium ${
                 saveMessage.startsWith('✓') 
                   ? 'bg-green-100 text-green-700 border border-green-200' 
                   : 'bg-red-100 text-red-700 border border-red-200'
@@ -3269,20 +4430,30 @@ export default function DesignerPage() {
               </div>
             )}
 
-            {/* Projects Button - Open list of saved projects (Ctrl+O) */}
+            {/* Projects Button - Return to project selector (Ctrl+O) */}
             <button
-              onClick={() => setShowProjects(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+              onClick={() => setIsProjectSelectorVisible(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-sm font-medium transition-colors"
               title="Open Projects (Ctrl+O)"
             >
               <FolderOpen className="w-4 h-4" />
               Projects
             </button>
 
+            {/* 3D Piece Designer Button - More Visible */}
+            <Link
+              href="/designer/piece-editor"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-full text-sm font-semibold transition-all shadow-md hover:shadow-lg"
+              title="3D Object Designer"
+            >
+              <Shapes className="w-4 h-4" />
+              Design Objects
+            </Link>
+
             {/* AI Status Indicator */}
             <button
               onClick={() => setShowAIPanel(true)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium transition-colors ${
                 aiStatus?.available 
                   ? 'bg-purple-50 hover:bg-purple-100 text-purple-700' 
                   : 'bg-red-50 hover:bg-red-100 text-red-700'
@@ -3362,9 +4533,6 @@ export default function DesignerPage() {
                 
                 if (selectedInBox.length > 0) {
                   setSelectedIds(selectedInBox);
-                  console.log('Selected:', selectedInBox.length, 'objects');
-                } else {
-                  console.log('No objects in selection box');
                 }
               }
             }
@@ -3393,7 +4561,19 @@ export default function DesignerPage() {
         )}
         
         {/* 3D Canvas */}
-        <Canvas shadows className="absolute inset-0">
+        <Canvas 
+          shadows={!lowQuality}
+          className="absolute inset-0"
+          dpr={lowQuality ? 0.5 : 1}
+          gl={{ 
+            antialias: !lowQuality,
+            powerPreference: lowQuality ? 'low-power' : 'high-performance',
+            preserveDrawingBuffer: false, // Évite fuite mémoire
+            alpha: false, // Meilleure performance
+          }}
+          frameloop="demand" // ⚡ CRITIQUE : Render on-demand uniquement
+          performance={{ min: 0.5 }} // Throttle automatique si FPS < 30
+        >
           <Scene
             objects={objects}
             selectedIds={selectedIds}
@@ -3431,7 +4611,6 @@ export default function DesignerPage() {
               setSelectedIntelligentSnapPoint(snapPoint);
               // TRACER LE CÂBLE vers ce point
               if (showCableRouting) {
-                console.log('🎯 Snap point cliqué:', snapPoint.label, snapPoint.position);
                 handleCableFloorClick(snapPoint.position);
               }
             }}
@@ -3453,7 +4632,7 @@ export default function DesignerPage() {
               setViewDirection('top');
             }
           }}
-          className={`absolute top-4 left-4 z-30 flex items-center gap-2 px-4 py-2 rounded-xl font-medium shadow-lg transition-all ${
+          className={`absolute top-4 left-4 z-30 flex items-center gap-2 px-4 py-2 rounded-full font-medium shadow-lg transition-all ${
             boxSelectMode 
               ? 'bg-blue-500 text-white ring-2 ring-blue-300' 
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -3466,7 +4645,7 @@ export default function DesignerPage() {
         
         {/* Box Select Instructions */}
         {boxSelectMode && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-lg flex items-center gap-2">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg flex items-center gap-2">
             <Lock className="w-4 h-4" />
             Caméra verrouillée - Dessinez un rectangle pour sélectionner
           </div>
@@ -3500,10 +4679,22 @@ export default function DesignerPage() {
               camera.position.multiplyScalar(1.2);
             }
           }}
+          lowQuality={lowQuality}
+          onToggleLowQuality={() => setLowQuality(!lowQuality)}
+          onExportStep={handleExportStep}
           objectCount={objects.length}
           onCableRouting={() => setShowCableRouting(!showCableRouting)}
           cableRoutingActive={showCableRouting}
         />
+
+        {/* Floating Design Objects Button */}
+        <Link
+          href="/designer/piece-editor"
+          className="absolute top-4 right-4 z-30 flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-2xl text-sm font-bold shadow-xl hover:shadow-2xl transition-all hover:scale-105"
+        >
+          <Shapes className="w-5 h-5" />
+          <span>Design Objects</span>
+        </Link>
 
       {/* Properties Panel */}
         {selectedObject && (
@@ -3524,18 +4715,7 @@ export default function DesignerPage() {
             snapPoints={cableSnapPoints}
             selectedObjectIds={selectedIds}
             onClose={() => setShowCableRouting(false)}
-            activeRouteId={cableActiveRouteId}
-            onActiveRouteChange={setCableActiveRouteId}
-            // Nouvelles props pour snap points intelligents
-            intelligentSnapPoints={intelligentSnapPoints}
-            cableZones={cableZones}
-            onSnapPointSelect={setSelectedIntelligentSnapPoint}
-            selectedSnapPoint={selectedIntelligentSnapPoint}
-            onFilterTypesChange={setFilterConnectionTypes}
-            onHeightChange={setCurrentCableHeight}
-            currentHeight={currentCableHeight}
-            showForbiddenZones={showForbiddenZones}
-            onShowForbiddenZonesChange={setShowForbiddenZones}
+            objects={objects}
           />
         )}
 
@@ -3550,21 +4730,21 @@ export default function DesignerPage() {
               {/* D-Pad - 10cm increments */}
               <div className="grid grid-cols-3 gap-0.5">
                 <div />
-                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, z: obj.position.z - 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors" title="↑ (10cm)">
+                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, z: obj.position.z - 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors" title="↑ (10cm)">
                   <ChevronUp className="w-4 h-4 text-slate-600" />
                 </button>
                 <div />
-                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, x: obj.position.x - 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors" title="← (10cm)">
+                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, x: obj.position.x - 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors" title="← (10cm)">
                   <ChevronLeft className="w-4 h-4 text-slate-600" />
                 </button>
-                <div className="w-9 h-9 bg-slate-50 rounded-lg flex items-center justify-center">
+                <div className="w-9 h-9 bg-slate-50 rounded-full flex items-center justify-center">
                   <Move className="w-4 h-4 text-slate-300" />
                 </div>
-                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, x: obj.position.x + 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors" title="→ (10cm)">
+                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, x: obj.position.x + 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors" title="→ (10cm)">
                   <ChevronRight className="w-4 h-4 text-slate-600" />
                 </button>
                 <div />
-                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, z: obj.position.z + 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors" title="↓ (10cm)">
+                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, z: obj.position.z + 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors" title="↓ (10cm)">
                   <ChevronDown className="w-4 h-4 text-slate-600" />
                 </button>
                 <div />
@@ -3574,16 +4754,16 @@ export default function DesignerPage() {
               
               {/* Y + Rotation */}
               <div className="grid grid-cols-2 gap-1">
-                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, y: obj.position.y + 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors" title="Up (A)">
+                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, y: obj.position.y + 0.1 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors" title="Up (A)">
                   <ArrowUp className="w-4 h-4 text-slate-600" />
                 </button>
-                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, rotation: { ...obj.rotation, y: obj.rotation.y + Math.PI / 2 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors" title="+90° (S)">
+                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, rotation: { ...obj.rotation, y: obj.rotation.y + Math.PI / 2 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors" title="+90° (S)">
                   <RotateCw className="w-4 h-4 text-slate-600" />
                 </button>
-                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, y: Math.max(0, obj.position.y - 0.1) } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors" title="Down (Q)">
+                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, position: { ...obj.position, y: Math.max(0, obj.position.y - 0.1) } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors" title="Down (Q)">
                   <ArrowDown className="w-4 h-4 text-slate-600" />
                 </button>
-                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, rotation: { ...obj.rotation, y: obj.rotation.y - Math.PI / 2 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors" title="-90° (E)">
+                <button onClick={() => setObjects(prev => prev.map(obj => selectedIds.includes(obj.id) ? { ...obj, rotation: { ...obj.rotation, y: obj.rotation.y - Math.PI / 2 } } : obj))} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors" title="-90° (E)">
                   <RotateCcw className="w-4 h-4 text-slate-600" />
                 </button>
               </div>
@@ -3592,10 +4772,10 @@ export default function DesignerPage() {
               
               {/* Actions */}
               <div className="flex flex-col gap-1">
-                <button onClick={() => { const newObjs = selectedObjects.map(obj => ({ ...obj, id: `${obj.type}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, position: { ...obj.position, x: obj.position.x + 2 } })); setObjects(prev => [...prev, ...newObjs]); setSelectedIds(newObjs.map(o => o.id)); }} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors" title="Dup (Ctrl+D)">
+                <button onClick={() => { const newObjs = selectedObjects.map(obj => ({ ...obj, id: `${obj.type}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, position: { ...obj.position, x: obj.position.x + 2 } })); setObjects(prev => [...prev, ...newObjs]); setSelectedIds(newObjs.map(o => o.id)); }} className="w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors" title="Dup (Ctrl+D)">
                   <Copy className="w-4 h-4 text-slate-600" />
                 </button>
-                <button onClick={() => { setObjects(prev => prev.filter(obj => !selectedIds.includes(obj.id))); setSelectedIds([]); }} className="w-9 h-9 bg-red-50 hover:bg-red-100 rounded-lg flex items-center justify-center transition-colors" title="Del">
+                <button onClick={() => { setObjects(prev => prev.filter(obj => !selectedIds.includes(obj.id))); setSelectedIds([]); }} className="w-9 h-9 bg-red-50 hover:bg-red-100 rounded-full flex items-center justify-center transition-colors" title="Del">
                   <Trash2 className="w-4 h-4 text-red-500" />
                 </button>
               </div>
@@ -3621,7 +4801,7 @@ export default function DesignerPage() {
                 <Cloud className="w-5 h-5 text-blue-500" />
                 Cloud Projects
               </h3>
-              <button onClick={() => setShowProjects(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+              <button onClick={() => setShowProjects(false)} className="p-2 hover:bg-slate-100 rounded-full">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -3642,13 +4822,13 @@ export default function DesignerPage() {
                   {dbLayouts.map((layout) => (
                     <div
                       key={layout.id}
-                      className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                      className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
                         currentLayoutId === layout.id 
                           ? 'border-hearst-green bg-hearst-green/5' 
                           : 'border-slate-200 hover:border-hearst-green/50 hover:bg-slate-50'
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
                         <Database className="w-5 h-5 text-blue-500" />
                       </div>
                       <div className="flex-1">
@@ -3673,7 +4853,7 @@ export default function DesignerPage() {
                         {currentLayoutId === layout.id ? 'Loaded' : 'Open'}
                       </Button>
                       <button 
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-full"
                         onClick={() => deleteFromDatabase(layout.id)}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -3706,7 +4886,7 @@ export default function DesignerPage() {
                 <Cloud className="w-5 h-5 text-blue-500" />
                 Save to Cloud
               </h3>
-              <button onClick={() => setShowSaveModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+              <button onClick={() => setShowSaveModal(false)} className="p-2 hover:bg-slate-100 rounded-full">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -3722,7 +4902,7 @@ export default function DesignerPage() {
                 {objects.length} objects will be saved to Supabase
               </div>
               {currentLayoutId && (
-                <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded-lg">
+                <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded-2xl">
                   This will update the existing project in the cloud
                 </div>
               )}
@@ -3776,7 +4956,7 @@ export default function DesignerPage() {
             </div>
             <button 
               onClick={() => setShowAIPanel(false)} 
-              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-slate-100 rounded-full transition-colors"
             >
               <X className="w-4 h-4 text-slate-400" />
             </button>
@@ -3836,14 +5016,14 @@ export default function DesignerPage() {
                 onChange={(e) => setAiUserPrompt(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !aiLoading && aiUserPrompt.trim() && handleAIGenerate()}
                 placeholder="Demande quelque chose..."
-                className="flex-1 px-4 py-2.5 bg-slate-100 border-0 rounded-xl focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
+                className="flex-1 px-4 py-2.5 bg-slate-100 border-0 rounded-full focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-sm"
                 disabled={aiLoading}
                 autoFocus
               />
               <button
                 onClick={() => handleAIGenerate()}
                 disabled={aiLoading || !aiUserPrompt.trim()}
-                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-xl transition-colors"
+                className="px-4 py-2.5 bg-[#0a0a0f] hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-full transition-colors"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -3867,7 +5047,7 @@ export default function DesignerPage() {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-cyan-50">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
                   <Database className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -3879,12 +5059,12 @@ export default function DesignerPage() {
                 <button 
                   onClick={loadDbLayouts}
                   disabled={dbLoading}
-                  className="p-2 hover:bg-slate-100 rounded-lg"
+                  className="p-2 hover:bg-slate-100 rounded-full"
                   title="Refresh"
                 >
                   <RefreshCw className={`w-5 h-5 ${dbLoading ? 'animate-spin' : ''}`} />
                 </button>
-                <button onClick={() => setShowDbPanel(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <button onClick={() => setShowDbPanel(false)} className="p-2 hover:bg-slate-100 rounded-full">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -3893,7 +5073,7 @@ export default function DesignerPage() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4">
               {/* Current Project Save */}
-              <div className="mb-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+              <div className="mb-4 p-4 bg-blue-50 rounded-2xl border border-blue-200">
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <h4 className="font-medium text-slate-900">{projectName}</h4>
@@ -3945,13 +5125,13 @@ export default function DesignerPage() {
                   {dbLayouts.map((layout) => (
                     <div
                       key={layout.id}
-                      className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                      className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
                         currentLayoutId === layout.id 
                           ? 'border-blue-400 bg-blue-50' 
                           : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
                         <Cloud className="w-5 h-5 text-slate-400" />
                       </div>
                       <div className="flex-1">
@@ -3977,7 +5157,7 @@ export default function DesignerPage() {
                           {currentLayoutId === layout.id ? 'Loaded' : 'Open'}
                         </Button>
                         <button 
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-full"
                           onClick={() => deleteFromDatabase(layout.id)}
                           title="Delete"
                         >
@@ -4033,7 +5213,7 @@ export default function DesignerPage() {
                 className="w-full mb-6 p-6 border-2 border-dashed border-hearst-green/50 rounded-2xl hover:border-hearst-green hover:bg-hearst-green/5 transition-all group"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-hearst-green/10 rounded-xl flex items-center justify-center group-hover:bg-hearst-green/20 transition-colors">
+                  <div className="w-12 h-12 bg-hearst-green/10 rounded-2xl flex items-center justify-center group-hover:bg-hearst-green/20 transition-colors">
                     <Zap className="w-6 h-6 text-hearst-green" />
                   </div>
                   <div className="text-left">
@@ -4068,9 +5248,9 @@ export default function DesignerPage() {
                           loadFromDatabase(layout);
                           setShowProjectSelector(false);
                         }}
-                        className="w-full flex items-center gap-4 p-4 bg-slate-50 hover:bg-hearst-green/10 border border-slate-200 hover:border-hearst-green/30 rounded-xl transition-all text-left"
+                        className="w-full flex items-center gap-4 p-4 bg-slate-50 hover:bg-hearst-green/10 border border-slate-200 hover:border-hearst-green/30 rounded-2xl transition-all text-left"
                       >
-                        <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
                           <Database className="w-5 h-5 text-slate-400" />
                         </div>
                         <div className="flex-1 min-w-0">

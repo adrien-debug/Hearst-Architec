@@ -71,7 +71,7 @@ export default function HomePage() {
       </section>
 
       {/* Network Stats */}
-      <section className="py-8 bg-slate-900">
+      <section className="py-8 bg-[#0a0a0f]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <NetworkStats />
         </div>
@@ -94,7 +94,7 @@ export default function HomePage() {
                 href={feature.href}
                 className="group p-6 bg-white border border-slate-200 rounded-2xl hover:border-hearst-green/50 hover:shadow-xl transition-all duration-300"
               >
-                <div className={`w-12 h-12 ${feature.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                <div className={`w-12 h-12 ${feature.color} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
                   <feature.icon className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">
@@ -130,7 +130,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-slate-900">
+      <section className="py-20 bg-[#0a0a0f]">
         <div className="max-w-4xl mx-auto text-center px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
             Ready to Design Your Mining Farm?
